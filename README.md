@@ -1,4 +1,4 @@
-# RollTheDice — CS2 骰子插件（moyo 增强版）
+# RollTheDice — CS2 骰子插件（Kacyra 增强版）
 
 [![License](https://img.shields.io/badge/License-GPLv3-blue)](LICENSE)
 
@@ -576,7 +576,7 @@ A: 检查：
 本项目基于 [Kandru/cs2-roll-the-dice](https://github.com/Kandru/cs2-roll-the-dice) 修改，遵循 **GNU General Public License v3.0 (GPLv3)**。
 
 - 原项目版权 © [Kandru](https://github.com/Kandru) & [derkalle4](https://github.com/derkalle4)
-- 修改部分版权 © moyo
+- 修改部分版权 © Kacyra
 
 完整许可证文本见 [LICENSE](LICENSE)。
 

@@ -1,0 +1,219 @@
+================================================================================
+  RollTheDice 全骰子测试命令 (已删黑潮/连跳大师，当前约 140 骰子)
+  用法: !givedice * ClassName
+================================================================================
+!givedice * BeyondHeaven             超越天堂      [combodice] 按E暂停时间9s，只能一次！合成自World/十六夜+天堂
+!givedice * Cthulhu                  克苏恩        1HP不能移动，每秒全体敌人-1%移速-1HP，100s后全体敌方死亡！
+
+!givedice * Adrenaline               肾上腺素       HP低于40%时爆发，获得40%~100%速度加成！
+!givedice * Afterimage               残影         每几秒留下空间残影，按E键时空回溯！
+!givedice * Amber                    琥珀         被击中时40%~70%概率冻结攻击者2s！
+!givedice * Awakener                 觉醒者        初始弱化！每击杀1人变强，2人后MAX：伤害×2+速度×1.5！
+!givedice * Bank                     银行         每存活15秒，随机2名队友获得-1000~1000随机金额！
+!givedice * Berserker                狂战士        血量越低伤害越高，最高+300%伤害加成！
+!givedice * BlackHole                小型黑洞       你变成了完全的黑！但能吸附周围掉落武器和投掷物！
+!givedice * WhiteHole                白洞          死亡时在尸体位置生成白洞！推离敌人+吸引队友+弹射物品！持续10秒！
+!givedice * BoneMaggot               附骨之疽       你击中的敌人被绿色发光标记5秒，隔墙可见！
+!givedice * Bounty                   赏金猎人       击杀敌人获随机赏金！每回合指定一个赏金目标，击杀获得额外随机骰子！
+!givedice * Bugle                    冲锋号        开局60s内你和全队获得+100%速度+20%伤害加成！
+!givedice * C4Expert                 C4专家       CT秒拆C4！T安包后C4 3秒爆炸！
+!givedice * Capitalist               资本家        每死亡一名玩家，你获得500！
+!givedice * ChaosStorm               混沌风暴       每45秒所有存活玩家位置随机交换！
+!givedice * Corona                   日冕         45s后被火烧死→复活为太阳神(200HP+200甲)，攻击附带5HP/s火焰灼烧！
+!givedice * Countdown                倒计时        倒计时一到回溯至出生点！满血满甲还原武器！
+!givedice * Cupid                    丘比特        你死亡时将随机带走一名玩家！
+!givedice * Cutter                   刺客信条       持刀一击必杀！获得+30%速度加成！
+!givedice * DamageMultiplier         毁灭之力       你获得40%-120%的伤害加成！(1.4x~2.2x)
+!givedice * DeadHand                 死手         全玩家效果！每次开枪自伤15HP，命中敌人回复15HP！
+!givedice * Deaf                     失聪         你聋了！按E透视随机一名活着的敌人4s，冷却25s！
+!givedice * DeagleKing               沙漠之鹰       你的沙鹰伤害×3！
+!givedice * DeathKnight              死亡骑士       每失去1HP获得1%减伤(上限99%)！持刀时每秒回复1HP！
+!givedice * DeathKnightComplete       死亡骑士完全体 [combodice] 333HP/333全甲，减伤99%，持刀回血！
+!givedice * DragonSoul                巨龙之魂      250HP，队友拥有时进化为冰/火巨龙！
+!givedice * DecoyDummy               假人诱饵       开局获得一颗真诱饵弹！每20秒自动补给一颗！
+!givedice * Disarm                   缴械         你的攻击能打掉敌人的武器！(不掉刀和C4)
+!givedice * DivinePunishment         天罚         每击杀2人随机处决一名敌人！
+!givedice * DivineResurrection       神迹         击杀时有几率复活一名阵亡的队友！
+!givedice * Dragonborn               龙裔         击杀2人后按E化身为龙！传送出生点+300HP+300护甲！
+!givedice * Drone                    无人机        无人机环绕飞行，每1.2s对800范围内最近敌人造成20~35伤害！
+!givedice * DuskDawn                 暮光         命悬一线(刚好1HP)→破晓！每秒回复100HP+10护甲，上限150HP！
+!givedice * Eclipse                  月蚀         15秒新月(速度×1.2+半透明+伤害×0.8)→15秒满月(速度×0.8+伤害×1.5)循环
+!givedice * Emperor                  皇帝         队友首次死亡后会复活！
+!givedice * Empress                  女皇         本回合金钱收入+100%！每获得2000元复活一名队友！
+!givedice * Evasion                  闪避         你有 % 几率闪避攻击！
+!givedice * Evolution                进化         每存活25秒随机进化！伤害+20%/移速+20%/HP上限+30，最多5次，死亡重置！
+!givedice * Fibonacci                斐波那契       受到伤害为1,2,3,5,8,13,21,34,55时免疫并回复89HP！
+!givedice * FireLord                 炎魔         免疫火焰！所有投掷物变为燃烧瓶！
+!givedice * Fireball                 火球术        燃烧弹爆炸范围增大，附带80~200范围火焰伤害！
+!givedice * FogOfWar                 迷雾行者       战争迷雾笼罩全场！所有玩家视野受限
+!givedice * Fool                     愚者         ???
+!givedice * FourHorsemen             四骑士        全图随机分配：战争(±50%伤害)/瘟疫(传染+扣血)/饥荒(弹夹清零)/死亡(击杀者一同死亡)
+!givedice * Forsaken                 Forsaken   你的子弹必爆头！
+!givedice * FourtyTwo                42         每42s获得4s无敌+2s隐身！
+!givedice * FrontlineBeast           前线巨兽       击杀敌人时回出生点+满血+速度×2！移速不可叠加！
+!givedice * Gaia                     大地母亲       每秒获得1HP，可突破上限，最高500HP！
+!givedice * Gargoyle                 石像         按E进入石像形态！3秒免疫子弹伤害，无法移动和攻击！冷却15秒
+!givedice * Giant                    巨人         体型极大化！MaxHP×4
+!givedice * Glutton                  暴食者        每杀一人，下回合多一个骰子！(最多+2)
+!givedice * God                      上帝         你获得了神之力！666HP+666甲+2倍移速+1.5倍伤害！
+!givedice * Goddess                  女神         随机2名队友额外获得一个骰子！
+!givedice * GravityWell              黑洞         你死亡时尸体变为引力井！吸附全图所有掉落武器和投掷物，持续10秒！
+!givedice * GrenadeKing              手雷王        你的手雷伤害提升了！
+!givedice * GuardianAngel            守护天使       守护天使注视着你！下一次致命伤害将被抵挡！
+!givedice * GunGod                   枪神         免疫投掷物和刀伤！所有伤害减免66%！
+!givedice * GunHealer                绝命枪师       每次开枪回复5HP！
+!givedice * HangedMan                倒吊者        每秒钟流失1HP！击杀敌人则诅咒反转，每秒回复4HP！
+!givedice * Heaven                   天堂         按E键打开天堂之门！时间从0.5x加速到3x，每2s+0.1倍！
+!givedice * Hermit                   隐者         脚步无声，几乎完全隐身！ShadowWarrior联动→极限隐身！
+!givedice * HighGravity              千钧         重力超高！但获得60%减伤！
+!givedice * HotPotato                烫手山芋       C4变成了烫手山芋！靠近C4的玩家每秒受到4伤害！
+!givedice * IceBeam                  寒冰射线       你的攻击有 % 几率冻结敌人！
+!givedice * ImposterSyndrome         第六感        被敌人雷达发现时收到通知！扔诱饵弹让周围敌人高亮1秒！
+!givedice * IncreaseSpeed            疾风步        你的速度提升了 {percentageIncrease}%！
+!givedice * InfiniteAmmo             无限火力       无限弹药，无需换弹！
+!givedice * InfiniteProliferation    无限增殖       你复活4次！每次HP减半，护甲全满
+!givedice * InfoHole                 信息黑洞       敌方雷达被屏蔽（不影响队友）！
+!givedice * Izayoi                   十六夜        时间之力正在躁动！
+!givedice * Jammer                   干扰器       全场HUD屏蔽！你保留准心！+15%速度加成！
+!givedice * Jester                   小丑         移动时每秒失去2HP！+30%速度！首次击杀后移动改为回血！
+!givedice * JumpHeal                 跳跳糖        跳跃时回复5-8HP！
+!givedice * Karma                    因果报应       移速×1.5+每秒回复1HP！每杀一名敌人，随机敌人也获得此buff！
+!givedice * Knight                   骑士         队友每10秒从你身上吸取50HP！你拥有300HP！
+!givedice * LaserCage                激光牢笼       你被旋转激光牢笼环绕！靠近的敌人受到持续伤害
+!givedice * LoanShark                高利贷        获得50000贷款！本回合未击杀则下回合破产！
+!givedice * LongerFlashes            闪光大师       闪光弹持续时间变长！被闪敌人减速50%！
+!givedice * Lottery                  彩票         全体员工！所有人随机获得0~5000元钱！
+!givedice * Lucky                    幸运星        每N秒随机获得幸运金币+随机Buff（加速/增伤/回血/护甲）！
+!givedice * Martyrdom                殉道者        死亡时原地爆炸，对800范围内的敌人造成最多200伤害！
+!givedice * Mimic                    模仿大师       击杀敌人后获得其骰子！
+!givedice * Miser                    吝啬鬼        本回合每花费2000，受到的伤害降低10%！上限50%
+!givedice * Molt                     蜕皮         死亡时复活，体型缩小为0.4倍！
+!givedice * Mosquito                 蚊子         体型极小化！(20%大小, 22HP)
+!givedice * Necromancer              死灵法师       队友死亡时消耗50HP在死亡位置将其复活！复活后1秒无敌！（不能开枪）
+!givedice * Nightglow                夜光         地图亮度极低！但所有玩家发光可见！
+!givedice * Nirvana                  彼岸         受击时30%~50%概率触发彼岸！回到出生点+满血满甲！
+!givedice * NoExplosives             哑火         随机2名敌人不能使用爆炸物！
+!givedice * NoRecoil                 铁腕         你没有了后坐力！伤害+10%！
+!givedice * NukeLeak                 核弹泄露       核弹即将在60秒后引爆，全员死亡！
+!givedice * Overheat                 红温         每5秒+5%速度+3%伤害，上限14层！击杀降低10%层数！
+!givedice * Paladin                  圣骑士        200额外护甲！护甲每掉一次强化自己：速度+10%+血量+10,速度最高+50%
+!givedice * Parasite                 寄生         攻击过的目标死亡时，获得50HP+10%伤害加成+10%速度加成，伤害上限+50%！
+!givedice * Payback                  以牙还牙       杀你的人会遭到报应：-50HP+金钱清零！
+!givedice * Phoenix                  菲尼克斯      受致命伤害时触发涅槃：10s无敌+漂浮+发光，结束后爆炸并回复444HP/444甲+AK！
+!givedice * Pickpocket               扒窃         攻击可偷取敌人金钱！
+!givedice * PistolMaster             手枪大师       你的手枪+100%伤害！(左轮除外)
+!givedice * Plague                   瘟疫         你感染了瘟疫！每秒-1HP，攻击可传染给敌人！
+!givedice * PlayAsChicken            鸡神         你现在是一只大鸡！HP只有150！
+!givedice * PoisonBlade              淬毒之刃       你的攻击可附带中毒效果（持续伤害）！
+!givedice * Pope                     教皇         所有队友+100%生命值！
+!givedice * Prayer                   祈愿         每20s祈祷一次(50%成功率)，成功3次杀死所有敌方！
+!givedice * Priest                   牧师         攻击队友治疗他们！
+!givedice * Prophet                  先知          直接看到对面所有dice！
+!givedice * RadarJammer              雷达干扰       击杀敌人时黑掉所有敌人雷达20秒！冷却25秒！
+!givedice * RadarStation             雷达站        所有敌人都在发光！但移速降至×0.6！
+!givedice * Ragnarok                 终焉         开局30s全员无敌，本回合只有60s！
+!givedice * Redemption               赎罪         获得40%伤害加成！死亡时本回合被你击杀的敌人全部复活！
+!givedice * Regeneration             生命之泉       每秒回复HP！
+!givedice * Reincarnation            轮回         每死亡一次，下回合获得随机骰子(上限2次)！
+!givedice * RepulsionField           斥力场        周围8m内的投掷物自动弹回！
+!givedice * ResetOnReload            快手         你获得了换弹即重置！
+!givedice * Respawn                  涅槃         死亡后你将复活！
+!givedice * ReverseCausality         因果倒置       所有攻击伤害延迟5s生效，延迟期间你的伤害翻倍！
+!givedice * ReturnToSender           遣返         射击敌人有30%~70%几率将对方送回出生点！
+!givedice * Rewind                   回溯求源       按E触发时间回溯！全员回到出生点满血满甲，死者复活，回合时间重置！仅一次
+!givedice * RouletteGambler          轮盘赌徒       每次开枪有2%概率死亡！非死亡射击+1%速度+1%伤害(最高50%)！
+!givedice * RoyalBarrier             皇家壁垒       你获得了血甲！但移速极慢且无法跳跃！
+!givedice * Sacrifice                献祭         队友死亡4人时触发献祭！复活随机队友(300HP+300甲+AK47+速度×2)，自己献祭！
+!givedice * SacrificeSelf            牺牲         按E键牺牲自己！全队存活队友获得+20%伤害加成+50%速度加成！
+!givedice * Satellite                卫星         极低重力(0.15倍)！空中精准射击无扩散！
+!givedice * ShadowWarrior            影子武士       按E键召唤一个半透明分身跑在前面！持续6秒，冷却12秒
+!givedice * Shield                   坚盾         你获得了 点额外护甲！伤害减免50%！
+!givedice * Singularity              奇点         按E释放奇点！15s内全图玩家被不可抗拒地拉向落点，冷却60s！
+!givedice * Skyline                  天际         按E键飞行3秒！在空中自由翱翔！冷却30秒
+!givedice * SlyFox                   狡猾狐狸       投掷物爆炸时间完全随机(0-20s)！
+!givedice * SmokeBomb                迷雾逃生       血量低于25%时自动丢出烟雾弹并隐身10秒！每命一次！
+!givedice * SmokeVision              烟雾克星       你能看穿烟雾！
+!givedice * SniperElite              狙击精英       你的狙击枪伤害×3！AWP/轻狙/连狙一发裂颅！
+!givedice * SoulEater                噬魂者        击杀敌人时吸取灵魂，回复30~50HP+获得2随机投掷物！
+!givedice * SpeedOnKill              猎杀快感       击杀敌人获得随机速度爆发+1投掷物！
+!givedice * SwordSaint               剑仙         持刀时免疫子弹伤害！
+!givedice * Synced                   心有灵犀       全员换弹同步！一人换弹，全员换弹！
+!givedice * Tactician                军师         每15秒暴露所有敌人位置1秒！
+!givedice * Taotie                   饕餮         每次攻击一名玩家，吃掉其骰子，获得100HP！
+!givedice * Thorns                   魔镜         受到伤害时100%反弹给攻击者！
+!givedice * ThunderChain             雷劫         击杀敌人引发雷霆连锁！弹射2~4次，每次递减伤害
+!givedice * Titanfall                泰坦陨落       锁定60s，期间HP和护甲逐渐涨至500，觉醒后解锁移动+50%伤害加成！
+!givedice * ToxicSmoke               致命毒雾       你的烟雾弹有毒！
+!givedice * Traitor                  叛徒         击杀队友时随机杀死一名敌人！
+!givedice * Trickster                诡术师        你获得了一个假骰子！首次击杀后揭露真相并获得新骰子！
+!givedice * Twilight                 黄昏之时       全部玩家出生点随机互换！
+!givedice * Universe                 宇宙         你死亡时自动时间回溯！全员状态回滚到回合初！上限次
+!givedice * Vampire                  吸血鬼        造成的伤害回复自身HP！
+!givedice * Void                     虚无         按E遁入虚无！5s无敌+noclip飞行+隐身，不可攻击，冷却45s！
+!givedice * WASDChaos                方向错乱       全员方向错乱！WASD按键效果随机旋转！
+!givedice * WeaponRoulette           武器轮盘       每开一枪随机换一把武器！伤害×1.3！
+!givedice * WheelOfFate              命运之轮       每次死亡有66%概率复活！(可连续触发)
+!givedice * Wolf                     狼          5s后，队友每有一只狼+30HP+30护甲+10%伤害+10%速度！
+!givedice * WolfKing                 狼王          自身300HP+40%伤害+40%速度！每个队友必定获得狼骰子！！
+!givedice * World                    世界         你额外获得{extraCount}个骰子效果！
+!givedice * FireDragon               火巨龙        [combodice] 333HP+222全甲，攻击附灼烧！
+!givedice * Frostmourne              霜之哀伤      拿刀时60%减伤+每秒回复2HP！
+!givedice * IceDragon                冰巨龙        [combodice] 222HP+333全甲，攻击附冰冻！
+
+================================================================================
+  Combo 系统速查
+================================================================================
+
+【Combo 设计原则】Combo 效果必须 > 两个骰子单独叠加效果！
+【获取方式】combodice 标记 [combodice] 无法通过 !rtd 随机抽取，只能 combo 合成获得
+
+标记说明：未标注 [combodice] 的骰子仍可正常抽取，combo 仅增强效果不替换骰子
+
+# 骰子A        骰子B         组合名          效果简述
+Giant          RoyalBarrier    钢铁要塞        MaxHP×4 + 超高HP/甲
+Vampire        SoulEater       噬魂血族        HP上限333 吸血翻倍+回复护甲
+Fireball       FireLord        焚天灭地        燃烧弹范围翻倍+伤害翻倍
+Berserker      Adrenaline      狂暴血脉        伤害上限+50%+速度额外+50%
+Berserker      DamageMultiplier 狂暴之力       毁灭之力倍率×1.5
+Regeneration   JumpHeal        生命律动        跳跳糖回血翻倍(6~10→12~20HP)
+Priest         Pope            神圣共鸣        治疗量翻倍
+Cutter         SwordSaint      剑刃风暴        持刀一击必杀+免疫子弹
+Evasion        Shield          钢铁壁垒        闪避成功回满护甲
+Emperor        Empress         王权永恒        皇帝复活 女皇金钱翻倍
+Dragonborn     Respawn         浴火重生        复活时满血满甲
+Necromancer    InfiniteProliferation 不死军团   复活消耗HP减半
+SniperElite    DeagleKing      精准猎杀        沙鹰×3 狙击×3
+Bank           Miser           资本要塞        花费豁免50%+利息翻倍
+Countdown      Rewind          时空主宰        倒计时触发全体回溯
+Thorns         GuardianAngel   圣光荆棘        反弹伤害翻倍+守护天使治疗翻倍
+Nirvana        GuardianAngel   菲尼克斯        合成 Phoenix [combodice]
+IceBeam        PoisonBlade     霜毒双刃        冻结+中毒同时触发
+Bounty         Capitalist      赏金猎人        击杀额外赏金翻倍+全场死亡赏金
+Evolution      Awakener        超进化          进化速度翻倍 觉醒者起始强化
+Hermit         ShadowWarrior   暗影行者        隐身透明度更高
+GrenadeKing    Martyrdom       爆炸艺术家      殉道爆炸范围×2+手雷伤害上限提升
+Gargoyle       Titanfall       泰坦神像        石像时间延长+泰坦觉醒加速
+LaserCage      ThunderChain    雷光炼狱        激光伤害翻倍+雷链弹射次数+1
+Drone          RepulsionField  无人防线        无人机伤害翻倍+斥力场范围翻倍
+FrontlineBeast SpeedOnKill     猎杀本能        击杀后爆炸性增益
+Karma          Plague          因果循环        karma范围扩大+瘟疫传染加速
+Mosquito       PlayAsChicken   迷你鸡神        体型极小+鸡神属性翻倍
+World          Heaven          超越天堂        世界额外骰子+天堂加速
+Izayoi         Heaven          超越天堂        十六夜高频触发+天堂加速
+DeathKnight    Frostmourne     死亡骑士完全体  合成 DeathKnightComplete [combodice]
+PistolMaster   Disarm          缴械大师        缴械成功率翻倍
+SmokeBomb      SmokeVision     烟雾掌控        烟雾弹自动触发+看得清楚
+BlackHole      GravityWell     引力深渊        黑洞+引力井双倍吸附
+BlackHole      WhiteHole       坍缩            死时坍缩10s→吸所有人+每秒-10HP→爆开
+Overheat       Adrenaline      狂热            速度/伤害获取翻倍 上限翻倍(28层)
+Bugle          World           天启            冲锋号+世界！全队速度更长+2队友多拿1骰子
+Cthulhu        DuskDawn        深渊觉醒        克苏恩+暮光！直接破晓+敌方扣血翻倍+每秒回血
+God            Goddess         神之共鸣        上帝伤害×3(原1.5)+女神多祝福一人(3→3人)
+Parasite       Plague          生化危机        寄生效果翻倍+瘟疫传染翻倍
+Drone          Satellite       天网            无人机伤害+50%+卫星浮空(重力极低)
+IceBeam        Amber           极寒地狱        冻结时间×2+琥珀概率×2
+Ragnarok       NukeLeak        末日审判        诸神黄昏+核泄漏！全图终结倒计时加速
+DeadHand       DeagleKing      致命一击        开枪自伤减半+命中回血翻倍
+DragonSoul     Dragonborn      巨龙共鸣        龙裔化龙时额外获得龙魂之力
+
+当前 Combo 总数: 42 对
