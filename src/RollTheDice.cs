@@ -791,13 +791,17 @@ namespace RollTheDice
         private void DestroyModules()
         {
             // deregister listeners
-            DeregisterListeners();
-            DeregisterEventHandlers();
-            DeregisterUserMessageHooks();
-            // destroy all cosmetics modules
+            try { DeregisterListeners(); } catch { }
+            try { DeregisterEventHandlers(); } catch { }
+            try { DeregisterUserMessageHooks(); } catch { }
+            // destroy all modules - wrap each in try-catch so one bad dice doesn't block cleanup
             foreach (DiceBlueprint module in _dices)
             {
-                module.Destroy();
+                try { module.Destroy(); }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[RollTheDice] DestroyModules: error destroying {module.ClassName}: {ex.Message}");
+                }
             }
             _dices.Clear();
         }
@@ -806,10 +810,8 @@ namespace RollTheDice
         {
             foreach (DiceBlueprint module in _dices)
             {
-                //DebugPrint($"Initializing listener for module {module.GetType().Name}");
                 foreach (string listenerName in module.Listeners)
                 {
-                    //DebugPrint($"- {listenerName}");
                     DynamicHandlers.RegisterModuleListener(this, listenerName, module);
                 }
             }
@@ -1055,10 +1057,43 @@ namespace RollTheDice
             }
         }
 
+        private static int _heartbeatCount;
+        public static int DiceTickCounter;
+        public void OnHeartbeat()
+        {
+            _heartbeatCount++;
+            if (_heartbeatCount % 128 == 1)
+            {
+                try
+                {
+                    // Count dice with active OnTick listeners and players
+                    int onTickDice = 0, activePlayers = 0;
+                    foreach (var d in _dices)
+                    {
+                        if (d.Listeners.Contains("OnTick")) onTickDice++;
+                        if (d._players.Count > 0) activePlayers++;
+                    }
+                    var sb = new System.Text.StringBuilder();
+                    sb.Append($"{DateTime.Now:HH:mm:ss} <3 #{_heartbeatCount} alive=[");
+                    foreach (var p in Utilities.GetPlayers().Where(p => p.IsValid && !p.IsHLTV))
+                        sb.Append($"{p.PlayerName}({p.TeamNum}) ");
+                    sb.Append($"] dices={_dices.Count} onTickDice={onTickDice} activeDice={activePlayers}");
+                    sb.Append($" | tickTest={_tickTest}");
+                    File.AppendAllText(Path.Combine(Server.GameDirectory, "csgo/addons/counterstrikesharp/logs/rtd_debug.txt"), sb + "\n");
+                }
+                catch { }
+            }
+            _tickTest++; // increment every tick to prove OnTick works
+        }
+        private static int _tickTest;
+
         private void OnPlayerButtonsChanged(CCSPlayerController player, PlayerButtons pressed, PlayerButtons released)
         {
             if (!pressed.HasFlag(PlayerButtons.Use)) return;
             if (player == null || !player.IsValid || player.IsHLTV || player.IsBot) return;
+
+            File.AppendAllText(Path.Combine(Server.GameDirectory, "csgo/addons/counterstrikesharp/logs/rtd_debug.txt"),
+                $"{DateTime.Now:HH:mm:ss} [E] {player.PlayerName} pressed E\n");
 
             var cdMessages = new List<string>();
             foreach (var dice in _dices)
