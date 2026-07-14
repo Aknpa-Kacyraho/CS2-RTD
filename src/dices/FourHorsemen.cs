@@ -234,8 +234,17 @@ namespace RollTheDice.Dices
                 {
                     _plagueInfected.Remove(p.SteamID);
                     _assignments.Remove(p.SteamID);
-                    if (!p.IsBot)
+                    if (!p.IsBot && !p.IsHLTV)
                         pawn.CommitSuicide(false, true);
+                    else
+                    {
+                        try { pawn.CommitSuicide(false, true); }
+                        catch
+                        {
+                            pawn.Health = 0;
+                            Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth");
+                        }
+                    }
                 }
             }
 
