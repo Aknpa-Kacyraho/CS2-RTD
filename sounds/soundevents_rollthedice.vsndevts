@@ -1,0 +1,223 @@
+<!-- kv3 encoding:text:version{e21c7f3c-8a33-41c5-9977-a76d3a32aa0d} format:generic:version{7412167c-06e9-4698-aff2-e63eb59037e7} -->
+{
+	RollTheDice.Base =
+	{
+		type = "csgo_mega"
+		volume = 1.000000
+		pitch = 1.000000
+		mixgroup = "VO"
+		use_fadetime_volume_mapping_curve = false
+		block_matching_events = false
+    	block_match_entity = false
+		block_duration = 0.000000
+    	block_distance = 0.000000
+        occlusion_intensity = 0
+		occlusion_frequency_scale = 0.000000
+        distance_effect_mix = 0
+		distance_volume_mapping_curve = 
+		[
+			[
+				0.000000,
+				1.000000,
+				0.000000,
+				0.000000,
+				2.000000,
+				3.000000,
+			],
+			[
+				2048.000000,
+				1.000000,
+				0.000000,
+				0.000000,
+				2.000000,
+				3.000000,
+			],
+		]
+		position_offset = 
+		[
+			0.000000,
+			0.000000,
+			60.000000,
+		]
+	}
+
+	RollTheDice.BigTaserBattery = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/BigTaserBattery.vsnd"
+	}
+
+	RollTheDice.ChangeName = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/ChangeName.vsnd"
+	}
+
+	RollTheDice.ChangePlayerModel = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/ChangePlayerModel.vsnd"
+	}
+
+	RollTheDice.ChangePlayerSize = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/ChangePlayerSize.vsnd"
+	}
+
+	RollTheDice.ChickenLeader = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/ChickenLeader.vsnd"
+	}
+
+	RollTheDice.Cloak = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/Cloak.vsnd"
+	}
+
+	RollTheDice.DecreaseHealth = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/DecreaseHealth.vsnd"
+	}
+
+	RollTheDice.DecreaseMoney = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/DecreaseMoney.vsnd"
+	}
+
+	RollTheDice.DisguiseAsProp = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/DisguiseAsProp.vsnd"
+	}
+
+	RollTheDice.GiveHealthShot = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/GiveHealthShot.vsnd"
+	}
+
+	RollTheDice.FogOfWar = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/FogOfWar.vsnd"
+	}
+
+	RollTheDice.Glow = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/Glow.vsnd"
+	}
+
+	RollTheDice.HighGravity = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/HighGravity.vsnd"
+	}
+
+	RollTheDice.IncreaseHealth = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/IncreaseHealth.vsnd"
+	}
+
+	RollTheDice.IncreaseMoney = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/IncreaseMoney.vsnd"
+	}
+
+	RollTheDice.IncreaseSpeed = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/IncreaseSpeed.vsnd"
+	}
+
+	RollTheDice.Invisible = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/Invisible.vsnd"
+	}
+
+	RollTheDice.LowGravity = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/LowGravity.vsnd"
+	}
+
+	RollTheDice.MakeFakeGunSounds = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/MakeFakeGunSounds.vsnd"
+	}
+
+	RollTheDice.MakeHostageSounds = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/MakeHostageSounds.vsnd"
+	}
+
+	RollTheDice.NoExplosives = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/NoExplosives.vsnd"
+	}
+
+	RollTheDice.NoRecoil = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/NoRecoil.vsnd"
+	}
+
+	RollTheDice.OneHP = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/OneHP.vsnd"
+	}
+
+	RollTheDice.PlayerAsChicken = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/PlayerAsChicken.vsnd"
+	}
+
+	RollTheDice.PlayerHealthBar = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/PlayerHealthBar.vsnd"
+	}
+
+	RollTheDice.Respawn = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/Respawn.vsnd"
+	}
+
+	RollTheDice.StripWeapons = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/StripWeapons.vsnd"
+	}
+
+	RollTheDice.Suicide = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/Suicide.vsnd"
+	}
+
+	RollTheDice.ThirdPersonView = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/ThirdPersonView.vsnd"
+	}
+
+	RollTheDice.Vampire = 
+	{
+		base = "RollTheDice.Base"
+		vsnd_files_track_01 = "sounds/cs2/dices/Vampire.vsnd"
+	}
+}
