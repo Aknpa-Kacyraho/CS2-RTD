@@ -74,7 +74,8 @@ public class FrontlineBeast : DiceBlueprint
 				BeastKills[((CBasePlayerController)player).SteamID] = 0;
 			}
 			CCSPlayerPawn value = player.PlayerPawn.Value;
-			value.VelocityModifier = BaseSpeed;
+			SpeedBonusManager.Register(player, "FrontlineBeast", BaseSpeed - 1f);
+			value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
@@ -88,6 +89,7 @@ public class FrontlineBeast : DiceBlueprint
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		_players.Remove(player);
+		SpeedBonusManager.Unregister(player, "FrontlineBeast");
 		if (reason != DiceRemoveReason.NewDice)
 		{
 			BeastKills.Remove(((CBasePlayerController)player).SteamID);
@@ -96,6 +98,14 @@ public class FrontlineBeast : DiceBlueprint
 
 	public override void Reset()
 	{
+		foreach (CCSPlayerController item in _players.ToList())
+		{
+			SpeedBonusManager.Unregister(item, "FrontlineBeast");
+		}
+		foreach (ulong steamId in BeastKills.Keys.ToList())
+		{
+			SpeedBonusManager.UnregisterBySteamId(steamId, "FrontlineBeast");
+		}
 		_players.Clear();
 		BeastKills.Clear();
 	}
@@ -156,7 +166,8 @@ public class FrontlineBeast : DiceBlueprint
 		}
 		((CBaseEntity)value).Health = ((CBaseEntity)value).MaxHealth;
 		Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iHealth", 0);
-		value.VelocityModifier = num;
+		SpeedBonusManager.Register(attacker, "FrontlineBeast", num - 1f);
+		value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(attacker, 100f);
 		Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		attacker.PrintToCenterAlert($"\ud83e\udd81 前线巨兽！{value2}杀 速度×{num:F1} 满血！");
 		return (HookResult)0;
@@ -182,9 +193,11 @@ public class FrontlineBeast : DiceBlueprint
 				{
 					num = Math.Min(num * 2f, maxSpeed * 2f);
 				}
-				if (Math.Abs(value.VelocityModifier - num) > 0.01f)
+				SpeedBonusManager.Register(val, "FrontlineBeast", num - 1f);
+				float numExpected = 1f + SpeedBonusManager.GetEffective(val, 100f);
+				if (Math.Abs(value.VelocityModifier - numExpected) > 0.01f)
 				{
-					value.VelocityModifier = num;
+					value.VelocityModifier = numExpected;
 					Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 				}
 			}
@@ -194,9 +207,11 @@ public class FrontlineBeast : DiceBlueprint
 			if (!((CEntityInstance)(object)item == (CEntityInstance)null) && ((CEntityInstance)item).IsValid && !BeastKills.ContainsKey(((CBasePlayerController)item).SteamID) && !((CEntityInstance)(object)item.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)item.PlayerPawn.Value).IsValid && ((CBaseEntity)item.PlayerPawn.Value).LifeState == 0)
 			{
 				CCSPlayerPawn value2 = item.PlayerPawn.Value;
-				if (Math.Abs(value2.VelocityModifier - baseSpeed) > 0.01f)
+				SpeedBonusManager.Register(item, "FrontlineBeast", baseSpeed - 1f);
+				float numExpected2 = 1f + SpeedBonusManager.GetEffective(item, 100f);
+				if (Math.Abs(value2.VelocityModifier - numExpected2) > 0.01f)
 				{
-					value2.VelocityModifier = baseSpeed;
+					value2.VelocityModifier = numExpected2;
 					Utilities.SetStateChanged((CBaseEntity)(object)value2, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 				}
 			}

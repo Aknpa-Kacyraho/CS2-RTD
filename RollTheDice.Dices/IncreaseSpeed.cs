@@ -7,6 +7,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -51,6 +52,7 @@ public class IncreaseSpeed : DiceBlueprint
 			float num = _random.NextSingle() * (_config.Dices.IncreaseSpeed.MaxSpeed - _config.Dices.IncreaseSpeed.MinSpeed) + _config.Dices.IncreaseSpeed.MinSpeed;
 			_playerSpeed.Add(player, num);
 			_players.Add(player);
+			SpeedBonusManager.Register(player, "IncreaseSpeed", num - 1f);
 			SetPlayerSpeed(player);
 			NotifyPlayers(player, ClassName, new Dictionary<string, string>
 			{
@@ -81,7 +83,8 @@ public class IncreaseSpeed : DiceBlueprint
 				return;
 			}
 		}
-		SetPlayerSpeed(player, 1f, force: true);
+		SpeedBonusManager.Unregister(player, "IncreaseSpeed");
+		SetPlayerSpeed(player, force: true);
 		_playerSpeed.Remove(player);
 		_players.Remove(player);
 	}
@@ -126,7 +129,8 @@ public class IncreaseSpeed : DiceBlueprint
 		{
 			return (HookResult)0;
 		}
-		SetPlayerSpeed(@event.Userid, 1f);
+		SpeedBonusManager.Unregister(@event.Userid, "IncreaseSpeed");
+		SetPlayerSpeed(@event.Userid);
 		return (HookResult)0;
 	}
 
@@ -145,7 +149,7 @@ public class IncreaseSpeed : DiceBlueprint
 		{
 			return;
 		}
-		float speedToApply = ((speed >= 0f) ? speed : (_playerSpeed.TryGetValue(player, out var value) ? value : 1f));
+		float speedToApply = 1f + SpeedBonusManager.GetEffective(player, 100f);
 		Server.NextFrame((Action)delegate
 		{
 			Server.NextFrame((Action)delegate

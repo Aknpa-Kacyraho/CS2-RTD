@@ -42,7 +42,8 @@ public class Priest : DiceBlueprint
 		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
 			_players.Add(player);
-			player.PlayerPawn.Value.VelocityModifier = 1.2f;
+			SpeedBonusManager.Register(player, "Priest", 0.2f);
+			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			_comboActive = DiceSynergy.HasPartner(player, "Pope");
 			if (_comboActive)
@@ -59,9 +60,10 @@ public class Priest : DiceBlueprint
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
+		SpeedBonusManager.Unregister(player, "Priest");
 		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
-			player.PlayerPawn.Value.VelocityModifier = 1f;
+			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
 		_players.Remove(player);
@@ -71,9 +73,10 @@ public class Priest : DiceBlueprint
 	{
 		foreach (CCSPlayerController item in _players.ToList())
 		{
+			SpeedBonusManager.Unregister(item, "Priest");
 			if ((CEntityInstance)(object)((item == null) ? null : item.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)item.PlayerPawn.Value).IsValid)
 			{
-				item.PlayerPawn.Value.VelocityModifier = 1f;
+				item.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item, 100f);
 				Utilities.SetStateChanged((CBaseEntity)(object)item.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			}
 		}

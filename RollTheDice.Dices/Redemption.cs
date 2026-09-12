@@ -31,20 +31,6 @@ public class Redemption : DiceBlueprint
 		}
 	}
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnPlayerTakeDamagePre";
-			return list;
-		}
-	}
-
 	public Redemption(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
@@ -92,46 +78,6 @@ public class Redemption : DiceBlueprint
 	public override void Destroy()
 	{
 		Reset();
-	}
-
-	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
-	{
-		//IL_0017: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a5: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a1: Unknown result type (might be due to invalid IL or missing references)
-		//IL_007d: Unknown result type (might be due to invalid IL or missing references)
-		if ((CEntityInstance)(object)info.Attacker.Value == (CEntityInstance)null)
-		{
-			return (HookResult)0;
-		}
-		CCSPlayerPawn obj = ((NativeObject)info.Attacker.Value).As<CCSPlayerPawn>();
-		object obj2;
-		if (obj == null)
-		{
-			obj2 = null;
-		}
-		else
-		{
-			CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj).Controller;
-			if (controller == null)
-			{
-				obj2 = null;
-			}
-			else
-			{
-				CBasePlayerController value = controller.Value;
-				obj2 = ((value != null) ? ((NativeObject)value).As<CCSPlayerController>() : null);
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj2;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
-		{
-			return (HookResult)0;
-		}
-		float effective = DamageBonusManager.GetEffective(val);
-		float num = 1f + effective;
-		info.Damage *= num;
-		return (HookResult)1;
 	}
 
 	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)

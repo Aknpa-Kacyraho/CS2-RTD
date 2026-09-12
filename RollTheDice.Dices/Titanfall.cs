@@ -84,9 +84,10 @@ public class Titanfall : DiceBlueprint
 	{
 		MoveLockManager.Unlock(player, "Titanfall");
 		DamageBonusManager.Unregister(player, "Titanfall");
+		SpeedBonusManager.Unregister(player, "Titanfall");
 		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
-			player.PlayerPawn.Value.VelocityModifier = 1f;
+			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
 		_players.Remove(player);
@@ -102,9 +103,10 @@ public class Titanfall : DiceBlueprint
 		foreach (CCSPlayerController item in _players.ToList())
 		{
 			MoveLockManager.Unlock(item, "Titanfall");
+			SpeedBonusManager.Unregister(item, "Titanfall");
 			if ((CEntityInstance)(object)((item == null) ? null : item.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)item.PlayerPawn.Value).IsValid)
 			{
-				item.PlayerPawn.Value.VelocityModifier = 1f;
+				item.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item, 100f);
 				Utilities.SetStateChanged((CBaseEntity)(object)item.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			}
 		}
@@ -166,7 +168,8 @@ public class Titanfall : DiceBlueprint
 						((CBaseEntity)value).Health = titanHP;
 						Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iMaxHealth", 0);
 						Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iHealth", 0);
-						value.VelocityModifier = 1.5f;
+						SpeedBonusManager.Register(item, "Titanfall", 0.5f);
+						value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item, 100f);
 						Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 						DamageBonusManager.Register(item, "Titanfall", _config.Dices.Titanfall.DamageMultiplier - 1f);
 						item.PrintToCenterAlert("⚡ 泰坦觉醒！+50%伤害 +50%移速！");
@@ -177,10 +180,14 @@ public class Titanfall : DiceBlueprint
 						item.PrintToCenterAlert($"\ud83d\ude80 泰坦陨落中... HP:{((CBaseEntity)value).Health}/{((CBaseEntity)value).MaxHealth} 甲:{value.ArmorValue} {Math.Ceiling(num2)}s");
 					}
 				}
-				else if (value.VelocityModifier < 1.4f)
+				else
 				{
-					value.VelocityModifier = 1.5f;
-					Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+					float speedExpected = 1f + SpeedBonusManager.GetEffective(item, 100f);
+					if (value.VelocityModifier < speedExpected - 0.1f)
+					{
+						value.VelocityModifier = speedExpected;
+						Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+					}
 				}
 			}
 			catch

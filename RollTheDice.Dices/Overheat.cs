@@ -81,9 +81,10 @@ public class Overheat : DiceBlueprint
 		_stacks.Remove(player);
 		_nextTickTime.Remove(player);
 		DamageBonusManager.Unregister(player, "Overheat");
+		SpeedBonusManager.Unregister(player, "Overheat");
 		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
-			player.PlayerPawn.Value.VelocityModifier = 1f;
+			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
 	}
@@ -93,9 +94,10 @@ public class Overheat : DiceBlueprint
 		foreach (CCSPlayerController item in _players.ToList())
 		{
 			DamageBonusManager.Unregister(item, "Overheat");
+			SpeedBonusManager.Unregister(item, "Overheat");
 			if ((CEntityInstance)(object)((item == null) ? null : item.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)item.PlayerPawn.Value).IsValid)
 			{
-				item.PlayerPawn.Value.VelocityModifier = 1f;
+				item.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item, 100f);
 				Utilities.SetStateChanged((CBaseEntity)(object)item.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			}
 		}
@@ -135,7 +137,8 @@ public class Overheat : DiceBlueprint
 			if ((CEntityInstance)(object)attacker.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)attacker.PlayerPawn.Value).IsValid)
 			{
 				float item = GetComboParams(attacker).speedPerStack;
-				float num2 = 1f + (float)_stacks[attacker] * item;
+				SpeedBonusManager.Register(attacker, "Overheat", (float)_stacks[attacker] * item);
+				float num2 = 1f + SpeedBonusManager.GetEffective(attacker, 100f);
 				attacker.PlayerPawn.Value.VelocityModifier = num2;
 				Utilities.SetStateChanged((CBaseEntity)(object)attacker.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			}
@@ -171,7 +174,8 @@ public class Overheat : DiceBlueprint
 				_stacks[key] = value;
 				if ((CEntityInstance)(object)((key == null) ? null : key.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)key.PlayerPawn.Value).IsValid)
 				{
-					float num5 = 1f + (float)value * num2;
+					SpeedBonusManager.Register(key, "Overheat", (float)value * num2);
+					float num5 = 1f + SpeedBonusManager.GetEffective(key, 100f);
 					key.PlayerPawn.Value.VelocityModifier = num5;
 					Utilities.SetStateChanged((CBaseEntity)(object)key.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 					float num6 = (float)value * num3;
@@ -184,7 +188,8 @@ public class Overheat : DiceBlueprint
 			}
 			else if ((CEntityInstance)(object)((key == null) ? null : key.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)key.PlayerPawn.Value).IsValid)
 			{
-				float num7 = 1f + (float)num4 * num2;
+				SpeedBonusManager.Register(key, "Overheat", (float)num4 * num2);
+				float num7 = 1f + SpeedBonusManager.GetEffective(key, 100f);
 				if (key.PlayerPawn.Value.VelocityModifier != num7)
 				{
 					key.PlayerPawn.Value.VelocityModifier = num7;
@@ -197,7 +202,8 @@ public class Overheat : DiceBlueprint
 			if (!((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid && _stacks.TryGetValue(player, out var value2))
 			{
 				float item = GetComboParams(player).speedPerStack;
-				float num8 = 1f + (float)value2 * item;
+				SpeedBonusManager.Register(player, "Overheat", (float)value2 * item);
+				float num8 = 1f + SpeedBonusManager.GetEffective(player, 100f);
 				if (player.PlayerPawn.Value.VelocityModifier != num8)
 				{
 					player.PlayerPawn.Value.VelocityModifier = num8;

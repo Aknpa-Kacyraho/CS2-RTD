@@ -7,6 +7,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -81,9 +82,10 @@ public class Paladin : DiceBlueprint
 
 	private void Revert(CCSPlayerController player)
 	{
+		SpeedBonusManager.Unregister(player, "Paladin");
 		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
-			player.PlayerPawn.Value.VelocityModifier = 1f;
+			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
 	}
@@ -130,7 +132,8 @@ public class Paladin : DiceBlueprint
 			}
 			num2 += 10;
 			_paladinHpBonus[val] = num2;
-			value2.VelocityModifier = 1f + num;
+			SpeedBonusManager.Register(val, "Paladin", num);
+			value2.VelocityModifier = 1f + SpeedBonusManager.GetEffective(val, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)value2, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			((CBaseEntity)value2).MaxHealth += 10;
 			((CBaseEntity)value2).Health += 10;
@@ -154,7 +157,8 @@ public class Paladin : DiceBlueprint
 				if (!((CEntityInstance)(object)((item == null) ? null : item.PlayerPawn?.Value) == (CEntityInstance)null) && ((CEntityInstance)item.PlayerPawn.Value).IsValid && _paladinSpeedBonus.TryGetValue(item, out var value) && !(value <= 0f))
 				{
 					CCSPlayerPawn value2 = item.PlayerPawn.Value;
-					float num = 1f + value;
+					SpeedBonusManager.Register(item, "Paladin", value);
+					float num = 1f + SpeedBonusManager.GetEffective(item, 100f);
 					if (Math.Abs(value2.VelocityModifier - num) > 0.01f)
 					{
 						value2.VelocityModifier = num;

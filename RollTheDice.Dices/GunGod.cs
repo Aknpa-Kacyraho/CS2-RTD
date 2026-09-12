@@ -6,6 +6,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -40,6 +41,7 @@ public class GunGod : DiceBlueprint
 		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
 			_players.Add(player);
+			DamageReductionManager.Register(player, "GunGod", 0.66f);
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
 				"playerName",
@@ -51,10 +53,15 @@ public class GunGod : DiceBlueprint
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		_players.Remove(player);
+		DamageReductionManager.Unregister(player, "GunGod");
 	}
 
 	public override void Reset()
 	{
+		foreach (CCSPlayerController item in _players)
+		{
+			DamageReductionManager.Unregister(item, "GunGod");
+		}
 		_players.Clear();
 	}
 
@@ -127,8 +134,6 @@ public class GunGod : DiceBlueprint
 			info.Damage = 0f;
 			return (HookResult)1;
 		}
-		float damageReduction = _config.Dices.GunGod.DamageReduction;
-		info.Damage *= 1f - damageReduction;
 		return (HookResult)1;
 	}
 }

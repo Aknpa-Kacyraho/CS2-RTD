@@ -24,12 +24,14 @@ public class Miser : DiceBlueprint
 	{
 		get
 		{
-			int num = 1;
+			int num = 2;
 			List<string> list = new List<string>(num);
 			CollectionsMarshal.SetCount(list, num);
 			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnPlayerTakeDamagePre";
+			int num2 = 0;
+			span[num2] = "OnTick";
+			num2++;
+			span[num2] = "OnPlayerTakeDamagePre";
 			return list;
 		}
 	}
@@ -68,13 +70,32 @@ public class Miser : DiceBlueprint
 		_players.Remove(player);
 		_startingMoney.Remove(player);
 		_reductionCache.Remove(player);
+		DamageReductionManager.Unregister(player, "Miser");
 	}
 
 	public override void Reset()
 	{
+		foreach (CCSPlayerController item in _players)
+		{
+			DamageReductionManager.Unregister(item, "Miser");
+		}
 		_players.Clear();
 		_startingMoney.Clear();
 		_reductionCache.Clear();
+	}
+
+	public void OnTick()
+	{
+		foreach (CCSPlayerController item in _players)
+		{
+			if ((CEntityInstance)(object)item == (CEntityInstance)null || !((CEntityInstance)item).IsValid || (CEntityInstance)(object)item.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)item.PlayerPawn.Value).IsValid || ((CBaseEntity)item.PlayerPawn.Value).LifeState != 0)
+			{
+				continue;
+			}
+			float reduction = GetReduction(item);
+			float applied = DiceSynergy.HasPartner(item, "Bank") ? Math.Min(reduction * 1.5f, 0.75f) : reduction;
+			DamageReductionManager.Register(item, "Miser", applied);
+		}
 	}
 
 	private float GetReduction(CCSPlayerController player)
@@ -135,7 +156,6 @@ public class Miser : DiceBlueprint
 		float reduction = GetReduction(val);
 		if (reduction > 0.001f)
 		{
-			info.Damage *= 1f - (DiceSynergy.HasPartner(val, "Bank") ? Math.Min(reduction * 1.5f, 0.75f) : reduction);
 			float num = (_reductionCache.TryGetValue(val, out var value2) ? value2 : 0f);
 			if (Math.Abs(reduction - num) > 0.01f)
 			{

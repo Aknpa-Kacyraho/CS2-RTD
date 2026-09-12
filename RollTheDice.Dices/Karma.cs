@@ -68,7 +68,8 @@ public class Karma : DiceBlueprint
 			}
 			BuffedPlayers.Add(((CBasePlayerController)player).SteamID);
 			CCSPlayerPawn value = player.PlayerPawn.Value;
-			value.VelocityModifier = _config.Dices.Karma.SpeedMultiplier;
+			SpeedBonusManager.Register(player, "Karma", _config.Dices.Karma.SpeedMultiplier - 1f);
+			value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
@@ -82,6 +83,7 @@ public class Karma : DiceBlueprint
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		_players.Remove(player);
+		SpeedBonusManager.Unregister(player, "Karma");
 		if ((CEntityInstance)(object)player != (CEntityInstance)null && ((CEntityInstance)player).IsValid)
 		{
 			ulong steamID = ((CBasePlayerController)player).SteamID;
@@ -89,7 +91,7 @@ public class Karma : DiceBlueprint
 			CCSPlayerPawn pawn = player.PlayerPawn?.Value;
 			if ((CEntityInstance)(object)pawn != (CEntityInstance)null && ((CEntityInstance)pawn).IsValid && ((CBaseEntity)pawn).LifeState == 0)
 			{
-				pawn.VelocityModifier = 1f;
+				pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 				Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			}
 		}
@@ -99,13 +101,14 @@ public class Karma : DiceBlueprint
 	{
 		foreach (ulong steamId in BuffedPlayers.ToList())
 		{
+			SpeedBonusManager.UnregisterBySteamId(steamId, "Karma");
 			CCSPlayerController val = Utilities.GetPlayers().FirstOrDefault((CCSPlayerController p) => ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && ((CBasePlayerController)p).SteamID == steamId);
 			if ((CEntityInstance)(object)val != (CEntityInstance)null)
 			{
 				CCSPlayerPawn pawn = val.PlayerPawn?.Value;
 				if ((CEntityInstance)(object)pawn != (CEntityInstance)null && ((CEntityInstance)pawn).IsValid && ((CBaseEntity)pawn).LifeState == 0)
 				{
-					pawn.VelocityModifier = 1f;
+					pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(val, 100f);
 					Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 				}
 			}
@@ -152,7 +155,8 @@ public class Karma : DiceBlueprint
 		CCSPlayerController val = list[_random.Next(list.Count)];
 		BuffedPlayers.Add(((CBasePlayerController)val).SteamID);
 		CCSPlayerPawn value = val.PlayerPawn.Value;
-		value.VelocityModifier = _config.Dices.Karma.SpeedMultiplier;
+		SpeedBonusManager.Register(val, "Karma", _config.Dices.Karma.SpeedMultiplier - 1f);
+		value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(val, 100f);
 		Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		val.PrintToCenterAlert("☸ 因果报应！移速×1.5 + 每秒回复1HP！");
 		Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + _localizer["dice_Karma_spread"].Value.Replace("{attacker}", ((CBasePlayerController)attacker).PlayerName).Replace("{target}", ((CBasePlayerController)val).PlayerName));
@@ -181,20 +185,25 @@ public class Karma : DiceBlueprint
 					Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iHealth", 0);
 				}
 			}
-			BuffedPlayers.RemoveWhere(delegate(ulong steamId)
+			foreach (ulong steamId in BuffedPlayers.Where(delegate(ulong steamId)
 			{
 				CCSPlayerController val = Utilities.GetPlayers().FirstOrDefault((CCSPlayerController pl) => ((CBasePlayerController)pl).SteamID == steamId);
 				return (CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || (CEntityInstance)(object)val.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)val.PlayerPawn.Value).IsValid || ((CBaseEntity)val.PlayerPawn.Value).LifeState != 0;
-			});
+			}).ToList())
+			{
+				BuffedPlayers.Remove(steamId);
+				SpeedBonusManager.UnregisterBySteamId(steamId, "Karma");
+			}
 		}
 		foreach (CCSPlayerController item2 in from p in Utilities.GetPlayers()
 			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && BuffedPlayers.Contains(((CBasePlayerController)p).SteamID) && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0
 			select p)
 		{
 			CCSPlayerPawn value2 = item2.PlayerPawn.Value;
-			if (value2.VelocityModifier != _config.Dices.Karma.SpeedMultiplier)
+			float expected = 1f + SpeedBonusManager.GetEffective(item2, 100f);
+			if (value2.VelocityModifier != expected)
 			{
-				value2.VelocityModifier = _config.Dices.Karma.SpeedMultiplier;
+				value2.VelocityModifier = expected;
 				Utilities.SetStateChanged((CBaseEntity)(object)value2, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			}
 		}

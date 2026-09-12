@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
@@ -12,7 +11,6 @@ namespace RollTheDice.Dices;
 
 public class DeagleKing : DiceBlueprint
 {
-
 	public override string ClassName => "DeagleKing";
 
 	public override List<string> Listeners
@@ -61,79 +59,56 @@ public class DeagleKing : DiceBlueprint
 		_players.Remove(player);
 	}
 
+	public override void Reset()
+	{
+		_players.Clear();
+	}
+
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
-		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
-		//IL_012a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0088: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00d3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0103: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0126: Unknown result type (might be due to invalid IL or missing references)
 		if (_players.Count == 0)
 		{
 			return (HookResult)0;
 		}
-		CHandle<CBaseEntity> attacker = info.Attacker;
-		object obj;
-		if (attacker == null)
-		{
-			obj = null;
-		}
-		else
+		var attacker = info.Attacker;
+		CCSPlayerController val = null;
+		if (attacker != null)
 		{
 			CBaseEntity value = attacker.Value;
-			if (value == null)
+			if (value != null)
 			{
-				obj = null;
-			}
-			else
-			{
-				CCSPlayerPawn obj2 = ((NativeObject)value).As<CCSPlayerPawn>();
-				if (obj2 == null)
+				CCSPlayerPawn pawn = ((NativeObject)value).As<CCSPlayerPawn>();
+				if (pawn != null)
 				{
-					obj = null;
-				}
-				else
-				{
-					CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj2).Controller;
-					if (controller == null)
+					var controller = ((CBasePlayerPawn)pawn).Controller;
+					if (controller != null && controller.Value != null)
 					{
-						obj = null;
-					}
-					else
-					{
-						CBasePlayerController value2 = controller.Value;
-						obj = ((value2 != null) ? ((NativeObject)value2).As<CCSPlayerController>() : null);
+						val = ((NativeObject)controller.Value).As<CCSPlayerController>();
 					}
 				}
 			}
 		}
-		CCSPlayerController val = (CCSPlayerController)obj;
 		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
 		{
 			return (HookResult)0;
 		}
 		CCSPlayerPawn val2 = val.PlayerPawn?.Value;
-		object obj3;
-		if (val2 == null)
-		{
-			obj3 = null;
-		}
-		else
-		{
-			CPlayer_WeaponServices weaponServices = ((CBasePlayerPawn)val2).WeaponServices;
-			obj3 = ((weaponServices == null) ? null : weaponServices.ActiveWeapon?.Value);
-		}
-		if ((CEntityInstance)obj3 == (CEntityInstance)null)
+		if ((CEntityInstance)(object)val2 == (CEntityInstance)null || !((CEntityInstance)val2).IsValid)
 		{
 			return (HookResult)0;
 		}
-		string designerName = ((CEntityInstance)((CBasePlayerPawn)val2).WeaponServices.ActiveWeapon.Value).DesignerName;
-		if (!designerName.Contains("deagle", StringComparison.OrdinalIgnoreCase))
+		var activeWeapon = val2.WeaponServices?.ActiveWeapon;
+		CBasePlayerWeapon weapon = ((activeWeapon == null) ? null : activeWeapon.Value);
+		if ((CEntityInstance)(object)weapon == (CEntityInstance)null || !((CEntityInstance)weapon).IsValid)
 		{
 			return (HookResult)0;
 		}
-		info.Damage *= (DiceSynergy.HasPartner(val, "SniperElite") || DiceSynergy.HasPartner(val, "DeadHand") ? 5f : 3f);
+		string designerName = ((CEntityInstance)weapon).DesignerName;
+		if (designerName == null || !designerName.Contains("deagle"))
+		{
+			return (HookResult)0;
+		}
+		info.Damage *= (DiceSynergy.HasPartner(val, "SniperElite") || DiceSynergy.HasPartner(val, "DeadHand")) ? 5f : 3f;
 		return (HookResult)1;
 	}
 }

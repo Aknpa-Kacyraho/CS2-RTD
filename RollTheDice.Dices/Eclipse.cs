@@ -8,6 +8,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -23,14 +24,12 @@ public class Eclipse : DiceBlueprint
 	{
 		get
 		{
-			int num = 2;
+			int num = 1;
 			List<string> list = new List<string>(num);
 			CollectionsMarshal.SetCount(list, num);
 			Span<string> span = CollectionsMarshal.AsSpan(list);
 			int num2 = 0;
 			span[num2] = "OnTick";
-			num2++;
-			span[num2] = "OnPlayerTakeDamagePre";
 			return list;
 		}
 	}
@@ -79,9 +78,11 @@ public class Eclipse : DiceBlueprint
 
 	private void Revert(CCSPlayerController player)
 	{
+		DamageBonusManager.Unregister(player, "Eclipse");
+		SpeedBonusManager.Unregister(player, "Eclipse");
 		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
-			player.PlayerPawn.Value.VelocityModifier = 1f;
+			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			((CBaseModelEntity)player.PlayerPawn.Value).Render = Color.FromArgb(255, 255, 255, 255);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CBaseModelEntity", "m_clrRender", 0);
@@ -95,17 +96,20 @@ public class Eclipse : DiceBlueprint
 			CCSPlayerPawn value = player.PlayerPawn.Value;
 			if (newMoon)
 			{
-				value.VelocityModifier = _config.Dices.Eclipse.NewMoonSpeed;
+				SpeedBonusManager.Register(player, "Eclipse", _config.Dices.Eclipse.NewMoonSpeed - 1f);
+				value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 				((CBaseModelEntity)value).Render = Color.FromArgb(100, 180, 180, 220);
 				Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseModelEntity", "m_clrRender", 0);
 			}
 			else
 			{
-				value.VelocityModifier = _config.Dices.Eclipse.FullMoonSpeed;
+				SpeedBonusManager.Register(player, "Eclipse", _config.Dices.Eclipse.FullMoonSpeed - 1f);
+				value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 				((CBaseModelEntity)value).Render = Color.FromArgb(255, 255, 255, 255);
 				Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseModelEntity", "m_clrRender", 0);
 			}
 			Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+			DamageBonusManager.Register(player, "Eclipse", (newMoon ? _config.Dices.Eclipse.NewMoonDamageMult : _config.Dices.Eclipse.FullMoonDamageMult) - 1f);
 		}
 	}
 
@@ -142,71 +146,5 @@ public class Eclipse : DiceBlueprint
 			{
 			}
 		}
-	}
-
-	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
-	{
-		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00f4: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0087: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a2: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00f1: Unknown result type (might be due to invalid IL or missing references)
-		if (_players.Count == 0)
-		{
-			return (HookResult)0;
-		}
-		CHandle<CBaseEntity> attacker = info.Attacker;
-		object obj;
-		if (attacker == null)
-		{
-			obj = null;
-		}
-		else
-		{
-			CBaseEntity value = attacker.Value;
-			if (value == null)
-			{
-				obj = null;
-			}
-			else
-			{
-				CCSPlayerPawn obj2 = ((NativeObject)value).As<CCSPlayerPawn>();
-				if (obj2 == null)
-				{
-					obj = null;
-				}
-				else
-				{
-					CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj2).Controller;
-					if (controller == null)
-					{
-						obj = null;
-					}
-					else
-					{
-						CBasePlayerController value2 = controller.Value;
-						obj = ((value2 != null) ? ((NativeObject)value2).As<CCSPlayerController>() : null);
-					}
-				}
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
-		{
-			return (HookResult)0;
-		}
-		if (!_isNewMoon.TryGetValue(val, out var value3))
-		{
-			return (HookResult)0;
-		}
-		if (value3)
-		{
-			info.Damage *= _config.Dices.Eclipse.NewMoonDamageMult;
-		}
-		else
-		{
-			info.Damage *= _config.Dices.Eclipse.FullMoonDamageMult;
-		}
-		return (HookResult)1;
 	}
 }

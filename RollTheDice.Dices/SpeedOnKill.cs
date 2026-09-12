@@ -64,18 +64,16 @@ public class SpeedOnKill : DiceBlueprint
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		_players.Remove(player);
-		if (_activeBoosts.Remove(player, out Timer value))
+		SpeedBonusManager.Unregister(player, "SpeedOnKill");
+		if (_activeBoosts.Remove(player, out Timer value) && value != null)
 		{
-			if (value != null)
-			{
-				value.Kill();
-			}
-			CCSPlayerPawn val = player.PlayerPawn?.Value;
-			if (val != null && ((CEntityInstance)val).IsValid)
-			{
-				val.VelocityModifier = 1f;
-				Utilities.SetStateChanged((CBaseEntity)(object)val, "CCSPlayerPawn", "m_flVelocityModifier", 0);
-			}
+			value.Kill();
+		}
+		CCSPlayerPawn val = player.PlayerPawn?.Value;
+		if (val != null && ((CEntityInstance)val).IsValid)
+		{
+			val.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
+			Utilities.SetStateChanged((CBaseEntity)(object)val, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
 	}
 
@@ -87,10 +85,14 @@ public class SpeedOnKill : DiceBlueprint
 			{
 				val4.Kill();
 			}
+			if (val3 != null)
+			{
+				SpeedBonusManager.Unregister(val3, "SpeedOnKill");
+			}
 			CCSPlayerPawn val5 = ((val3 == null) ? null : val3.PlayerPawn?.Value);
 			if (val5 != null && ((CEntityInstance)val5).IsValid)
 			{
-				val5.VelocityModifier = 1f;
+				val5.VelocityModifier = 1f + SpeedBonusManager.GetEffective(val3, 100f);
 				Utilities.SetStateChanged((CBaseEntity)(object)val5, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			}
 		}
@@ -123,7 +125,8 @@ public class SpeedOnKill : DiceBlueprint
 			num2 *= 2f;
 		}
 		CCSPlayerPawn value = attacker.PlayerPawn.Value;
-		value.VelocityModifier = num;
+		SpeedBonusManager.Register(attacker, "SpeedOnKill", num - 1f);
+		value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(attacker, 100f);
 		Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		attacker.PrintToCenterAlert($"⚡ 击杀加速 {(num - 1f) * 100f:F0}% {num2:F0}秒!");
 		if (_activeBoosts.Remove(attacker, out Timer value2) && value2 != null)
@@ -133,10 +136,11 @@ public class SpeedOnKill : DiceBlueprint
 		_activeBoosts[attacker] = new Timer(num2, (Action)delegate
 		{
 			CCSPlayerController obj = attacker;
+			SpeedBonusManager.Unregister(obj, "SpeedOnKill");
 			CCSPlayerPawn val = ((obj == null) ? null : obj.PlayerPawn?.Value);
 			if (val != null && ((CEntityInstance)val).IsValid)
 			{
-				val.VelocityModifier = 1f;
+				val.VelocityModifier = 1f + SpeedBonusManager.GetEffective(obj, 100f);
 				Utilities.SetStateChanged((CBaseEntity)(object)val, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			}
 			_activeBoosts.Remove(attacker);

@@ -25,14 +25,12 @@ public class God : DiceBlueprint
 	{
 		get
 		{
-			int num = 2;
+			int num = 1;
 			List<string> list = new List<string>(num);
 			CollectionsMarshal.SetCount(list, num);
 			Span<string> span = CollectionsMarshal.AsSpan(list);
 			int num2 = 0;
 			span[num2] = "OnTick";
-			num2++;
-			span[num2] = "OnPlayerTakeDamagePre";
 			return list;
 		}
 	}
@@ -56,10 +54,12 @@ public class God : DiceBlueprint
 			Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iMaxHealth", 0);
 			Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iHealth", 0);
 			Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_ArmorValue", 0);
-			value.VelocityModifier = 2f;
+			SpeedBonusManager.Register(player, "God", 1f);
+			value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			_players.Add(player);
 			_comboActive = DiceSynergy.HasPartner(player, "Goddess");
+			DamageBonusManager.Register(player, "God", _comboActive ? 2f : 0.5f);
 			if (_comboActive)
 			{
 				DiceSynergy.AnnounceCombo(player, "神之共鸣", "上帝伤害翻倍+女神多祝福一人！");
@@ -74,6 +74,8 @@ public class God : DiceBlueprint
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
+		DamageBonusManager.Unregister(player, "God");
+		SpeedBonusManager.Unregister(player, "God");
 		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
 			CCSPlayerPawn value = player.PlayerPawn.Value;
@@ -91,7 +93,7 @@ public class God : DiceBlueprint
 				Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_ArmorValue", 0);
 				_originalArmor.Remove(player);
 			}
-			value.VelocityModifier = 1f;
+			value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
 		_players.Remove(player);
@@ -113,60 +115,6 @@ public class God : DiceBlueprint
 		Reset();
 	}
 
-	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
-	{
-		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a8: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a5: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a1: Unknown result type (might be due to invalid IL or missing references)
-		if (_players.Count == 0)
-		{
-			return (HookResult)0;
-		}
-		CHandle<CBaseEntity> attacker = info.Attacker;
-		object obj;
-		if (attacker == null)
-		{
-			obj = null;
-		}
-		else
-		{
-			CBaseEntity value = attacker.Value;
-			if (value == null)
-			{
-				obj = null;
-			}
-			else
-			{
-				CCSPlayerPawn obj2 = ((NativeObject)value).As<CCSPlayerPawn>();
-				if (obj2 == null)
-				{
-					obj = null;
-				}
-				else
-				{
-					CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj2).Controller;
-					if (controller == null)
-					{
-						obj = null;
-					}
-					else
-					{
-						CBasePlayerController value2 = controller.Value;
-						obj = ((value2 != null) ? ((NativeObject)value2).As<CCSPlayerController>() : null);
-					}
-				}
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj;
-		if ((CEntityInstance)(object)val != (CEntityInstance)null && ((CEntityInstance)val).IsValid && _players.Contains(val))
-		{
-			info.Damage *= (DiceSynergy.HasPartner(val, "Goddess") ? 3f : 1.5f);
-			return (HookResult)1;
-		}
-		return (HookResult)0;
-	}
-
 	public void OnTick()
 	{
 		if (_players.Count == 0)
@@ -180,9 +128,10 @@ public class God : DiceBlueprint
 				if (!((CEntityInstance)(object)item == (CEntityInstance)null) && ((CEntityInstance)item).IsValid && !((CEntityInstance)(object)item.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)item.PlayerPawn.Value).IsValid)
 				{
 					CCSPlayerPawn value = item.PlayerPawn.Value;
-					if (value.VelocityModifier < 1.5f)
+					float expected = 1f + SpeedBonusManager.GetEffective(item, 100f);
+					if (value.VelocityModifier < expected - 0.5f)
 					{
-						value.VelocityModifier = 2f;
+						value.VelocityModifier = expected;
 						Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 					}
 				}

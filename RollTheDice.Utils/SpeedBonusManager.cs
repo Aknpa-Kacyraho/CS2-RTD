@@ -33,12 +33,12 @@ public static class SpeedBonusManager
 		StackingBonusManager.Unregister(steamId, StackingBonusManager.DomainSpeed, source);
 	}
 
-	public static float GetEffective(CCSPlayerController player, float cap = 0.5f)
+	public static float GetEffective(CCSPlayerController player, float cap = 100f)
 	{
 		return StackingBonusManager.GetTotal(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainSpeed, cap);
 	}
 
-	public static float GetEffectiveBySteamId(ulong steamId, float cap = 0.5f)
+	public static float GetEffectiveBySteamId(ulong steamId, float cap = 100f)
 	{
 		return StackingBonusManager.GetTotal(steamId, StackingBonusManager.DomainSpeed, cap);
 	}

@@ -23,14 +23,12 @@ public class DeathKnight : DiceBlueprint
 	{
 		get
 		{
-			int num = 2;
+			int num = 1;
 			List<string> list = new List<string>(num);
 			CollectionsMarshal.SetCount(list, num);
 			Span<string> span = CollectionsMarshal.AsSpan(list);
 			int num2 = 0;
 			span[num2] = "OnTick";
-			num2++;
-			span[num2] = "OnPlayerTakeDamagePre";
 			return list;
 		}
 	}
@@ -97,55 +95,6 @@ public class DeathKnight : DiceBlueprint
 	public override void Destroy()
 	{
 		Reset();
-	}
-
-	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
-	{
-		//IL_001d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0179: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0079: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0175: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00af: Unknown result type (might be due to invalid IL or missing references)
-		if ((CEntityInstance)(object)entity == (CEntityInstance)null || !((CEntityInstance)entity).IsValid)
-		{
-			return (HookResult)0;
-		}
-		CCSPlayerPawn obj = ((NativeObject)entity).As<CCSPlayerPawn>();
-		object obj2;
-		if (obj == null)
-		{
-			obj2 = null;
-		}
-		else
-		{
-			CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj).Controller;
-			if (controller == null)
-			{
-				obj2 = null;
-			}
-			else
-			{
-				CBasePlayerController value = controller.Value;
-				obj2 = ((value != null) ? ((NativeObject)value).As<CCSPlayerController>() : null);
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj2;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
-		{
-			return (HookResult)0;
-		}
-		CCSPlayerPawn val2 = val.PlayerPawn?.Value;
-		if ((CEntityInstance)(object)val2 == (CEntityInstance)null || !((CEntityInstance)val2).IsValid)
-		{
-			return (HookResult)0;
-		}
-		float val3 = 1f - (float)((CBaseEntity)val2).Health / (float)Math.Max(((CBaseEntity)val2).MaxHealth, 1);
-		float num = Math.Min(val3, _config.Dices.DeathKnight.ReductionCap);
-		DamageReductionManager.Register(val, "DeathKnight", num);
-		val.PrintToCenterAlert($"\ud83d\udc80 减伤 {(int)(num * 100f)}%");
-		float effective = DamageReductionManager.GetEffective(val, _config.Dices.DeathKnight.ReductionCap);
-		info.Damage = (int)(info.Damage * (1f - effective));
-		return (HookResult)1;
 	}
 
 	public void OnTick()

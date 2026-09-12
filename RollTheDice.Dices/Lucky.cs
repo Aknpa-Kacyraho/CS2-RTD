@@ -7,6 +7,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -26,14 +27,12 @@ public class Lucky : DiceBlueprint
 	{
 		get
 		{
-			int num = 2;
+			int num = 1;
 			List<string> list = new List<string>(num);
 			CollectionsMarshal.SetCount(list, num);
 			Span<string> span = CollectionsMarshal.AsSpan(list);
 			int num2 = 0;
 			span[num2] = "OnTick";
-			num2++;
-			span[num2] = "OnPlayerTakeDamagePre";
 			return list;
 		}
 	}
@@ -62,13 +61,15 @@ public class Lucky : DiceBlueprint
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
+		DamageBonusManager.Unregister(player, "Lucky");
+		SpeedBonusManager.Unregister(player, "Lucky");
 		_players.Remove(player);
 		_nextTickTime.Remove(player);
 		_interval.Remove(player);
 		_activeBuffs.Remove(player);
 		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
-			player.PlayerPawn.Value.VelocityModifier = 1f;
+			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
 	}
@@ -77,9 +78,11 @@ public class Lucky : DiceBlueprint
 	{
 		foreach (CCSPlayerController item in _players.ToList())
 		{
+			DamageBonusManager.Unregister(item, "Lucky");
+			SpeedBonusManager.Unregister(item, "Lucky");
 			if ((CEntityInstance)(object)((item == null) ? null : item.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)item.PlayerPawn.Value).IsValid)
 			{
-				item.PlayerPawn.Value.VelocityModifier = 1f;
+				item.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item, 100f);
 				Utilities.SetStateChanged((CBaseEntity)(object)item.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			}
 		}
@@ -87,60 +90,6 @@ public class Lucky : DiceBlueprint
 		_nextTickTime.Clear();
 		_interval.Clear();
 		_activeBuffs.Clear();
-	}
-
-	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
-	{
-		//IL_006c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00c0: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00bd: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00b9: Unknown result type (might be due to invalid IL or missing references)
-		CHandle<CBaseEntity> attacker = info.Attacker;
-		object obj;
-		if (attacker == null)
-		{
-			obj = null;
-		}
-		else
-		{
-			CBaseEntity value = attacker.Value;
-			if (value == null)
-			{
-				obj = null;
-			}
-			else
-			{
-				CCSPlayerPawn obj2 = ((NativeObject)value).As<CCSPlayerPawn>();
-				if (obj2 == null)
-				{
-					obj = null;
-				}
-				else
-				{
-					CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj2).Controller;
-					if (controller == null)
-					{
-						obj = null;
-					}
-					else
-					{
-						CBasePlayerController value2 = controller.Value;
-						obj = ((value2 != null) ? ((NativeObject)value2).As<CCSPlayerController>() : null);
-					}
-				}
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_activeBuffs.ContainsKey(val))
-		{
-			return (HookResult)0;
-		}
-		if (_activeBuffs.TryGetValue(val, out (float, float, string) value3) && value3.Item3 == "damage" && Server.CurrentTime < value3.Item1)
-		{
-			info.Damage *= value3.Item2;
-			return (HookResult)1;
-		}
-		return (HookResult)0;
 	}
 
 	public void OnTick()
@@ -151,10 +100,21 @@ public class Lucky : DiceBlueprint
 			select kv.Key).ToList();
 		foreach (CCSPlayerController item in list)
 		{
+			if (_activeBuffs.TryGetValue(item, out var expired))
+			{
+				if (expired.Item3 == "damage")
+				{
+					DamageBonusManager.Unregister(item, "Lucky");
+				}
+				else if (expired.Item3 == "speed")
+				{
+					SpeedBonusManager.Unregister(item, "Lucky");
+				}
+			}
 			_activeBuffs.Remove(item);
 			if ((CEntityInstance)(object)((item == null) ? null : item.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)item.PlayerPawn.Value).IsValid)
 			{
-				item.PlayerPawn.Value.VelocityModifier = 1f;
+				item.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item, 100f);
 				Utilities.SetStateChanged((CBaseEntity)(object)item.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			}
 		}
@@ -162,7 +122,7 @@ public class Lucky : DiceBlueprint
 		{
 			if (tuple2.Item3 == "speed" && (CEntityInstance)(object)((val2 == null) ? null : val2.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)val2.PlayerPawn.Value).IsValid)
 			{
-				val2.PlayerPawn.Value.VelocityModifier = tuple2.Item2;
+				val2.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(val2, 100f);
 				Utilities.SetStateChanged((CBaseEntity)(object)val2.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			}
 		}
@@ -182,12 +142,26 @@ public class Lucky : DiceBlueprint
 				item2.InGameMoneyServices.Account += num;
 				Utilities.SetStateChanged((CBaseEntity)(object)item2, "CCSPlayerController", "m_pInGameMoneyServices", 0);
 				string value2 = "";
+				if (_activeBuffs.TryGetValue(item2, out var previous) && previous.Item3 == "damage")
+				{
+					DamageBonusManager.Unregister(item2, "Lucky");
+				}
+				if (_activeBuffs.TryGetValue(item2, out var previousSpeed) && previousSpeed.Item3 == "speed")
+				{
+					SpeedBonusManager.Unregister(item2, "Lucky");
+					if (((CEntityInstance)item2.PlayerPawn.Value).IsValid)
+					{
+						item2.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item2, 100f);
+						Utilities.SetStateChanged((CBaseEntity)(object)item2.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+					}
+				}
 				switch (_random.Next(0, 4))
 				{
 				case 0:
 					if (((CEntityInstance)item2.PlayerPawn.Value).IsValid)
 					{
-						item2.PlayerPawn.Value.VelocityModifier = 1.2f;
+						SpeedBonusManager.Register(item2, "Lucky", 0.2f);
+						item2.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item2, 100f);
 						Utilities.SetStateChanged((CBaseEntity)(object)item2.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 						_activeBuffs[item2] = (now + 5f, 1.2f, "speed");
 					}
@@ -195,6 +169,7 @@ public class Lucky : DiceBlueprint
 					break;
 				case 1:
 					_activeBuffs[item2] = (now + 5f, 1.2f, "damage");
+					DamageBonusManager.Register(item2, "Lucky", 1.2f - 1f);
 					value2 = "\ud83d\udcaa增伤";
 					break;
 				case 2:

@@ -31,14 +31,12 @@ public class DeathKnightComplete : DiceBlueprint
 	{
 		get
 		{
-			int num = 2;
+			int num = 1;
 			List<string> list = new List<string>(num);
 			CollectionsMarshal.SetCount(list, num);
 			Span<string> span = CollectionsMarshal.AsSpan(list);
 			int num2 = 0;
 			span[num2] = "OnTick";
-			num2++;
-			span[num2] = "OnPlayerTakeDamagePre";
 			return list;
 		}
 	}
@@ -79,6 +77,7 @@ public class DeathKnightComplete : DiceBlueprint
 			Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_ArmorValue", 0);
 			_players.Add(player);
 			_lastHealTime[player] = 0f;
+			DamageReductionManager.Register(player, "DeathKnightComplete", _config.Dices.DeathKnightComplete.InitialDamageReduction);
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
 				"playerName",
@@ -132,58 +131,6 @@ public class DeathKnightComplete : DiceBlueprint
 		Reset();
 	}
 
-	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
-	{
-		//IL_0056: Unknown result type (might be due to invalid IL or missing references)
-		//IL_011a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_007e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0116: Unknown result type (might be due to invalid IL or missing references)
-		CCSPlayerPawn obj = ((NativeObject)entity).As<CCSPlayerPawn>();
-		object obj2;
-		if (obj == null)
-		{
-			obj2 = null;
-		}
-		else
-		{
-			CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj).Controller;
-			if (controller == null)
-			{
-				obj2 = null;
-			}
-			else
-			{
-				CBasePlayerController value = controller.Value;
-				obj2 = ((value != null) ? ((NativeObject)value).As<CCSPlayerController>() : null);
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj2;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
-		{
-			return (HookResult)0;
-		}
-		if (!_startMaxHP.TryGetValue(val, out var value2) || value2 <= 0)
-		{
-			return (HookResult)0;
-		}
-		CCSPlayerPawn value3 = val.PlayerPawn.Value;
-		int num = value2 - ((CBaseEntity)value3).Health;
-		if (num < 0)
-		{
-			num = 0;
-		}
-		float initialDamageReduction = _config.Dices.DeathKnightComplete.InitialDamageReduction;
-		float num2 = (float)num / (float)value2;
-		float num3 = initialDamageReduction + num2 * (1f - initialDamageReduction);
-		float maxDamageReduction = _config.Dices.DeathKnightComplete.MaxDamageReduction;
-		if (num3 > maxDamageReduction)
-		{
-			num3 = maxDamageReduction;
-		}
-		info.Damage = (int)(info.Damage * (1f - num3));
-		return (HookResult)1;
-	}
-
 	public void OnTick()
 	{
 		if (_players.Count == 0)
@@ -229,6 +176,24 @@ public class DeathKnightComplete : DiceBlueprint
 				((CBaseEntity)value3).Health = Math.Min(((CBaseEntity)value3).Health + _config.Dices.DeathKnightComplete.KnifeHealPerSec, ((CBaseEntity)value3).MaxHealth);
 				Utilities.SetStateChanged((CBaseEntity)(object)value3, "CBaseEntity", "m_iHealth", 0);
 			}
+			if (!_startMaxHP.TryGetValue(item, out var value4) || value4 <= 0)
+			{
+				continue;
+			}
+			int num4 = value4 - ((CBaseEntity)item.PlayerPawn.Value).Health;
+			if (num4 < 0)
+			{
+				num4 = 0;
+			}
+			float initialDamageReduction = _config.Dices.DeathKnightComplete.InitialDamageReduction;
+			float num5 = (float)num4 / (float)value4;
+			float num6 = initialDamageReduction + num5 * (1f - initialDamageReduction);
+			float maxDamageReduction = _config.Dices.DeathKnightComplete.MaxDamageReduction;
+			if (num6 > maxDamageReduction)
+			{
+				num6 = maxDamageReduction;
+			}
+			DamageReductionManager.Register(item, "DeathKnightComplete", num6);
 		}
 	}
 

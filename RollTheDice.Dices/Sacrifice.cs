@@ -7,6 +7,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Timers;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -74,6 +75,10 @@ public class Sacrifice : DiceBlueprint
 
 	public override void Reset()
 	{
+		foreach (CCSPlayerController item in _speedBonusEndTime.Keys.ToList())
+		{
+			SpeedBonusManager.Unregister(item, "Sacrifice");
+		}
 		_players.Clear();
 		_teammateDeathCount.Clear();
 		_speedBonusEndTime.Clear();
@@ -145,7 +150,8 @@ public class Sacrifice : DiceBlueprint
 								((CBaseEntity)value2).MaxHealth = _config.Dices.Sacrifice.ReviveHP;
 								Utilities.SetStateChanged((CBaseEntity)(object)value2, "CBaseEntity", "m_iHealth", 0);
 								Utilities.SetStateChanged((CBaseEntity)(object)value2, "CBaseEntity", "m_iMaxHealth", 0);
-								value2.VelocityModifier = _config.Dices.Sacrifice.SpeedMultiplier;
+								SpeedBonusManager.Register(reviveTarget, "Sacrifice", _config.Dices.Sacrifice.SpeedMultiplier - 1f);
+								value2.VelocityModifier = 1f + SpeedBonusManager.GetEffective(reviveTarget, 100f);
 								Utilities.SetStateChanged((CBaseEntity)(object)value2, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 								_speedBonusEndTime[reviveTarget] = float.MaxValue;
 								if ((int)reviveTarget.Team == 3)
@@ -184,12 +190,20 @@ public class Sacrifice : DiceBlueprint
 			CCSPlayerController key = item.Key;
 			if ((CEntityInstance)(object)((key == null) ? null : key.PlayerPawn?.Value) == (CEntityInstance)null || !((CEntityInstance)key.PlayerPawn.Value).IsValid || ((CBaseEntity)key.PlayerPawn.Value).LifeState != 0)
 			{
+				if (key != null)
+				{
+					SpeedBonusManager.Unregister(key, "Sacrifice");
+				}
 				_speedBonusEndTime.Remove(key);
 			}
-			else if (key.PlayerPawn.Value.VelocityModifier != _config.Dices.Sacrifice.SpeedMultiplier)
+			else
 			{
-				key.PlayerPawn.Value.VelocityModifier = _config.Dices.Sacrifice.SpeedMultiplier;
-				Utilities.SetStateChanged((CBaseEntity)(object)key.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+				float num = 1f + SpeedBonusManager.GetEffective(key, 100f);
+				if (key.PlayerPawn.Value.VelocityModifier != num)
+				{
+					key.PlayerPawn.Value.VelocityModifier = num;
+					Utilities.SetStateChanged((CBaseEntity)(object)key.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+				}
 			}
 		}
 	}
