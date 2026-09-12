@@ -17,19 +17,7 @@ public class HighGravity : DiceBlueprint
 
 	public override string ClassName => "HighGravity";
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnPlayerTakeDamagePre";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string>();
 
 	public HighGravity(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
@@ -72,40 +60,6 @@ public class HighGravity : DiceBlueprint
 	public override void Destroy()
 	{
 		Reset();
-	}
-
-	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
-	{
-		//IL_008c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0054: Unknown result type (might be due to invalid IL or missing references)
-		//IL_008f: Unknown result type (might be due to invalid IL or missing references)
-		CCSPlayerPawn obj = ((NativeObject)entity).As<CCSPlayerPawn>();
-		object obj2;
-		if (obj == null)
-		{
-			obj2 = null;
-		}
-		else
-		{
-			CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj).Controller;
-			if (controller == null)
-			{
-				obj2 = null;
-			}
-			else
-			{
-				CBasePlayerController value = controller.Value;
-				obj2 = ((value != null) ? ((NativeObject)value).As<CCSPlayerController>() : null);
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj2;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
-		{
-			return (HookResult)0;
-		}
-		float effective = DamageReductionManager.GetEffective(val, _config.Dices.HighGravity.DamageReduction);
-		info.Damage = (int)(info.Damage * (1f - effective));
-		return (HookResult)1;
 	}
 
 	private static void ChangePlayerGravity(CCSPlayerController? player, float gravityScale)

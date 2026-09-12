@@ -31,14 +31,12 @@ public class Titanfall : DiceBlueprint
 	{
 		get
 		{
-			int num = 2;
+			int num = 1;
 			List<string> list = new List<string>(num);
 			CollectionsMarshal.SetCount(list, num);
 			Span<string> span = CollectionsMarshal.AsSpan(list);
 			int num2 = 0;
 			span[num2] = "OnTick";
-			num2++;
-			span[num2] = "OnPlayerTakeDamagePre";
 			return list;
 		}
 	}
@@ -194,70 +192,5 @@ public class Titanfall : DiceBlueprint
 			{
 			}
 		}
-	}
-
-	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
-	{
-		//IL_001b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00f2: Unknown result type (might be due to invalid IL or missing references)
-		//IL_008e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00af: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00ef: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00eb: Unknown result type (might be due to invalid IL or missing references)
-		if ((CEntityInstance)(object)entity == (CEntityInstance)null || !((CEntityInstance)entity).IsValid)
-		{
-			return (HookResult)0;
-		}
-		CHandle<CBaseEntity> attacker = info.Attacker;
-		object obj;
-		if (attacker == null)
-		{
-			obj = null;
-		}
-		else
-		{
-			CBaseEntity value = attacker.Value;
-			if (value == null)
-			{
-				obj = null;
-			}
-			else
-			{
-				CCSPlayerPawn obj2 = ((NativeObject)value).As<CCSPlayerPawn>();
-				if (obj2 == null)
-				{
-					obj = null;
-				}
-				else
-				{
-					CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj2).Controller;
-					if (controller == null)
-					{
-						obj = null;
-					}
-					else
-					{
-						CBasePlayerController value2 = controller.Value;
-						obj = ((value2 != null) ? ((NativeObject)value2).As<CCSPlayerController>() : null);
-					}
-				}
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
-		{
-			return (HookResult)0;
-		}
-		if (!_released.TryGetValue(val, out var value3) || !value3)
-		{
-			return (HookResult)0;
-		}
-		if (DamageBonusManager.IsHighest(val, "Titanfall"))
-		{
-			float effective = DamageBonusManager.GetEffective(val);
-			info.Damage = (int)(info.Damage * (1f + effective));
-			return (HookResult)1;
-		}
-		return (HookResult)0;
 	}
 }

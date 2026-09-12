@@ -167,12 +167,6 @@ public class LaserCage : DiceBlueprint
 			info.Damage = 0f;
 			return (HookResult)1;
 		}
-		if (((uint)info.BitsDamageType & 2u) != 0)
-		{
-			float effective = DamageReductionManager.GetEffective(val, 0.3f);
-			info.Damage = (int)(info.Damage * (1f - effective));
-			return (HookResult)1;
-		}
 		return (HookResult)0;
 	}
 

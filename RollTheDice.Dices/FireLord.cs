@@ -350,10 +350,6 @@ public class FireLord : DiceBlueprint
 				{
 					DamageBonusManager.Unregister(item, "FireLord");
 				}
-				if (DamageBonusManager.IsHighest(item, "FireLord"))
-				{
-					float effective = DamageBonusManager.GetEffective(item);
-				}
 			}
 			catch
 			{

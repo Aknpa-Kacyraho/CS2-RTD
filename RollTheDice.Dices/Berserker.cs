@@ -114,12 +114,6 @@ public class Berserker : DiceBlueprint
 			num2 = 0.3f;
 		}
 		DamageBonusManager.Register(val, "Berserker", num2);
-		if (DamageBonusManager.IsHighest(val, "Berserker"))
-		{
-			float effective = DamageBonusManager.GetEffective(val, maxMultiplier - 1f);
-			info.Damage = (int)(info.Damage * (1f + effective));
-			return (HookResult)1;
-		}
 		return (HookResult)0;
 	}
 }

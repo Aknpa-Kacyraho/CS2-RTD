@@ -21,7 +21,7 @@ public class SacrificeSelf : DiceBlueprint
 	{
 		get
 		{
-			int num = 3;
+			int num = 2;
 			List<string> list = new List<string>(num);
 			CollectionsMarshal.SetCount(list, num);
 			Span<string> span = CollectionsMarshal.AsSpan(list);
@@ -29,8 +29,6 @@ public class SacrificeSelf : DiceBlueprint
 			span[num2] = "OnPlayerButtonsChanged";
 			num2++;
 			span[num2] = "OnTick";
-			num2++;
-			span[num2] = "OnPlayerTakeDamagePre";
 			return list;
 		}
 	}
@@ -99,66 +97,6 @@ public class SacrificeSelf : DiceBlueprint
 		{
 			((CBasePlayerPawn)player.PlayerPawn.Value).CommitSuicide(false, true);
 		}
-	}
-
-	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
-	{
-		//IL_001b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00cf: Unknown result type (might be due to invalid IL or missing references)
-		//IL_008c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00cc: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00c8: Unknown result type (might be due to invalid IL or missing references)
-		if ((CEntityInstance)(object)entity == (CEntityInstance)null || !((CEntityInstance)entity).IsValid)
-		{
-			return (HookResult)0;
-		}
-		CHandle<CBaseEntity> attacker = info.Attacker;
-		object obj;
-		if (attacker == null)
-		{
-			obj = null;
-		}
-		else
-		{
-			CBaseEntity value = attacker.Value;
-			if (value == null)
-			{
-				obj = null;
-			}
-			else
-			{
-				CCSPlayerPawn obj2 = ((NativeObject)value).As<CCSPlayerPawn>();
-				if (obj2 == null)
-				{
-					obj = null;
-				}
-				else
-				{
-					CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj2).Controller;
-					if (controller == null)
-					{
-						obj = null;
-					}
-					else
-					{
-						CBasePlayerController value2 = controller.Value;
-						obj = ((value2 != null) ? ((NativeObject)value2).As<CCSPlayerController>() : null);
-					}
-				}
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_boostedTeammates.Contains(val))
-		{
-			return (HookResult)0;
-		}
-		if (DamageBonusManager.IsHighest(val, "SacrificeSelf"))
-		{
-			float effective = DamageBonusManager.GetEffective(val);
-			info.Damage = (int)(info.Damage * (1f + effective));
-			return (HookResult)1;
-		}
-		return (HookResult)0;
 	}
 
 	public void OnTick()

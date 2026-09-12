@@ -638,49 +638,6 @@ public class Fate : DiceBlueprint
 			}
 		}
 		CCSPlayerController victim = (CCSPlayerController)obj2;
-		CHandle<CBaseEntity> attacker = info.Attacker;
-		object obj3;
-		if (attacker == null)
-		{
-			obj3 = null;
-		}
-		else
-		{
-			CBaseEntity value2 = attacker.Value;
-			if (value2 == null)
-			{
-				obj3 = null;
-			}
-			else
-			{
-				CCSPlayerPawn obj4 = ((NativeObject)value2).As<CCSPlayerPawn>();
-				if (obj4 == null)
-				{
-					obj3 = null;
-				}
-				else
-				{
-					CHandle<CBasePlayerController> controller2 = ((CBasePlayerPawn)obj4).Controller;
-					if (controller2 == null)
-					{
-						obj3 = null;
-					}
-					else
-					{
-						CBasePlayerController value3 = controller2.Value;
-						obj3 = ((value3 != null) ? ((NativeObject)value3).As<CCSPlayerController>() : null);
-					}
-				}
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj3;
-		bool flag = false;
-		if ((CEntityInstance)(object)val != (CEntityInstance)null && ((CEntityInstance)val).IsValid && _assignments.TryGetValue(((CBasePlayerController)val).SteamID, out string value4) && value4 == "balance")
-		{
-			float effective = DamageBonusManager.GetEffective(val, _config.Dices.Fate.BalanceDamageBonus);
-			info.Damage = (int)(info.Damage * (1f + effective));
-			flag = true;
-		}
 		if ((CEntityInstance)(object)victim != (CEntityInstance)null && ((CEntityInstance)victim).IsValid && _assignments.TryGetValue(((CBasePlayerController)victim).SteamID, out string value5) && value5 == "web" && !_webTriggered.GetValueOrDefault(((CBasePlayerController)victim).SteamID))
 		{
 			int num = (int)((float)entity.Health - info.Damage);
@@ -760,7 +717,7 @@ public class Fate : DiceBlueprint
 				return (HookResult)1;
 			}
 		}
-		return (HookResult)(flag ? 1 : 0);
+		return (HookResult)0;
 	}
 
 	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)

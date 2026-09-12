@@ -244,11 +244,6 @@ public class FourHorsemen : DiceBlueprint
 		{
 			return (HookResult)0;
 		}
-		if (DamageBonusManager.HasAny(val) && DamageBonusManager.IsHighest(val, "FourHorsemenWar"))
-		{
-			float effective = DamageBonusManager.GetEffective(val);
-			info.Damage *= 1f + effective;
-		}
 		if (_assignments.TryGetValue(((CBasePlayerController)val).SteamID, out string value5) && value5 == "plague" && !_plagueInfected.Contains(((CBasePlayerController)val2).SteamID))
 		{
 			_plagueInfected.Add(((CBasePlayerController)val2).SteamID);
