@@ -8,19 +8,19 @@ namespace RollTheDice.Utils;
 /// </summary>
 public static class DamageReductionManager
 {
-	public static void Register(CCSPlayerController player, string source, float percentage, float? cap = null)
+	public static void Register(CCSPlayerController player, string source, float percentage, float? cap = null, float? durationSeconds = null)
 	{
-		StackingBonusManager.Set(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainReduction, source, percentage, cap);
+		StackingBonusManager.Set(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainReduction, source, percentage, cap, durationSeconds);
 	}
 
-	public static void RegisterBySteamId(ulong steamId, string source, float percentage, float? cap = null)
+	public static void RegisterBySteamId(ulong steamId, string source, float percentage, float? cap = null, float? durationSeconds = null)
 	{
-		StackingBonusManager.Set(steamId, StackingBonusManager.DomainReduction, source, percentage, cap);
+		StackingBonusManager.Set(steamId, StackingBonusManager.DomainReduction, source, percentage, cap, durationSeconds);
 	}
 
-	public static void AddStack(CCSPlayerController player, string source, float amount, float? cap = null)
+	public static void AddStack(CCSPlayerController player, string source, float amount, float? cap = null, float? durationSeconds = null)
 	{
-		StackingBonusManager.AddStack(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainReduction, source, amount, cap);
+		StackingBonusManager.AddStack(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainReduction, source, amount, cap, durationSeconds);
 	}
 
 	public static void Unregister(CCSPlayerController player, string source)

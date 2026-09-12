@@ -24,14 +24,12 @@ public class RouletteGambler : DiceBlueprint
 	{
 		get
 		{
-			int num = 2;
+			int num = 1;
 			List<string> list = new List<string>(num);
 			CollectionsMarshal.SetCount(list, num);
 			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int num2 = 0;
-			span[num2] = "EventPlayerDeath";
-			num2++;
-			span[num2] = "EventWeaponFire";
+			int index = 0;
+			span[index] = "EventWeaponFire";
 			return list;
 		}
 	}

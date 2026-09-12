@@ -13,8 +13,6 @@ public class NukeLeak : DiceBlueprint
 {
 	private bool _comboActive;
 
-	private static bool _timeAccelerated;
-
 	private float _detonationTime;
 
 	private bool _detonated;
@@ -56,7 +54,6 @@ public class NukeLeak : DiceBlueprint
 			_detonated = false;
 			if (_comboActive)
 			{
-				_timeAccelerated = true;
 				DiceSynergy.AnnounceCombo(player, "末日审判", "诸神黄昏+核泄漏！终焉加速降临！");
 			}
 		}
@@ -78,7 +75,6 @@ public class NukeLeak : DiceBlueprint
 		_players.Clear();
 		_detonationTime = 0f;
 		_detonated = false;
-		_timeAccelerated = false;
 	}
 
 	public void OnTick()

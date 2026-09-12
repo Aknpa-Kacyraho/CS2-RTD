@@ -8,19 +8,19 @@ namespace RollTheDice.Utils;
 /// </summary>
 public static class SpeedBonusManager
 {
-	public static void Register(CCSPlayerController player, string source, float percentage)
+	public static void Register(CCSPlayerController player, string source, float percentage, float? durationSeconds = null)
 	{
-		StackingBonusManager.Set(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainSpeed, source, percentage);
+		StackingBonusManager.Set(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainSpeed, source, percentage, null, durationSeconds);
 	}
 
-	public static void RegisterBySteamId(ulong steamId, string source, float percentage)
+	public static void RegisterBySteamId(ulong steamId, string source, float percentage, float? durationSeconds = null)
 	{
-		StackingBonusManager.Set(steamId, StackingBonusManager.DomainSpeed, source, percentage);
+		StackingBonusManager.Set(steamId, StackingBonusManager.DomainSpeed, source, percentage, null, durationSeconds);
 	}
 
-	public static void AddStack(CCSPlayerController player, string source, float amount, float? cap = null)
+	public static void AddStack(CCSPlayerController player, string source, float amount, float? cap = null, float? durationSeconds = null)
 	{
-		StackingBonusManager.AddStack(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainSpeed, source, amount, cap);
+		StackingBonusManager.AddStack(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainSpeed, source, amount, cap, durationSeconds);
 	}
 
 	public static void Unregister(CCSPlayerController player, string source)
