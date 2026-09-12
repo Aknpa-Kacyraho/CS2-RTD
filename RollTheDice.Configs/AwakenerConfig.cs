@@ -8,17 +8,17 @@ public class AwakenerConfig
 	public bool Enabled { get; set; } = true;
 
 	[JsonPropertyName("kills_to_max")]
-	public int KillsToMax { get; set; } = 2;
+	public int KillsToMax { get; set; } = 3;
 
 	[JsonPropertyName("start_damage_mult")]
-	public float StartDamageMult { get; set; } = 0.8f;
+	public float StartDamageMult { get; set; } = 1f;
 
 	[JsonPropertyName("start_speed_mult")]
-	public float StartSpeedMult { get; set; } = 0.8f;
+	public float StartSpeedMult { get; set; } = 1f;
 
 	[JsonPropertyName("max_damage_mult")]
-	public float MaxDamageMult { get; set; } = 2f;
+	public float MaxDamageMult { get; set; } = 2.5f;
 
 	[JsonPropertyName("max_speed_mult")]
-	public float MaxSpeedMult { get; set; } = 1.5f;
+	public float MaxSpeedMult { get; set; } = 1.8f;
 }

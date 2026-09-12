@@ -11,5 +11,5 @@ public class HangedManConfig
 	public int DrainHp { get; set; } = 1;
 
 	[JsonPropertyName("heal_hp")]
-	public int HealHp { get; set; } = 4;
+	public int HealHp { get; set; } = 8;
 }

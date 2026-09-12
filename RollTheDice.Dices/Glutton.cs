@@ -73,8 +73,8 @@ public class Glutton : DiceBlueprint
 		{
 			return (HookResult)0;
 		}
-		DamageBonusManager.Register(attacker, "Glutton", 0.1f);
-		SpeedBonusManager.Register(attacker, "Glutton", 0.05f);
+		DamageBonusManager.AddStack(attacker, "Glutton", 0.1f);
+		SpeedBonusManager.AddStack(attacker, "Glutton", 0.05f);
 		attacker.PrintToCenterAlert("\ud83c\udf7d 暴食！+10%伤害 +5%移速！");
 		int maxExtraDice = _config.Dices.Glutton.MaxExtraDice;
 		int num = (KillCounts.TryGetValue(((CBasePlayerController)attacker).SteamID, out var value) ? value : 0);

@@ -39,14 +39,12 @@ public class Awakener : DiceBlueprint
 	{
 		get
 		{
-			int num = 2;
+			int num = 1;
 			List<string> list = new List<string>(num);
 			CollectionsMarshal.SetCount(list, num);
 			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int num2 = 0;
-			span[num2] = "OnTick";
-			num2++;
-			span[num2] = "OnPlayerTakeDamagePre";
+			int index = 0;
+			span[index] = "OnTick";
 			return list;
 		}
 	}
@@ -107,9 +105,14 @@ public class Awakener : DiceBlueprint
 
 	private void Revert(CCSPlayerController player)
 	{
+		if ((CEntityInstance)(object)player != (CEntityInstance)null && ((CEntityInstance)player).IsValid)
+		{
+			DamageBonusManager.Unregister(player, ClassName);
+			SpeedBonusManager.Unregister(player, ClassName);
+		}
 		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
-			player.PlayerPawn.Value.VelocityModifier = 1f;
+			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
 		if (_originalMaxHealth.TryGetValue(player, out var value) && (CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
@@ -127,23 +130,16 @@ public class Awakener : DiceBlueprint
 			int killsToMax = _config.Dices.Awakener.KillsToMax;
 			float num = Math.Min((float)kills / (float)killsToMax, 1f);
 			float num2 = _config.Dices.Awakener.StartSpeedMult + num * (_config.Dices.Awakener.MaxSpeedMult - _config.Dices.Awakener.StartSpeedMult);
-			player.PlayerPawn.Value.VelocityModifier = num2;
+			float num3 = _config.Dices.Awakener.StartDamageMult + num * (_config.Dices.Awakener.MaxDamageMult - _config.Dices.Awakener.StartDamageMult);
+			SpeedBonusManager.Register(player, ClassName, num2 - 1f);
+			DamageBonusManager.Register(player, ClassName, num3 - 1f);
+			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
 	}
 
-	private float GetDamageMult(CCSPlayerController player)
-	{
-		int num = (_killCount.TryGetValue(player, out var value) ? value : 0);
-		int killsToMax = _config.Dices.Awakener.KillsToMax;
-		float num2 = Math.Min((float)num / (float)killsToMax, 1f);
-		return _config.Dices.Awakener.StartDamageMult + num2 * (_config.Dices.Awakener.MaxDamageMult - _config.Dices.Awakener.StartDamageMult);
-	}
-
 	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
 	{
-		//IL_001c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_001f: Unknown result type (might be due to invalid IL or missing references)
 		CheckKill(@event.Attacker);
 		CheckKill(@event.Assister);
 		return (HookResult)0;
@@ -179,60 +175,6 @@ public class Awakener : DiceBlueprint
 				player.PrintToCenterAlert($"⚡ 觉醒中... +100HP！({num}/{killsToMax})");
 			}
 		}
-	}
-
-	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
-	{
-		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
-		//IL_009d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_009a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0085: Unknown result type (might be due to invalid IL or missing references)
-		if (_players.Count == 0)
-		{
-			return (HookResult)0;
-		}
-		CHandle<CBaseEntity> attacker = info.Attacker;
-		object obj;
-		if (attacker == null)
-		{
-			obj = null;
-		}
-		else
-		{
-			CBaseEntity value = attacker.Value;
-			if (value == null)
-			{
-				obj = null;
-			}
-			else
-			{
-				CCSPlayerPawn obj2 = ((NativeObject)value).As<CCSPlayerPawn>();
-				if (obj2 == null)
-				{
-					obj = null;
-				}
-				else
-				{
-					CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj2).Controller;
-					if (controller == null)
-					{
-						obj = null;
-					}
-					else
-					{
-						CBasePlayerController value2 = controller.Value;
-						obj = ((value2 != null) ? ((NativeObject)value2).As<CCSPlayerController>() : null);
-					}
-				}
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
-		{
-			return (HookResult)0;
-		}
-		info.Damage *= GetDamageMult(val);
-		return (HookResult)1;
 	}
 
 	public void OnTick()

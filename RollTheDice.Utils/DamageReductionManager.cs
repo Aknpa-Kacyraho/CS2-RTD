@@ -1,69 +1,66 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using CounterStrikeSharp.API.Core;
 
 namespace RollTheDice.Utils;
 
+/// <summary>
+/// 伤害减免（跨 source 求和，同 source 可叠层）。实际应用已上移到主插件统一的 OnPlayerTakeDamagePre，
+/// 各 dice 只负责注册/注销。
+/// </summary>
 public static class DamageReductionManager
 {
-	private const float DefaultCap = 0.5f;
-
-	private static readonly Dictionary<ulong, Dictionary<string, float>> _reductions = new Dictionary<ulong, Dictionary<string, float>>();
-
-	public static void Register(CCSPlayerController player, string source, float percentage)
+	public static void Register(CCSPlayerController player, string source, float percentage, float? cap = null)
 	{
-		RegisterBySteamId(((CBasePlayerController)player).SteamID, source, percentage);
+		StackingBonusManager.Set(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainReduction, source, percentage, cap);
 	}
 
-	public static void RegisterBySteamId(ulong steamId, string source, float percentage)
+	public static void RegisterBySteamId(ulong steamId, string source, float percentage, float? cap = null)
 	{
-		if (!_reductions.ContainsKey(steamId))
-		{
-			_reductions[steamId] = new Dictionary<string, float>();
-		}
-		_reductions[steamId][source] = percentage;
+		StackingBonusManager.Set(steamId, StackingBonusManager.DomainReduction, source, percentage, cap);
+	}
+
+	public static void AddStack(CCSPlayerController player, string source, float amount, float? cap = null)
+	{
+		StackingBonusManager.AddStack(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainReduction, source, amount, cap);
 	}
 
 	public static void Unregister(CCSPlayerController player, string source)
 	{
-		UnregisterBySteamId(((CBasePlayerController)player).SteamID, source);
+		StackingBonusManager.Unregister(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainReduction, source);
 	}
 
 	public static void UnregisterBySteamId(ulong steamId, string source)
 	{
-		if (_reductions.TryGetValue(steamId, out Dictionary<string, float> value))
-		{
-			value.Remove(source);
-			if (value.Count == 0)
-			{
-				_reductions.Remove(steamId);
-			}
-		}
+		StackingBonusManager.Unregister(steamId, StackingBonusManager.DomainReduction, source);
 	}
 
+	public static float GetSource(CCSPlayerController player, string source)
+	{
+		return StackingBonusManager.GetSource(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainReduction, source);
+	}
+
+	public static float GetTotal(CCSPlayerController player)
+	{
+		return StackingBonusManager.GetTotal(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainReduction);
+	}
+
+	public static float GetTotalBySteamId(ulong steamId)
+	{
+		return StackingBonusManager.GetTotal(steamId, StackingBonusManager.DomainReduction);
+	}
+
+	/// <summary>已废弃：减伤改由主插件统一应用，这里恒为 0 以免旧 dice 代码重复减免。</summary>
 	public static float GetEffective(CCSPlayerController player, float cap = 0.5f)
 	{
-		return GetEffectiveBySteamId(((CBasePlayerController)player).SteamID, cap);
-	}
-
-	public static float GetEffectiveBySteamId(ulong steamId, float cap = 0.5f)
-	{
-		if (_reductions.TryGetValue(steamId, out Dictionary<string, float> value) && value.Count > 0)
-		{
-			return Math.Min(value.Values.Max(), cap);
-		}
 		return 0f;
 	}
 
 	public static bool HasAny(CCSPlayerController player)
 	{
-		Dictionary<string, float> value;
-		return _reductions.TryGetValue(((CBasePlayerController)player).SteamID, out value) && value.Count > 0;
+		return StackingBonusManager.HasAny(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainReduction);
 	}
 
 	public static void ClearAll()
 	{
-		_reductions.Clear();
+		StackingBonusManager.ClearDomain(StackingBonusManager.DomainReduction);
 	}
 }

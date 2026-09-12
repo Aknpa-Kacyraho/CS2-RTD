@@ -128,7 +128,7 @@ public class Jester : DiceBlueprint
 					int health = ((CBaseEntity)value2).Health;
 					if (_hasKill.Contains(item))
 					{
-						int num3 = Math.Min(health + _config.Dices.Jester.DamagePerSecond, ((CBaseEntity)value2).MaxHealth);
+						int num3 = Math.Min(health + _config.Dices.Jester.HealPerSecond, ((CBaseEntity)value2).MaxHealth);
 						((CBaseEntity)value2).Health = num3;
 						goto IL_01dd;
 					}

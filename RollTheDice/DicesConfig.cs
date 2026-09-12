@@ -8,6 +8,9 @@ public class DicesConfig
 	[JsonPropertyName("high_gravity")]
 	public HighGravityConfig HighGravity { get; set; } = new HighGravityConfig();
 
+	[JsonPropertyName("kinship")]
+	public KinshipConfig Kinship { get; set; } = new KinshipConfig();
+
 	[JsonPropertyName("increase_speed")]
 	public IncreaseSpeedConfig IncreaseSpeed { get; set; } = new IncreaseSpeedConfig();
 

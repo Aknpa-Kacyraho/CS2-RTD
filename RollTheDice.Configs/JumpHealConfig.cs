@@ -8,8 +8,8 @@ public class JumpHealConfig
 	public bool Enabled { get; set; } = true;
 
 	[JsonPropertyName("heal_min")]
-	public int HealMin { get; set; } = 5;
+	public int HealMin { get; set; } = 10;
 
 	[JsonPropertyName("heal_max")]
-	public int HealMax { get; set; } = 8;
+	public int HealMax { get; set; } = 15;
 }

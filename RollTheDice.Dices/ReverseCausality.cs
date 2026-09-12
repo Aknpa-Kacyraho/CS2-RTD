@@ -160,40 +160,8 @@ public class ReverseCausality : DiceBlueprint
 			}
 		}
 		CCSPlayerController val = (CCSPlayerController)obj2;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid)
+		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
 		{
-			return (HookResult)0;
-		}
-		if (!_players.Contains(val))
-		{
-			if (info.Damage <= 0f)
-			{
-				return (HookResult)0;
-			}
-			CHandle<CBaseEntity> attackerHandle = info.Attacker;
-			CCSPlayerController atk = null;
-			if (attackerHandle != null)
-			{
-				CBaseEntity attackerEnt = attackerHandle.Value;
-				if (attackerEnt != null)
-				{
-					CCSPlayerPawn atkPawn = ((NativeObject)attackerEnt).As<CCSPlayerPawn>();
-					if (atkPawn != null)
-					{
-						CHandle<CBasePlayerController> atkController = ((CBasePlayerPawn)atkPawn).Controller;
-						if (atkController != null && atkController.Value != null)
-						{
-							atk = ((NativeObject)atkController.Value).As<CCSPlayerController>();
-						}
-					}
-				}
-			}
-			if ((CEntityInstance)(object)atk != (CEntityInstance)null && ((CEntityInstance)atk).IsValid && (CEntityInstance)(object)atk != (CEntityInstance)(object)val && _players.Contains(atk) && _delayedDamage.TryGetValue(((CBasePlayerController)atk).SteamID, out List<PendingDamage> pendingList) && pendingList.Count > 0)
-			{
-				info.Damage = (int)float.Round(info.Damage * (1f + _config.Dices.ReverseCausality.DamageMultiplier));
-				atk.PrintToCenterAlert("⚡ 因果倒置！伤害翻倍！");
-				return (HookResult)1;
-			}
 			return (HookResult)0;
 		}
 		if (info.Damage <= 0f)

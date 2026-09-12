@@ -8,8 +8,8 @@ public class RouletteGamblerConfig
 	public bool Enabled { get; set; } = true;
 
 	[JsonPropertyName("death_chance")]
-	public float DeathChance { get; set; } = 0.02f;
+	public float DeathChance { get; set; } = 0.01f;
 
 	[JsonPropertyName("bonus_max_percent")]
-	public float BonusMaxPercent { get; set; } = 50f;
+	public float BonusMaxPercent { get; set; } = 0f;
 }

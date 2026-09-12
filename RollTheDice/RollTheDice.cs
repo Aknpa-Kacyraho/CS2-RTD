@@ -363,6 +363,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		((BasePlugin)this).RegisterListener<Listeners.OnMapEnd>(new Listeners.OnMapEnd(OnMapEnd));
 		((BasePlugin)this).RegisterListener<Listeners.OnServerPrecacheResources>(new Listeners.OnServerPrecacheResources(OnServerPrecacheResources));
 		((BasePlugin)this).RegisterListener<Listeners.OnPlayerButtonsChanged>(new Listeners.OnPlayerButtonsChanged(OnPlayerButtonsChanged));
+		((BasePlugin)this).RegisterListener<Listeners.OnPlayerTakeDamagePre>(new Listeners.OnPlayerTakeDamagePre(OnPlayerTakeDamagePreCentral));
 		if (hotReload)
 		{
 			Console.WriteLine(((BasePlugin)this).Localizer["core.hotreload"]);
@@ -391,6 +392,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		((BasePlugin)this).RemoveListener<Listeners.OnMapStart>(new Listeners.OnMapStart(OnMapStart));
 		((BasePlugin)this).RemoveListener<Listeners.OnMapEnd>(new Listeners.OnMapEnd(OnMapEnd));
 		((BasePlugin)this).RemoveListener<Listeners.OnServerPrecacheResources>(new Listeners.OnServerPrecacheResources(OnServerPrecacheResources));
+		((BasePlugin)this).RemoveListener<Listeners.OnPlayerTakeDamagePre>(new Listeners.OnPlayerTakeDamagePre(OnPlayerTakeDamagePreCentral));
 		Console.WriteLine(((BasePlugin)this).Localizer["core.unload"]);
 	}
 
@@ -961,6 +963,63 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 		attacker.PrintToChat($" {((BasePlugin)this).Localizer["command.prefix"].Value}\ud83c\udfaf {(_originalPlayerNames.TryGetValue(userid, out string value2) ? value2 : ((CBasePlayerController)userid).PlayerName)}的骰子：{string.Join(" + ", list)}");
 		return (HookResult)0;
+	}
+
+	private static CCSPlayerController? ResolvePlayerController(CBaseEntity? entity)
+	{
+		if ((CEntityInstance)(object)entity == (CEntityInstance)null)
+		{
+			return null;
+		}
+		CCSPlayerPawn pawn = ((NativeObject)entity).As<CCSPlayerPawn>();
+		if (pawn == null)
+		{
+			return null;
+		}
+		CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)pawn).Controller;
+		if (controller == null || controller.Value == null)
+		{
+			return null;
+		}
+		return ((NativeObject)controller.Value).As<CCSPlayerController>();
+	}
+
+	/// <summary>
+	/// 统一的伤害加成/减免应用点：attacker 的总伤害加成（跨 dice 求和）与 victim 的总减伤（跨 dice 求和）在此一次性结算。
+	/// 各 dice 只负责注册/注销，不再各自乘 info.Damage，避免被重复放大。
+	/// </summary>
+	public HookResult OnPlayerTakeDamagePreCentral(CBaseEntity entity, CTakeDamageInfo info)
+	{
+		if (info.Damage <= 0f)
+		{
+			return HookResult.Continue;
+		}
+		bool changed = false;
+		CCSPlayerController attacker = ResolvePlayerController(info.Attacker?.Value);
+		if ((CEntityInstance)(object)attacker != (CEntityInstance)null && ((CEntityInstance)attacker).IsValid && !attacker.IsBot && !((CBasePlayerController)attacker).IsHLTV)
+		{
+			float bonus = DamageBonusManager.GetTotal(attacker);
+			if (bonus != 0f)
+			{
+				info.Damage *= 1f + bonus;
+				changed = true;
+			}
+		}
+		CCSPlayerController victim = ResolvePlayerController(entity);
+		if ((CEntityInstance)(object)victim != (CEntityInstance)null && ((CEntityInstance)victim).IsValid)
+		{
+			float reduction = DamageReductionManager.GetTotal(victim);
+			if (reduction > 0f)
+			{
+				if (reduction > 0.95f)
+				{
+					reduction = 0.95f;
+				}
+				info.Damage *= 1f - reduction;
+				changed = true;
+			}
+		}
+		return changed ? HookResult.Changed : HookResult.Continue;
 	}
 
 	private void OnMapStart(string mapName)

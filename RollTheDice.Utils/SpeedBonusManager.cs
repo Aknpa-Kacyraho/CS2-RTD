@@ -1,69 +1,60 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using CounterStrikeSharp.API.Core;
 
 namespace RollTheDice.Utils;
 
+/// <summary>
+/// 移速加成（跨 source 求和，同 source 可叠层）。读取方（各 dice 的 OnTick）用 VelocityModifier 写入，
+/// 多来源不会重复叠加，求和即可。
+/// </summary>
 public static class SpeedBonusManager
 {
-	private const float DefaultCap = 0.5f;
-
-	private static readonly Dictionary<ulong, Dictionary<string, float>> _bonuses = new Dictionary<ulong, Dictionary<string, float>>();
-
 	public static void Register(CCSPlayerController player, string source, float percentage)
 	{
-		RegisterBySteamId(((CBasePlayerController)player).SteamID, source, percentage);
+		StackingBonusManager.Set(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainSpeed, source, percentage);
 	}
 
 	public static void RegisterBySteamId(ulong steamId, string source, float percentage)
 	{
-		if (!_bonuses.ContainsKey(steamId))
-		{
-			_bonuses[steamId] = new Dictionary<string, float>();
-		}
-		_bonuses[steamId][source] = percentage;
+		StackingBonusManager.Set(steamId, StackingBonusManager.DomainSpeed, source, percentage);
+	}
+
+	public static void AddStack(CCSPlayerController player, string source, float amount, float? cap = null)
+	{
+		StackingBonusManager.AddStack(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainSpeed, source, amount, cap);
 	}
 
 	public static void Unregister(CCSPlayerController player, string source)
 	{
-		UnregisterBySteamId(((CBasePlayerController)player).SteamID, source);
+		StackingBonusManager.Unregister(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainSpeed, source);
 	}
 
 	public static void UnregisterBySteamId(ulong steamId, string source)
 	{
-		if (_bonuses.TryGetValue(steamId, out Dictionary<string, float> value))
-		{
-			value.Remove(source);
-			if (value.Count == 0)
-			{
-				_bonuses.Remove(steamId);
-			}
-		}
+		StackingBonusManager.Unregister(steamId, StackingBonusManager.DomainSpeed, source);
 	}
 
 	public static float GetEffective(CCSPlayerController player, float cap = 0.5f)
 	{
-		return GetEffectiveBySteamId(((CBasePlayerController)player).SteamID, cap);
+		return StackingBonusManager.GetTotal(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainSpeed, cap);
 	}
 
 	public static float GetEffectiveBySteamId(ulong steamId, float cap = 0.5f)
 	{
-		if (_bonuses.TryGetValue(steamId, out Dictionary<string, float> value) && value.Count > 0)
-		{
-			return Math.Min(value.Values.Max(), Math.Min(cap, 0.5f));
-		}
-		return 0f;
+		return StackingBonusManager.GetTotal(steamId, StackingBonusManager.DomainSpeed, cap);
+	}
+
+	public static float GetTotal(CCSPlayerController player, float? cap = null)
+	{
+		return StackingBonusManager.GetTotal(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainSpeed, cap);
 	}
 
 	public static bool HasAny(CCSPlayerController player)
 	{
-		Dictionary<string, float> value;
-		return _bonuses.TryGetValue(((CBasePlayerController)player).SteamID, out value) && value.Count > 0;
+		return StackingBonusManager.HasAny(((CBasePlayerController)player).SteamID, StackingBonusManager.DomainSpeed);
 	}
 
 	public static void ClearAll()
 	{
-		_bonuses.Clear();
+		StackingBonusManager.ClearDomain(StackingBonusManager.DomainSpeed);
 	}
 }

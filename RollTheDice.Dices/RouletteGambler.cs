@@ -4,14 +4,16 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
 public class RouletteGambler : DiceBlueprint
 {
+	private const float BonusPerShot = 0.01f;
+
 	private readonly Random _random = new Random(Guid.NewGuid().GetHashCode());
 
 	private readonly Dictionary<CCSPlayerController, int> _bonusShots = new Dictionary<CCSPlayerController, int>();
@@ -38,14 +40,12 @@ public class RouletteGambler : DiceBlueprint
 	{
 		get
 		{
-			int num = 2;
+			int num = 1;
 			List<string> list = new List<string>(num);
 			CollectionsMarshal.SetCount(list, num);
 			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int num2 = 0;
-			span[num2] = "OnTick";
-			num2++;
-			span[num2] = "OnPlayerTakeDamagePre";
+			int index = 0;
+			span[index] = "OnTick";
 			return list;
 		}
 	}
@@ -94,9 +94,15 @@ public class RouletteGambler : DiceBlueprint
 
 	private void RevertBonus(CCSPlayerController player)
 	{
+		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid)
+		{
+			return;
+		}
+		DamageBonusManager.Unregister(player, ClassName);
+		SpeedBonusManager.Unregister(player, ClassName);
 		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
-			player.PlayerPawn.Value.VelocityModifier = 1f;
+			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
 	}
@@ -105,9 +111,7 @@ public class RouletteGambler : DiceBlueprint
 	{
 		if (!((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
-			int num = (_bonusShots.TryGetValue(player, out var value) ? value : 0);
-			float bonusMaxPercent = _config.Dices.RouletteGambler.BonusMaxPercent;
-			float num2 = Math.Min((float)num * 0.01f, bonusMaxPercent / 100f);
+			float num2 = SpeedBonusManager.GetEffective(player, 100f);
 			player.PlayerPawn.Value.VelocityModifier = 1f + num2;
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
@@ -135,69 +139,8 @@ public class RouletteGambler : DiceBlueprint
 		}
 	}
 
-	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
-	{
-		//IL_0016: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e6: Unknown result type (might be due to invalid IL or missing references)
-		//IL_008a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e2: Unknown result type (might be due to invalid IL or missing references)
-		if (_bonusShots.Count == 0)
-		{
-			return (HookResult)0;
-		}
-		CHandle<CBaseEntity> attacker = info.Attacker;
-		object obj;
-		if (attacker == null)
-		{
-			obj = null;
-		}
-		else
-		{
-			CBaseEntity value = attacker.Value;
-			if (value == null)
-			{
-				obj = null;
-			}
-			else
-			{
-				CCSPlayerPawn obj2 = ((NativeObject)value).As<CCSPlayerPawn>();
-				if (obj2 == null)
-				{
-					obj = null;
-				}
-				else
-				{
-					CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj2).Controller;
-					if (controller == null)
-					{
-						obj = null;
-					}
-					else
-					{
-						CBasePlayerController value2 = controller.Value;
-						obj = ((value2 != null) ? ((NativeObject)value2).As<CCSPlayerController>() : null);
-					}
-				}
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
-		{
-			return (HookResult)0;
-		}
-		int num = (_bonusShots.TryGetValue(val, out var value3) ? value3 : 0);
-		float bonusMaxPercent = _config.Dices.RouletteGambler.BonusMaxPercent;
-		float num2 = Math.Min((float)num * 0.01f, bonusMaxPercent / 100f);
-		info.Damage *= 1f + num2;
-		return (HookResult)1;
-	}
-
 	public HookResult EventWeaponFire(EventWeaponFire @event, GameEventInfo info)
 	{
-		//IL_0071: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0171: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00d6: Unknown result type (might be due to invalid IL or missing references)
-		//IL_016d: Unknown result type (might be due to invalid IL or missing references)
 		CCSPlayerController userid = @event.Userid;
 		if ((CEntityInstance)(object)userid == (CEntityInstance)null || !((CEntityInstance)userid).IsValid || !_players.Contains(userid) || (CEntityInstance)(object)userid.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)userid.PlayerPawn.Value).IsValid || ((CBaseEntity)userid.PlayerPawn.Value).LifeState != 0)
 		{
@@ -213,14 +156,22 @@ public class RouletteGambler : DiceBlueprint
 			userid.PrintToCenterAlert("\ud83d\udd2b 赌命失败!");
 			return (HookResult)0;
 		}
-		int num = (_bonusShots.TryGetValue(userid, out var value) ? value : 0);
-		int num2 = (int)_config.Dices.RouletteGambler.BonusMaxPercent;
-		if (num < num2)
+		float current = DamageBonusManager.GetSource(userid, ClassName);
+		float cap = _config.Dices.RouletteGambler.BonusMaxPercent;
+		if (cap > 0f && current >= cap / 100f)
 		{
-			_bonusShots[userid] = num + 1;
-			ApplyBonus(userid);
-			userid.PrintToCenterAlert($"\ud83d\udd2b 赌命成功! 当前加成: {num + 1}%");
+			return (HookResult)0;
 		}
+		float amount = BonusPerShot;
+		if (cap > 0f && current + amount > cap / 100f)
+		{
+			amount = cap / 100f - current;
+		}
+		DamageBonusManager.AddStack(userid, ClassName, amount);
+		SpeedBonusManager.AddStack(userid, ClassName, amount);
+		_bonusShots[userid] = (_bonusShots.TryGetValue(userid, out var value) ? value : 0) + 1;
+		ApplyBonus(userid);
+		userid.PrintToCenterAlert($"\ud83d\udd2b 赌命成功! 当前加成: +{(current + amount) * 100f:F0}%");
 		return (HookResult)0;
 	}
 }
