@@ -459,7 +459,7 @@ public class Fate : DiceBlueprint
 			{
 			case "orbit":
 			{
-				value5.VelocityModifier = 1.2f;
+				value5.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player2, 100f);
 				Utilities.SetStateChanged((CBaseEntity)(object)value5, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 				if (!_orbitDeathTime.TryGetValue(sid2, out var value9) || !(num >= value9))
 				{
