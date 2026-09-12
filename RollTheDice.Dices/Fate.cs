@@ -162,29 +162,6 @@ public class Fate : DiceBlueprint
 			player.PrintToChat($" {_localizer["command.prefix"].Value}\ud83c\udf05 命运·黎明：死后复活，HP-{_config.Dices.Fate.DawnHpPenalty}");
 			break;
 		}
-		Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83d\udd2e {((CBasePlayerController)player).PlayerName} 的命运——{FateDisplayName(text)}！");
-	}
-
-	private static string FateDisplayName(string fate)
-	{
-		if (1 == 0)
-		{
-		}
-		string result = fate switch
-		{
-			"orbit" => "命轨", 
-			"dice_luck" => "骰运", 
-			"balance" => "天秤", 
-			"compass" => "罗盘", 
-			"web" => "织网", 
-			"darktide" => "暗潮", 
-			"dawn" => "黎明", 
-			_ => fate, 
-		};
-		if (1 == 0)
-		{
-		}
-		return result;
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)

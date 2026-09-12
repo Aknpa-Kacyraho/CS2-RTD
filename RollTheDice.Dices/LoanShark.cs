@@ -13,6 +13,8 @@ public class LoanShark : DiceBlueprint
 {
 	private readonly HashSet<ulong> _hasKilledThisRound = new HashSet<ulong>();
 
+	private readonly HashSet<ulong> _loanActive = new HashSet<ulong>();
+
 	public override string ClassName => "LoanShark";
 
 	public override List<string> Events
@@ -40,6 +42,7 @@ public class LoanShark : DiceBlueprint
 		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
 			_players.Add(player);
+			_loanActive.Add(((CBasePlayerController)player).SteamID);
 			int loanAmount = _config.Dices.LoanShark.LoanAmount;
 			player.InGameMoneyServices.Account = loanAmount;
 			Utilities.SetStateChanged((CBaseEntity)(object)player, "CCSPlayerController", "m_pInGameMoneyServices", 0);
@@ -58,39 +61,42 @@ public class LoanShark : DiceBlueprint
 
 	public override void Reset()
 	{
-		foreach (CCSPlayerController item in _players.ToList())
+		foreach (ulong sid in _loanActive.ToList())
 		{
-			if ((CEntityInstance)(object)item == (CEntityInstance)null || !((CEntityInstance)item).IsValid)
+			CCSPlayerController item = Utilities.GetPlayers().FirstOrDefault((CCSPlayerController p) => ((CEntityInstance)p).IsValid && ((CBasePlayerController)p).SteamID == sid);
+			if ((CEntityInstance)(object)item == (CEntityInstance)null || !((CEntityInstance)item).IsValid || item.InGameMoneyServices == null)
 			{
 				continue;
 			}
 			item.InGameMoneyServices.Account = 0;
 			Utilities.SetStateChanged((CBaseEntity)(object)item, "CCSPlayerController", "m_pInGameMoneyServices", 0);
-			if (_hasKilledThisRound.Contains(((CBasePlayerController)item).SteamID))
+			if (_hasKilledThisRound.Contains(sid))
 			{
 				continue;
 			}
 			item.PrintToCenterAlert("你没能还债！高利贷找上门了！");
-			if (!((CEntityInstance)(object)item.PlayerPawn?.Value != (CEntityInstance)null) || !((CEntityInstance)item.PlayerPawn.Value).IsValid || ((CBaseEntity)item.PlayerPawn.Value).LifeState != 0)
+			CCSPlayerPawn pawn = item.PlayerPawn?.Value;
+			if ((CEntityInstance)(object)pawn == (CEntityInstance)null || !((CEntityInstance)pawn).IsValid || ((CBaseEntity)pawn).LifeState != 0)
 			{
 				continue;
 			}
 			if (!item.IsBot && !((CBasePlayerController)item).IsHLTV)
 			{
-				((CBasePlayerPawn)item.PlayerPawn.Value).CommitSuicide(false, true);
+				((CBasePlayerPawn)pawn).CommitSuicide(false, true);
 				continue;
 			}
 			try
 			{
-				((CBasePlayerPawn)item.PlayerPawn.Value).CommitSuicide(false, true);
+				((CBasePlayerPawn)pawn).CommitSuicide(false, true);
 			}
 			catch
 			{
-				((CBaseEntity)item.PlayerPawn.Value).Health = 0;
-				Utilities.SetStateChanged((CBaseEntity)(object)item.PlayerPawn.Value, "CBaseEntity", "m_iHealth", 0);
+				((CBaseEntity)pawn).Health = 0;
+				Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CBaseEntity", "m_iHealth", 0);
 			}
 		}
 		_players.Clear();
+		_loanActive.Clear();
 		_hasKilledThisRound.Clear();
 	}
 
@@ -109,14 +115,9 @@ public class LoanShark : DiceBlueprint
 		{
 			return (HookResult)0;
 		}
-		foreach (CCSPlayerController item in _players.ToList())
+		if (_loanActive.Contains(((CBasePlayerController)attacker).SteamID))
 		{
-			if ((CEntityInstance)(object)item == (CEntityInstance)null || !((CEntityInstance)item).IsValid || ((CBasePlayerController)item).SteamID != ((CBasePlayerController)attacker).SteamID)
-			{
-				continue;
-			}
 			_hasKilledThisRound.Add(((CBasePlayerController)attacker).SteamID);
-			break;
 		}
 		return (HookResult)0;
 	}
