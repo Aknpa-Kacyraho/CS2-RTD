@@ -7,6 +7,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Memory;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -93,6 +94,10 @@ public class Skyline : DiceBlueprint
 			((CBaseEntity)value).MoveType = (MoveType_t)2;
 			Schema.SetSchemaValue<int>(((NativeEntity)value).Handle, "CBaseEntity", "m_nActualMoveType", 2);
 			Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_MoveType", 0);
+			if (DiceSynergy.HasPartner(player, "NoRecoil") && RollTheDice.Instance?.HasDiceActive(player, "NoRecoil") != true)
+			{
+				player.ReplicateConVar("weapon_accuracy_nospread", "0");
+			}
 		}
 	}
 
@@ -115,6 +120,11 @@ public class Skyline : DiceBlueprint
 			_flightEndTime[player] = num + flightDuration;
 			_cooldowns[player] = num + _config.Dices.Skyline.Cooldown;
 			player.PrintToCenterAlert($"☁ 飞行中！{flightDuration}秒");
+			if (DiceSynergy.HasPartner(player, "NoRecoil"))
+			{
+				NoRecoil.ApplyNoRecoil(player);
+				player.PrintToCenterAlert("✈ 制空权！飞行期间零后坐零扩散！");
+			}
 		}
 	}
 
@@ -145,6 +155,10 @@ public class Skyline : DiceBlueprint
 					((CBaseEntity)value).MoveType = (MoveType_t)7;
 					Schema.SetSchemaValue<int>(((NativeEntity)value).Handle, "CBaseEntity", "m_nActualMoveType", 7);
 					Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_MoveType", 0);
+				}
+				if (DiceSynergy.HasPartner(key, "NoRecoil"))
+				{
+					NoRecoil.ApplyNoRecoil(key);
 				}
 			}
 		}

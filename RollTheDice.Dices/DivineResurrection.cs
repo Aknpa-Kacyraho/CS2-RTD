@@ -4,9 +4,11 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -48,6 +50,10 @@ public class DivineResurrection : DiceBlueprint
 				"playerName",
 				((CBasePlayerController)player).PlayerName
 			} });
+			if (DiceSynergy.HasPartner(player, "Kinship"))
+			{
+				DiceSynergy.AnnounceCombo(player, "生死与共", "羁绊无敌翻倍，复活的队友附带 2s 无敌！");
+			}
 		}
 	}
 
@@ -164,6 +170,23 @@ public class DivineResurrection : DiceBlueprint
 							string value4 = _localizer["command.prefix"].Value;
 							capturedDead.PrintToChat(value4 + _localizer["dice_DivineResurrection_revived"].Value);
 							capturedAttacker.PrintToChat(value4 + _localizer["dice_DivineResurrection_reviver"].Value.Replace("{player}", ((CBasePlayerController)capturedDead).PlayerName));
+							if (DiceSynergy.HasPartner(capturedAttacker, "Kinship"))
+							{
+								CCSPlayerPawn revivedPawn = capturedDead.PlayerPawn?.Value;
+								if (revivedPawn != null && ((CEntityInstance)revivedPawn).IsValid)
+								{
+									((CBaseEntity)revivedPawn).TakesDamage = false;
+									capturedDead.PrintToCenterAlert("\ud83e\udd1d \u751f\u6b7b\u4e0e\u5171\uff1a\u590d\u6d3b\u83b7\u5f97 2s \u65e0\u654c\uff01");
+									new Timer(2f, (Action)delegate
+									{
+										CCSPlayerPawn after = capturedDead.PlayerPawn?.Value;
+										if (after != null && ((CEntityInstance)after).IsValid)
+										{
+											((CBaseEntity)after).TakesDamage = true;
+										}
+									}, (TimerFlags?)null);
+								}
+							}
 						}
 					});
 				}

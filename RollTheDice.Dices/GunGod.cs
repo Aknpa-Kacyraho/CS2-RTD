@@ -20,12 +20,14 @@ public class GunGod : DiceBlueprint
 	{
 		get
 		{
-			int num = 1;
+			int num = 2;
 			List<string> list = new List<string>(num);
 			CollectionsMarshal.SetCount(list, num);
 			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnPlayerTakeDamagePre";
+			int num2 = 0;
+			span[num2] = "OnPlayerTakeDamagePre";
+			num2++;
+			span[num2] = "OnTick";
 			return list;
 		}
 	}
@@ -41,12 +43,17 @@ public class GunGod : DiceBlueprint
 		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
 			_players.Add(player);
-			DamageReductionManager.Register(player, "GunGod", 0.66f);
+			float reduction = (DiceSynergy.HasPartner(player, "NoRecoil") ? 0.75f : 0.66f);
+			DamageReductionManager.Register(player, "GunGod", reduction);
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
 			} });
+			if (DiceSynergy.HasPartner(player, "NoRecoil"))
+			{
+				DiceSynergy.AnnounceCombo(player, "完美枪械", "减伤提升至 75%，任意武器零扩散！");
+			}
 		}
 	}
 
@@ -68,6 +75,19 @@ public class GunGod : DiceBlueprint
 	public override void Destroy()
 	{
 		Reset();
+	}
+
+	public void OnTick()
+	{
+		foreach (CCSPlayerController player in _players)
+		{
+			if (player == null || !player.IsValid)
+			{
+				continue;
+			}
+			float reduction = (DiceSynergy.HasPartner(player, "NoRecoil") ? 0.75f : 0.66f);
+			DamageReductionManager.Register(player, "GunGod", reduction);
+		}
 	}
 
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)

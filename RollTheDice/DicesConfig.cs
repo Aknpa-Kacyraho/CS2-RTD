@@ -478,4 +478,28 @@ public class DicesConfig
 
 	[JsonPropertyName("wolf")]
 	public WolfConfig Wolf { get; set; } = new WolfConfig();
+
+	[JsonPropertyName("combo")]
+	public ComboConfig Combo { get; set; } = new ComboConfig();
+
+	[JsonPropertyName("pain_converter")]
+	public PainConverterConfig PainConverter { get; set; } = new PainConverterConfig();
+
+	[JsonPropertyName("anatomist")]
+	public AnatomistConfig Anatomist { get; set; } = new AnatomistConfig();
+
+	[JsonPropertyName("iron_head")]
+	public IronHeadConfig IronHead { get; set; } = new IronHeadConfig();
+
+	[JsonPropertyName("guillotine")]
+	public GuillotineConfig Guillotine { get; set; } = new GuillotineConfig();
+
+	[JsonPropertyName("crouch")]
+	public CrouchConfig Crouch { get; set; } = new CrouchConfig();
+
+	[JsonPropertyName("last_stand")]
+	public LastStandConfig LastStand { get; set; } = new LastStandConfig();
+
+	[JsonPropertyName("reload_gap")]
+	public ReloadGapConfig ReloadGap { get; set; } = new ReloadGapConfig();
 }

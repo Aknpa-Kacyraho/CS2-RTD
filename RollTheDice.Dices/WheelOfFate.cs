@@ -7,6 +7,7 @@ using CounterStrikeSharp.API.Modules.Entities.Constants;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -51,6 +52,10 @@ public class WheelOfFate : DiceBlueprint
 				"playerName",
 				((CBasePlayerController)player).PlayerName
 			} });
+			if (DiceSynergy.HasPartner(player, "Fate"))
+			{
+				DiceSynergy.AnnounceCombo(player, "命运双生", "命运之轮复活率提升至 80%！");
+			}
 		}
 	}
 
@@ -96,7 +101,8 @@ public class WheelOfFate : DiceBlueprint
 			if (obj != null)
 			{
 				double num = _random.NextDouble();
-				if (num >= (double)_config.Dices.WheelOfFate.ReviveChance)
+				float reviveChance = (DiceSynergy.HasPartner(victim, "Fate") ? 0.8f : _config.Dices.WheelOfFate.ReviveChance);
+				if (num >= (double)reviveChance)
 				{
 					string value2 = _localizer["dice_WheelOfFate_failed"].Value;
 					if (!string.IsNullOrEmpty(value2))
@@ -188,6 +194,18 @@ public class WheelOfFate : DiceBlueprint
 										}
 										victim.PlayerPawn.Value.ArmorValue = 100;
 										Utilities.SetStateChanged((CBaseEntity)(object)victim.PlayerPawn.Value, "CCSPlayerPawn", "m_ArmorValue", 0);
+										if (Reincarnation.ComboWheelVictims.Remove(((CBasePlayerController)victim).SteamID))
+										{
+											ulong comboSteamId = ((CBasePlayerController)victim).SteamID;
+											int comboMax = _config.Dices.Reincarnation.MaxStacks;
+											int comboCur = (Reincarnation.PendingExtraDice.TryGetValue(comboSteamId, out var comboValue) ? comboValue : 0);
+											if (comboCur < comboMax)
+											{
+												Reincarnation.PendingExtraDice[comboSteamId] = comboCur + 1;
+												victim.PrintToCenterAlert("\u267b 不死轮回！下回合额外骰子 +1！");
+												Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + "\u267b 不死轮回联动！" + ((CBasePlayerController)victim).PlayerName + " 复活成功，轮回层数 +1！");
+											}
+										}
 										NotifyStatus(victim, ClassName, new Dictionary<string, string> { 
 										{
 											"playerName",

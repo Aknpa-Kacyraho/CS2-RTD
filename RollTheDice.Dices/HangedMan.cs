@@ -6,6 +6,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -64,6 +65,10 @@ public class HangedMan : DiceBlueprint
 				((CBasePlayerController)player).PlayerName
 			} });
 			player.PrintToCenterAlert("\ud83d\udc80 命悬一线！每秒扣血，击杀敌人逆转诅咒！");
+			if (DiceSynergy.HasPartner(player, "Gaia"))
+			{
+				DiceSynergy.AnnounceCombo(player, "生死天平", "诅咒逆转后每秒回复 12HP！");
+			}
 		}
 	}
 
@@ -130,7 +135,7 @@ public class HangedMan : DiceBlueprint
 				CCSPlayerPawn value2 = item.PlayerPawn.Value;
 				if (_reversed.TryGetValue(item, out var value3) & value3)
 				{
-					int healHp = _config.Dices.HangedMan.HealHp;
+					int healHp = _config.Dices.HangedMan.HealHp + (DiceSynergy.HasPartner(item, "Gaia") ? 4 : 0);
 					int num2 = Math.Min(((CBaseEntity)value2).Health + healHp, ((CBaseEntity)value2).MaxHealth);
 					if (num2 > ((CBaseEntity)value2).Health)
 					{

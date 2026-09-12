@@ -52,6 +52,10 @@ public class Miser : DiceBlueprint
 			{
 				DiceSynergy.AnnounceCombo(player, "资本要塞", "资本要塞联动生效！");
 			}
+			if (DiceSynergy.HasPartner(player, "LoanShark"))
+			{
+				DiceSynergy.AnnounceCombo(player, "华尔街之狼", "吝啬减伤上限提升至 90%！");
+			}
 			if (player.InGameMoneyServices != null)
 			{
 				_startingMoney[player] = player.InGameMoneyServices.Account;
@@ -114,6 +118,10 @@ public class Miser : DiceBlueprint
 		int threshold = _config.Dices.Miser.Threshold;
 		float reductionPerStep = _config.Dices.Miser.ReductionPerStep;
 		float maxReduction = _config.Dices.Miser.MaxReduction;
+		if (DiceSynergy.HasPartner(player, "LoanShark"))
+		{
+			maxReduction = Math.Max(maxReduction, 0.9f);
+		}
 		int num3 = num2 / threshold;
 		return Math.Min((float)num3 * reductionPerStep, maxReduction);
 	}

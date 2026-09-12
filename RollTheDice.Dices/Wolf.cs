@@ -54,6 +54,10 @@ public class Wolf : DiceBlueprint
 				"playerName",
 				((CBasePlayerController)player).PlayerName
 			} });
+			if (DiceSynergy.HasPartner(player, "WolfKing"))
+			{
+				DiceSynergy.AnnounceCombo(player, "月下狼群", "每只狼的加成额外 +1 档！");
+			}
 		}
 	}
 
@@ -110,6 +114,10 @@ public class Wolf : DiceBlueprint
 			if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid && !_bonusGranted.Contains(((CBasePlayerController)player).SteamID))
 			{
 				int num = _players.Count((CCSPlayerController p) => ((CEntityInstance)p).IsValid && ((CBaseEntity)p).TeamNum == ((CBaseEntity)player).TeamNum);
+				if (DiceSynergy.HasPartner(player, "WolfKing"))
+				{
+					num++;
+				}
 				int num2 = _config.Dices.Wolf.HpPerWolf * num;
 				int num3 = _config.Dices.Wolf.ArmorPerWolf * num;
 				float num4 = _config.Dices.Wolf.DamagePerWolf * (float)num;

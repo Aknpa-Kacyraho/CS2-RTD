@@ -11,9 +11,11 @@ using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
-public class SpeedOnKill : DiceBlueprint
-{
-	private bool _comboActive;
+	public class SpeedOnKill : DiceBlueprint
+	{
+		public static SpeedOnKill? Instance;
+
+		private bool _comboActive;
 
 	private readonly Random _random = new Random(Guid.NewGuid().GetHashCode());
 
@@ -40,7 +42,38 @@ public class SpeedOnKill : DiceBlueprint
 	public SpeedOnKill(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
+		Instance = this;
 		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+	}
+
+	public void TriggerBoost(CCSPlayerController attacker)
+	{
+		if (attacker == null || !attacker.IsValid || attacker.PlayerPawn?.Value == null || !attacker.PlayerPawn.Value.IsValid)
+		{
+			return;
+		}
+		float multiplier = _config.Dices.SpeedOnKill.SpeedMultiplierMin + (float)_random.NextDouble() * (_config.Dices.SpeedOnKill.SpeedMultiplierMax - _config.Dices.SpeedOnKill.SpeedMultiplierMin);
+		float duration = _config.Dices.SpeedOnKill.DurationMin + (float)_random.NextDouble() * (_config.Dices.SpeedOnKill.DurationMax - _config.Dices.SpeedOnKill.DurationMin);
+		CCSPlayerPawn pawn = attacker.PlayerPawn.Value;
+		SpeedBonusManager.Register(attacker, "SpeedOnKill", multiplier - 1f);
+		pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(attacker, 100f);
+		Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+		attacker.PrintToCenterAlert($"\u2694 \u8fde\u51fb\u8282\u594f {multiplier * 100f:F0}% {duration:F0}\u79d2!");
+		if (_activeBoosts.Remove(attacker, out Timer previous) && previous != null)
+		{
+			previous.Kill();
+		}
+		_activeBoosts[attacker] = new Timer(duration, (Action)delegate
+		{
+			SpeedBonusManager.Unregister(attacker, "SpeedOnKill");
+			CCSPlayerPawn value = attacker?.PlayerPawn?.Value;
+			if (value != null && ((CEntityInstance)value).IsValid)
+			{
+				value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(attacker, 100f);
+				Utilities.SetStateChanged(value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+			}
+			_activeBoosts.Remove(attacker);
+		}, (TimerFlags?)null);
 	}
 
 	public override void Add(CCSPlayerController player)

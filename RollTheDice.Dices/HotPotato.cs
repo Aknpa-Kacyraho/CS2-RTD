@@ -47,6 +47,10 @@ public class HotPotato : DiceBlueprint
 				"playerName",
 				((CBasePlayerController)player).PlayerName
 			} });
+			if (DiceSynergy.HasPartner(player, "C4Expert"))
+			{
+				DiceSynergy.AnnounceCombo(player, "炸弹专家", "热土豆灼烧免疫，持包者额外 99% 减伤！");
+			}
 		}
 	}
 
@@ -100,6 +104,10 @@ public class HotPotato : DiceBlueprint
 			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0
 			select p)
 		{
+			if (DiceSynergy.HasPartner(item, "C4Expert"))
+			{
+				continue;
+			}
 			CPlayer_WeaponServices weaponServices = ((CBasePlayerPawn)item.PlayerPawn.Value).WeaponServices;
 			NetworkedVector<CHandle<CBasePlayerWeapon>> val3 = ((weaponServices != null) ? weaponServices.MyWeapons : null);
 			if (val3 == null)
@@ -155,6 +163,10 @@ public class HotPotato : DiceBlueprint
 			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0 && ((CBaseEntity)p.PlayerPawn.Value).AbsOrigin != null
 			select p)
 		{
+			if (DiceSynergy.HasPartner(item3, "C4Expert"))
+			{
+				continue;
+			}
 			CCSPlayerPawn value3 = item3.PlayerPawn.Value;
 			float distance = Vectors.GetDistance(val, ((CBaseEntity)value3).AbsOrigin);
 			if (!(distance <= radius))

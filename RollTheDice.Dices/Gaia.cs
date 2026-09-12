@@ -6,6 +6,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -49,6 +50,10 @@ public class Gaia : DiceBlueprint
 				"playerName",
 				((CBasePlayerController)player).PlayerName
 			} });
+			if (DiceSynergy.HasPartner(player, "HangedMan"))
+			{
+				DiceSynergy.AnnounceCombo(player, "生死天平", "HP 上限提升至 666！");
+			}
 		}
 	}
 
@@ -102,7 +107,7 @@ public class Gaia : DiceBlueprint
 			{
 				_nextHealTime[item] = num + 1f;
 				CCSPlayerPawn value2 = item.PlayerPawn.Value;
-				int maxHP = _config.Dices.Gaia.MaxHP;
+				int maxHP = (DiceSynergy.HasPartner(item, "HangedMan") ? 666 : _config.Dices.Gaia.MaxHP);
 				((CBaseEntity)value2).MaxHealth = Math.Max(((CBaseEntity)value2).MaxHealth, Math.Min(((CBaseEntity)value2).Health + _config.Dices.Gaia.HpPerSecond, maxHP));
 				((CBaseEntity)value2).Health = Math.Min(((CBaseEntity)value2).Health + _config.Dices.Gaia.HpPerSecond, maxHP);
 				Utilities.SetStateChanged((CBaseEntity)(object)value2, "CBaseEntity", "m_iMaxHealth", 0);

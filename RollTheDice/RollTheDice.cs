@@ -647,12 +647,14 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				remaining[item5] = WeightedRandomDraw(list2) ?? WeightedRandomDraw(drawablePool);
 			}
 			double num = 1.0;
+			bool wolfCombo = dictionary.Values.Any((DiceBlueprint d) => d.ClassName == "Wolf");
+			Func<DiceBlueprint, double> effectiveSecondRound = (DiceBlueprint d) => (double)d.SecondRoundProbability * ((wolfCombo && d.ClassName == "WolfKing") ? 2.0 : 1.0);
 			foreach (DiceBlueprint item6 in list3)
 			{
-				num *= 1.0 - (double)item6.SecondRoundProbability;
+				num *= 1.0 - effectiveSecondRound(item6);
 			}
 			double num2 = 1.0 - num;
-			double num3 = ((IEnumerable<DiceBlueprint>)list3).Sum((Func<DiceBlueprint, double>)((DiceBlueprint st) => st.SecondRoundProbability));
+			double num3 = ((IEnumerable<DiceBlueprint>)list3).Sum((Func<DiceBlueprint, double>)((DiceBlueprint st) => effectiveSecondRound(st)));
 			foreach (CCSPlayerController item7 in remaining.Keys.ToList())
 			{
 				double num4 = _random.NextDouble();
@@ -664,7 +666,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					DiceBlueprint selectedType = list3[0];
 					foreach (DiceBlueprint item8 in list3)
 					{
-						num6 += (double)item8.SecondRoundProbability;
+						num6 += effectiveSecondRound(item8);
 						if (num5 < num6)
 						{
 							selectedType = item8;

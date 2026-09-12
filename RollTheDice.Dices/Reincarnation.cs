@@ -4,12 +4,15 @@ using System.Runtime.InteropServices;
 using CounterStrikeSharp.API.Core;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
 public class Reincarnation : DiceBlueprint
 {
 	public static readonly Dictionary<ulong, int> PendingExtraDice = new Dictionary<ulong, int>();
+
+	public static readonly HashSet<ulong> ComboWheelVictims = new HashSet<ulong>();
 
 	public override string ClassName => "Reincarnation";
 
@@ -59,11 +62,13 @@ public class Reincarnation : DiceBlueprint
 	public override void Reset()
 	{
 		_players.Clear();
+		ComboWheelVictims.Clear();
 	}
 
 	public override void Destroy()
 	{
 		PendingExtraDice.Clear();
+		ComboWheelVictims.Clear();
 		_players.Clear();
 	}
 
@@ -87,6 +92,10 @@ public class Reincarnation : DiceBlueprint
 		num++;
 		PendingExtraDice[((CBasePlayerController)userid).SteamID] = num;
 		userid.PrintToChat(" " + _localizer["command.prefix"].Value + _localizer["dice_Reincarnation_progress"].Value.Replace("{count}", num.ToString()));
+		if (DiceSynergy.HasPartner(userid, "WheelOfFate"))
+		{
+			ComboWheelVictims.Add(((CBasePlayerController)userid).SteamID);
+		}
 		return (HookResult)0;
 	}
 }

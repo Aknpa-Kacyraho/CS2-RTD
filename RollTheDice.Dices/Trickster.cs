@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
+using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -48,6 +51,10 @@ public class Trickster : DiceBlueprint
 			string text2 = _localizer["dice_Trickster_fake"].Value.Replace("{fakeName}", text);
 			player.PrintToChat(_localizer["command.prefix"].Value + text2);
 			player.PrintToCenterAlert("\ud83c\udfad 你获得了 " + text + "！");
+			if (DiceSynergy.HasPartner(player, "Mimic"))
+			{
+				DiceSynergy.AnnounceCombo(player, "千面戏法", "击杀揭露时将复制敌人的真实骰子！");
+			}
 		}
 	}
 
@@ -88,7 +95,34 @@ public class Trickster : DiceBlueprint
 		PendingFakeNames.Remove(((CBasePlayerController)attacker).SteamID);
 		attacker.PrintToCenterAlert("\ud83c\udfad 诡术揭晓！露出了真正的面目...");
 		attacker.PrintToChat(_localizer["command.prefix"].Value + _localizer["dice_Trickster_reveal"].Value);
-		RollTheDice.Instance?.ForceExtraDiceForPlayer(attacker);
+		RollTheDice instance = RollTheDice.Instance;
+		bool copied = false;
+		if (instance != null && DiceSynergy.HasPartner(attacker, "Mimic"))
+		{
+			List<string> candidates = new List<string>();
+			foreach (CCSPlayerController enemy in Utilities.GetPlayers())
+			{
+				if ((CEntityInstance)(object)enemy == (CEntityInstance)null || !((CEntityInstance)enemy).IsValid || enemy.IsBot || ((CBasePlayerController)enemy).IsHLTV || ((CBaseEntity)enemy).TeamNum == ((CBaseEntity)attacker).TeamNum)
+				{
+					continue;
+				}
+				candidates.AddRange(instance.GetAllDiceForPlayer(enemy));
+			}
+			if (candidates.Count > 0)
+			{
+				string pick = candidates[Random.Shared.Next(candidates.Count)];
+				copied = instance.ForceDiceForPlayer(attacker, pick);
+				if (copied)
+				{
+					attacker.PrintToCenterAlert($"\ud83c\udfad 千面戏法！复制了 {pick}！");
+					Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83c\udfad {((CBasePlayerController)attacker).PlayerName} 触发千面戏法，复制了 {pick}！");
+				}
+			}
+		}
+		if (!copied)
+		{
+			instance?.ForceExtraDiceForPlayer(attacker);
+		}
 		return (HookResult)0;
 	}
 }

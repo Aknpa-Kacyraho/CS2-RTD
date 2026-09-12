@@ -50,7 +50,7 @@ public static class DiceSynergy
 
 	static DiceSynergy()
 	{
-		int num = 47;
+		int num = 66;
 		List<(string, string, string)> list = new List<(string, string, string)>(num);
 		CollectionsMarshal.SetCount(list, num);
 		Span<(string, string, string)> span = CollectionsMarshal.AsSpan(list);
@@ -148,6 +148,44 @@ public static class DiceSynergy
 		span[num2] = ("MagneticPulse", "Thorns", "磁力荆棘");
 		num2++;
 		span[num2] = ("MagneticPulse", "RepulsionField", "禁区");
+		num2++;
+		span[num2] = ("Trickster", "Mimic", "千面戏法");
+		num2++;
+		span[num2] = ("Wolf", "WolfKing", "月下狼群");
+		num2++;
+		span[num2] = ("Reincarnation", "WheelOfFate", "不死轮回");
+		num2++;
+		span[num2] = ("Skyline", "NoRecoil", "制空权");
+		num2++;
+		span[num2] = ("Lucky", "Lottery", "暴富");
+		num2++;
+		span[num2] = ("LoanShark", "Miser", "华尔街之狼");
+		num2++;
+		span[num2] = ("DecoyDummy", "ImposterSyndrome", "幻影军团");
+		num2++;
+		span[num2] = ("Gaia", "HangedMan", "生死天平");
+		num2++;
+		span[num2] = ("Combo", "Vampire", "血怒连击");
+		num2++;
+		span[num2] = ("Combo", "Overheat", "过热连击");
+		num2++;
+		span[num2] = ("Combo", "SpeedOnKill", "杀戮节奏");
+		num2++;
+		span[num2] = ("PainConverter", "Adrenaline", "痛苦源泉");
+		num2++;
+		span[num2] = ("PainConverter", "DeathKnight", "伤痛铠甲");
+		num2++;
+		span[num2] = ("PainConverter", "Miser", "痛苦经济");
+		num2++;
+		span[num2] = ("Kinship", "DivineResurrection", "生死与共");
+		num2++;
+		span[num2] = ("Fate", "WheelOfFate", "命运双生");
+		num2++;
+		span[num2] = ("Twilight", "ChaosStorm", "时空乱流");
+		num2++;
+		span[num2] = ("C4Expert", "HotPotato", "炸弹专家");
+		num2++;
+		span[num2] = ("GunGod", "NoRecoil", "完美枪械");
 		_combos = list;
 	}
 }

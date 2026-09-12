@@ -7,6 +7,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Timers;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -49,6 +50,10 @@ public class Kinship : DiceBlueprint
 				"playerName",
 				((CBasePlayerController)player).PlayerName
 			} });
+			if (DiceSynergy.HasPartner(player, "DivineResurrection"))
+			{
+				DiceSynergy.AnnounceCombo(player, "生死与共", "羁绊无敌翻倍，复活队友附带 2s 无敌！");
+			}
 		}
 	}
 
@@ -121,6 +126,10 @@ public class Kinship : DiceBlueprint
 			return;
 		}
 		float seconds = _config.Dices.Kinship.InvulnSeconds;
+		if (DiceSynergy.HasPartner(player, "DivineResurrection"))
+		{
+			seconds *= 2f;
+		}
 		ulong sid = ((CBasePlayerController)player).SteamID;
 		_invulnUntil[sid] = Server.CurrentTime + seconds;
 		((CBaseEntity)pawn).TakesDamage = false;

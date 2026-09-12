@@ -90,7 +90,7 @@ public class NoRecoil : DiceBlueprint
 		return (HookResult)0;
 	}
 
-	private static void ApplyNoRecoil(CCSPlayerController? player)
+	public static void ApplyNoRecoil(CCSPlayerController? player)
 	{
 		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid || (CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)player.PlayerPawn.Value).IsValid || player.PlayerPawn.Value.AimPunchServices == null)
 		{
@@ -107,7 +107,7 @@ public class NoRecoil : DiceBlueprint
 		if (!((CEntityInstance)(object)val2 == (CEntityInstance)null))
 		{
 			string text = ((CEntityInstance)val2).DesignerName.ToLower(CultureInfo.CurrentCulture);
-			if (!text.Contains("mag7") && !text.Contains("nova") && !text.Contains("sawedoff") && !text.Contains("xm1014"))
+			if (DiceSynergy.HasPartner(player, "GunGod") || (!text.Contains("mag7") && !text.Contains("nova") && !text.Contains("sawedoff") && !text.Contains("xm1014")))
 			{
 				player.PlayerPawn.Value.AimPunchServices.PredictableBaseAngle.X = 0f;
 				player.PlayerPawn.Value.AimPunchServices.PredictableBaseAngle.Y = 0f;

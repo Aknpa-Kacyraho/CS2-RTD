@@ -4,6 +4,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -26,15 +27,23 @@ public class Lottery : DiceBlueprint
 			return;
 		}
 		_players.Add(player);
+		bool combo = DiceSynergy.HasPartner(player, "Lucky");
 		foreach (CCSPlayerController player2 in Utilities.GetPlayers())
 		{
 			if ((CEntityInstance)(object)player2 == (CEntityInstance)null || !((CEntityInstance)player2).IsValid || ((CBasePlayerController)player2).IsHLTV || player2.InGameMoneyServices == null)
 			{
 				continue;
 			}
-			int num = _random.Next(_config.Dices.Lottery.MoneyMin, _config.Dices.Lottery.MoneyMax + 1);
-			if (num != 0)
+			bool comboHolder = combo && ((CBasePlayerController)player2).SteamID == ((CBasePlayerController)player).SteamID;
+			int draws = comboHolder ? 2 : 1;
+			for (int drawIndex = 0; drawIndex < draws; drawIndex++)
 			{
+				int min = (comboHolder ? Math.Max(1, _config.Dices.Lottery.MoneyMin) : _config.Dices.Lottery.MoneyMin);
+				int num = _random.Next(min, _config.Dices.Lottery.MoneyMax + 1);
+				if (num == 0)
+				{
+					continue;
+				}
 				if (num > 0)
 				{
 					player2.InGameMoneyServices.Account += num;
@@ -55,6 +64,10 @@ public class Lottery : DiceBlueprint
 			((CBasePlayerController)player).PlayerName
 		} });
 		Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + _localizer["dice_Lottery_broadcast"].Value.Replace("{playerName}", ((CBasePlayerController)player).PlayerName));
+		if (combo)
+		{
+			DiceSynergy.AnnounceCombo(player, "暴富", "彩票必为正收益，并额外抽一份！");
+		}
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)

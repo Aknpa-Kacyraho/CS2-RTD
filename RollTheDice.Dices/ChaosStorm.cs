@@ -4,9 +4,11 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -45,7 +47,7 @@ public class ChaosStorm : DiceBlueprint
 			_players.Add(player);
 			if (_nextSwapTime == 0f)
 			{
-				_nextSwapTime = Server.CurrentTime + _config.Dices.ChaosStorm.Interval;
+				_nextSwapTime = Server.CurrentTime + GetInterval();
 			}
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
@@ -53,7 +55,16 @@ public class ChaosStorm : DiceBlueprint
 				((CBasePlayerController)player).PlayerName
 			} });
 			Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + _localizer["dice_ChaosStorm_broadcast"].Value.Replace("{playerName}", ((CBasePlayerController)player).PlayerName));
+			if (DiceSynergy.HasPartner(player, "Twilight"))
+			{
+				DiceSynergy.AnnounceCombo(player, "时空乱流", "风暴间隔缩短至 30s，换位后减速 50%！");
+			}
 		}
+	}
+
+	private float GetInterval()
+	{
+		return (_players.Any((CCSPlayerController p) => DiceSynergy.HasPartner(p, "Twilight")) ? 30f : _config.Dices.ChaosStorm.Interval);
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
@@ -87,7 +98,7 @@ public class ChaosStorm : DiceBlueprint
 		{
 			return;
 		}
-		float interval = _config.Dices.ChaosStorm.Interval;
+		float interval = GetInterval();
 		_nextSwapTime = num + interval;
 		List<CCSPlayerController> list = (from p in Utilities.GetPlayers()
 			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0 && ((CBaseEntity)p.PlayerPawn.Value).AbsOrigin != null
@@ -125,6 +136,33 @@ public class ChaosStorm : DiceBlueprint
 			{
 				Vector val = list3[num4];
 				((CBaseEntity)player.PlayerPawn.Value).Teleport(val, new QAngle((float?)0f, (float?)0f, (float?)0f), new Vector((float?)0f, (float?)0f, (float?)0f));
+			}
+		}
+		if (_players.Any((CCSPlayerController p) => DiceSynergy.HasPartner(p, "Twilight")))
+		{
+			foreach (var entry in list2)
+			{
+				CCSPlayerController slowed = entry.Player;
+				if (slowed == null || !((CEntityInstance)slowed).IsValid || slowed.PlayerPawn?.Value == null || !((CEntityInstance)slowed.PlayerPawn.Value).IsValid)
+				{
+					continue;
+				}
+				SpeedBonusManager.Register(slowed, "ChaosStormCombo", -0.5f);
+				CCSPlayerPawn slowedPawn = slowed.PlayerPawn.Value;
+				slowedPawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(slowed, 100f);
+				Utilities.SetStateChanged((CBaseEntity)(object)slowedPawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+				slowed.PrintToCenterAlert("\ud83c\udf00 \u65f6\u7a7a\u4e71\u6d41\uff01\u51cf\u901f 50% 1.5\u79d2");
+				CCSPlayerController capturedSlowed = slowed;
+				new Timer(1.5f, (Action)delegate
+				{
+					SpeedBonusManager.Unregister(capturedSlowed, "ChaosStormCombo");
+					CCSPlayerPawn after = capturedSlowed?.PlayerPawn?.Value;
+					if (after != null && ((CEntityInstance)after).IsValid)
+					{
+						after.VelocityModifier = 1f + SpeedBonusManager.GetEffective(capturedSlowed, 100f);
+						Utilities.SetStateChanged((CBaseEntity)(object)after, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+					}
+				}, (TimerFlags?)null);
 			}
 		}
 		Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + _localizer["dice_ChaosStorm_swap"].Value);

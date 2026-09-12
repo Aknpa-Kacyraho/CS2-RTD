@@ -65,6 +65,10 @@ public class Overheat : DiceBlueprint
 			{
 				DiceSynergy.AnnounceCombo(player, "狂热", "速度获取翻倍，上限翻倍！");
 			}
+			if (DiceSynergy.HasPartner(player, "Combo"))
+			{
+				DiceSynergy.AnnounceCombo(player, "过热连击", "击杀不再掉层，配合连击满层再 +10% 伤害！");
+			}
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
 				"playerName",
@@ -128,7 +132,7 @@ public class Overheat : DiceBlueprint
 		{
 			return (HookResult)0;
 		}
-		if (_stacks.TryGetValue(attacker, out var value) && value > 0)
+		if (_stacks.TryGetValue(attacker, out var value) && value > 0 && !DiceSynergy.HasPartner(attacker, "Combo"))
 		{
 			int num = Math.Max(1, (int)((float)_config.Dices.Overheat.MaxStacks * 0.1f));
 			_stacks[attacker] = Math.Max(0, value - num);

@@ -4,8 +4,10 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -43,12 +45,31 @@ public class C4Expert : DiceBlueprint
 				"playerName",
 				((CBasePlayerController)player).PlayerName
 			} });
+			if (DiceSynergy.HasPartner(player, "HotPotato"))
+			{
+				DiceSynergy.AnnounceCombo(player, "炸弹专家", "热土豆灼烧免疫，持包时 99% 减伤！");
+			}
 		}
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
+		DamageReductionManager.Unregister(player, "C4Expert");
 		_players.Remove(player);
+	}
+
+	public override void Reset()
+	{
+		foreach (CCSPlayerController item in _players.ToList())
+		{
+			DamageReductionManager.Unregister(item, "C4Expert");
+		}
+		_players.Clear();
+	}
+
+	public override void Destroy()
+	{
+		Reset();
 	}
 
 	public void OnTick()
@@ -76,6 +97,28 @@ public class C4Expert : DiceBlueprint
 					if ((int)item.Team == 2 && (CEntityInstance)(object)val != (CEntityInstance)null && ((CEntityInstance)val).IsValid)
 					{
 						val.C4Blow = ((val.C4Blow > 0f) ? Math.Min(val.C4Blow, Server.CurrentTime + 3f) : 0f);
+					}
+					bool carryingC4 = false;
+					CPlayer_WeaponServices weaponServices = ((CBasePlayerPawn)item.PlayerPawn.Value).WeaponServices;
+					if (weaponServices != null && weaponServices.MyWeapons != null)
+					{
+						foreach (CHandle<CBasePlayerWeapon> weapon in weaponServices.MyWeapons)
+						{
+							CBasePlayerWeapon value = weapon?.Value;
+							if (value != null && ((CEntityInstance)value).DesignerName == "weapon_c4")
+							{
+								carryingC4 = true;
+								break;
+							}
+						}
+					}
+					if (carryingC4 && DiceSynergy.HasPartner(item, "HotPotato"))
+					{
+						DamageReductionManager.Register(item, "C4Expert", 0.99f);
+					}
+					else
+					{
+						DamageReductionManager.Unregister(item, "C4Expert");
 					}
 				}
 			}

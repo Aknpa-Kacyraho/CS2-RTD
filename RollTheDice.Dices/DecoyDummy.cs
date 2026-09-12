@@ -9,6 +9,7 @@ using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -17,6 +18,8 @@ public class DecoyDummy : DiceBlueprint
 	private readonly Dictionary<CCSPlayerController, float> _nextGrenadeTime = new Dictionary<CCSPlayerController, float>();
 
 	private readonly Dictionary<CCSPlayerController, List<CDynamicProp>> _activeDummies = new Dictionary<CCSPlayerController, List<CDynamicProp>>();
+
+	private readonly Dictionary<CCSPlayerController, List<(CDynamicProp, CDynamicProp)>> _dummyGlows = new Dictionary<CCSPlayerController, List<(CDynamicProp, CDynamicProp)>>();
 
 	public override string ClassName => "DecoyDummy";
 
@@ -48,13 +51,21 @@ public class DecoyDummy : DiceBlueprint
 		{
 			_players.Add(player);
 			_nextGrenadeTime[player] = Server.CurrentTime + _config.Dices.DecoyDummy.GrenadeInterval;
-			player.GiveNamedItem("weapon_decoy");
+			int initialCount = (DiceSynergy.HasPartner(player, "ImposterSyndrome") ? 2 : 1);
+			for (int i = 0; i < initialCount; i++)
+			{
+				player.GiveNamedItem("weapon_decoy");
+			}
 			player.PrintToCenterAlert("\ud83e\ude86 获得诱饵弹！每20秒补一颗！");
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
 			} });
+			if (DiceSynergy.HasPartner(player, "ImposterSyndrome"))
+			{
+				DiceSynergy.AnnounceCombo(player, "幻影军团", "诱饵弹数量 +1，假人可暴露敌人！");
+			}
 		}
 	}
 
@@ -63,6 +74,7 @@ public class DecoyDummy : DiceBlueprint
 		_players.Remove(player);
 		_nextGrenadeTime.Remove(player);
 		CleanupDummies(player);
+		CleanupGlows(player);
 	}
 
 	public override void Reset()
@@ -70,6 +82,7 @@ public class DecoyDummy : DiceBlueprint
 		foreach (CCSPlayerController item in _players.ToList())
 		{
 			CleanupDummies(item);
+			CleanupGlows(item);
 		}
 		_players.Clear();
 		_nextGrenadeTime.Clear();
@@ -78,6 +91,19 @@ public class DecoyDummy : DiceBlueprint
 	public override void Destroy()
 	{
 		Reset();
+	}
+
+	private void CleanupGlows(CCSPlayerController player)
+	{
+		if (!_dummyGlows.TryGetValue(player, out List<(CDynamicProp, CDynamicProp)> value))
+		{
+			return;
+		}
+		foreach (var (glowProxy, glow) in value)
+		{
+			GlowUtil.RemoveGlow((CBaseEntity?)(object)glowProxy, (CBaseEntity?)(object)glow);
+		}
+		_dummyGlows.Remove(player);
 	}
 
 	private void CleanupDummies(CCSPlayerController player)
@@ -161,6 +187,28 @@ public class DecoyDummy : DiceBlueprint
 										}
 										_activeDummies[captured].Add(val4);
 										captured.PrintToCenterAlert("\ud83e\ude86 假人诱饵已部署！");
+										if (DiceSynergy.HasPartner(captured, "ImposterSyndrome"))
+										{
+											List<(CDynamicProp, CDynamicProp)> revealGlows = new List<(CDynamicProp, CDynamicProp)>();
+											foreach (CCSPlayerController enemy in Utilities.GetPlayers())
+											{
+												if ((CEntityInstance)(object)enemy == (CEntityInstance)null || !((CEntityInstance)enemy).IsValid || (CEntityInstance)(object)enemy == (CEntityInstance)(object)captured || ((CBaseEntity)enemy).TeamNum == ((CBaseEntity)captured).TeamNum || (CEntityInstance)(object)enemy.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)enemy.PlayerPawn.Value).IsValid || ((CBaseEntity)enemy.PlayerPawn.Value).LifeState != 0)
+												{
+													continue;
+												}
+												revealGlows.Add(GlowUtil.CreateGlow((CBaseEntity)(object)enemy.PlayerPawn.Value, Color.Orange));
+											}
+											if (revealGlows.Count > 0)
+											{
+												_dummyGlows[captured] = revealGlows;
+												captured.PrintToCenterAlert("\ud83d\udc41 幻影军团：假人暴露了敌人位置!");
+												CCSPlayerController glowOwner = captured;
+												new Timer(1f, (Action)delegate
+												{
+													CleanupGlows(glowOwner);
+												}, (TimerFlags?)null);
+											}
+										}
 										CDynamicProp capturedDummy = val4;
 										new Timer(8f, (Action)delegate
 										{
@@ -201,7 +249,11 @@ public class DecoyDummy : DiceBlueprint
 			if (!((CEntityInstance)(object)item == (CEntityInstance)null) && ((CEntityInstance)item).IsValid && !((CEntityInstance)(object)item.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)item.PlayerPawn.Value).IsValid && ((CBaseEntity)item.PlayerPawn.Value).LifeState == 0 && _nextGrenadeTime.TryGetValue(item, out var value) && num >= value)
 			{
 				_nextGrenadeTime[item] = num + _config.Dices.DecoyDummy.GrenadeInterval;
-				item.GiveNamedItem("weapon_decoy");
+				int refillCount = (DiceSynergy.HasPartner(item, "ImposterSyndrome") ? 2 : 1);
+				for (int j = 0; j < refillCount; j++)
+				{
+					item.GiveNamedItem("weapon_decoy");
+				}
 				item.PrintToCenterAlert("\ud83e\ude86 补给了一颗诱饵弹！");
 			}
 		}
