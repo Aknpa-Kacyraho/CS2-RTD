@@ -72,6 +72,7 @@ public class Adrenaline : DiceBlueprint
 		_players.Remove(player);
 		_adrenalineState.Remove(player);
 		SpeedBonusManager.Unregister(player, "Adrenaline");
+		DamageReductionManager.Unregister(player, "Adrenaline");
 	}
 
 	public override void Reset()
@@ -79,6 +80,7 @@ public class Adrenaline : DiceBlueprint
 		foreach (CCSPlayerController item in _players.ToList())
 		{
 			SpeedBonusManager.Unregister(item, "Adrenaline");
+			DamageReductionManager.Unregister(item, "Adrenaline");
 			_players.Remove(item);
 		}
 		_players.Clear();

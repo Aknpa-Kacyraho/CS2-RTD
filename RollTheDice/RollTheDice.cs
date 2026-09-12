@@ -330,6 +330,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			manifest.AddResource(Config.Precache.SoundEventFile);
 		}
+		manifest.AddResource("models/props/de_dust/hr_dust/dust_soccerball/dust_soccer_ball001.vmdl");
 		foreach (string precacheModel in _precacheModels)
 		{
 			manifest.AddResource(precacheModel);
@@ -427,6 +428,9 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			LogErr($"{DateTime.Now:HH:mm:ss} OnRoundStart: RemoveDicesForPlayers error (non-fatal): {ex.Message}\n");
 		}
+		DamageBonusManager.ClearAll();
+		DamageReductionManager.ClearAll();
+		SpeedBonusManager.ClearAll();
 		GameRules.Refresh();
 		object obj = GameRules.Get("WarmupPeriod");
 		bool flag = default(bool);
