@@ -503,9 +503,6 @@ public class DicesConfig
 	[JsonPropertyName("rally")]
 	public RallyConfig Rally { get; set; } = new RallyConfig();
 
-	[JsonPropertyName("swap")]
-	public SwapConfig Swap { get; set; } = new SwapConfig();
-
 	[JsonPropertyName("echo")]
 	public EchoConfig Echo { get; set; } = new EchoConfig();
 

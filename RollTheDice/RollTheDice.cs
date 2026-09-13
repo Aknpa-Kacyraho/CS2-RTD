@@ -16,6 +16,7 @@ using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Extensions;
 using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Utils;
+using RollTheDice.Configs;
 using RollTheDice.Dices;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
@@ -1072,6 +1073,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					}
 					_diceUsageCount[diceBlueprint]++;
 					RefreshCombos(player);
+					AnnounceDiceRarity(player, diceBlueprint);
 					return (diceBlueprint.ClassName, diceBlueprint.Description);
 				}
 				catch (Exception value)
@@ -1100,6 +1102,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					}
 					_diceUsageCount[diceBlueprint2]++;
 					RefreshCombos(player);
+					AnnounceDiceRarity(player, diceBlueprint2);
 					return (diceBlueprint2.ClassName, diceBlueprint2.Description);
 				}
 				catch (Exception value2)
@@ -1117,6 +1120,46 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		if (pool.Count == 0)
 		{
 			return null;
+		}
+		RarityConfig rarity = Config?.Dices?.Rarity;
+		if (rarity != null && rarity.TierWeights != null && rarity.TierWeights.Count > 0)
+		{
+			Dictionary<string, List<DiceBlueprint>> byTier = new Dictionary<string, List<DiceBlueprint>>();
+			foreach (DiceBlueprint dice in pool)
+			{
+				string tier = GetDiceTier(dice);
+				if (!byTier.TryGetValue(tier, out List<DiceBlueprint> bucket))
+				{
+					bucket = new List<DiceBlueprint>();
+					byTier[tier] = bucket;
+				}
+				bucket.Add(dice);
+			}
+			List<(List<DiceBlueprint> Bucket, float Weight)> tiers = new List<(List<DiceBlueprint>, float)>();
+			float totalWeight = 0f;
+			foreach (KeyValuePair<string, List<DiceBlueprint>> entry in byTier)
+			{
+				if (rarity.TierWeights.TryGetValue(entry.Key, out float tierWeight) && tierWeight > 0f)
+				{
+					tiers.Add((entry.Value, tierWeight));
+					totalWeight += tierWeight;
+				}
+			}
+			if (tiers.Count > 0 && totalWeight > 0f)
+			{
+				float roll = (float)_random.NextDouble() * totalWeight;
+				float accumulated = 0f;
+				foreach (var tier in tiers)
+				{
+					accumulated += tier.Weight;
+					if (roll < accumulated)
+					{
+						return tier.Bucket[_random.Next(tier.Bucket.Count)];
+					}
+				}
+				var last = tiers[tiers.Count - 1];
+				return last.Bucket[_random.Next(last.Bucket.Count)];
+			}
 		}
 		float num = 0f;
 		foreach (DiceBlueprint item in pool)
@@ -1138,6 +1181,64 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			}
 		}
 		return pool[pool.Count - 1];
+	}
+
+	private string GetDiceTier(DiceBlueprint dice)
+	{
+		RarityConfig rarity = Config?.Dices?.Rarity;
+		if (rarity != null && rarity.DiceTier != null && rarity.DiceTier.TryGetValue(dice.ClassName, out string tier) && !string.IsNullOrEmpty(tier))
+		{
+			return tier;
+		}
+		return "common";
+	}
+
+	private void AnnounceDiceRarity(CCSPlayerController player, DiceBlueprint dice)
+	{
+		try
+		{
+			string tier = GetDiceTier(dice);
+			string nameKey = "dice_" + dice.ClassName + "_name";
+			string localized = ((BasePlugin)this).Localizer[nameKey];
+			if (localized == nameKey)
+			{
+				localized = dice.ClassName;
+			}
+			string label;
+			string color;
+			switch (tier)
+			{
+			case "rare":
+				label = "稀有";
+				color = "\u0004";
+				break;
+			case "epic":
+				label = "史诗";
+				color = "\u0003";
+				break;
+			case "legendary":
+				label = "传说";
+				color = "\u0009";
+				break;
+			case "combo":
+				label = "传说";
+				color = "\u0002";
+				break;
+			default:
+				label = "普通";
+				color = "\u0001";
+				break;
+			}
+			string prefix = ((BasePlugin)this).Localizer["command.prefix"].Value;
+			player.PrintToChat($" {prefix}{color}🎲 你抽到了 [{label}] {localized}");
+			if ((tier == "legendary" || tier == "combo") && (Config?.Dices?.Rarity?.BroadcastLegendary ?? true))
+			{
+				Server.PrintToChatAll($" {prefix}{color}🌟 传说骰子降临！{((CBasePlayerController)player).PlayerName} 抽到了【{localized}】！");
+			}
+		}
+		catch
+		{
+		}
 	}
 
 	private List<DiceBlueprint> GetDrawablePool()
@@ -1568,6 +1669,22 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 		IncrementDiceRollCount(player);
 		PlayDiceSoundForPlayer(player, item);
+		return true;
+	}
+
+	public bool GrantComboDice(CCSPlayerController player, string diceClassName)
+	{
+		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid)
+		{
+			return false;
+		}
+		var (text, _) = RollTheDiceForPlayer(player, diceClassName);
+		if (string.IsNullOrEmpty(text))
+		{
+			return false;
+		}
+		IncrementDiceRollCount(player);
+		PlayDiceSoundForPlayer(player, text);
 		return true;
 	}
 

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using Microsoft.Extensions.Localization;
@@ -10,34 +9,25 @@ using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 超越天堂 BeyondHeaven：按 E 暂停时间 9 秒（冻结其他玩家移动），每回合仅一次。
+/// 状态一律用 SteamID 记录，避免控制器对象变化导致判定失效。
+/// </summary>
 public class BeyondHeaven : DiceBlueprint
 {
-	private readonly Dictionary<CCSPlayerController, float> _timeStopEnd = new Dictionary<CCSPlayerController, float>();
+	private readonly Dictionary<ulong, float> _timeStopEnd = new Dictionary<ulong, float>();
 
-	private readonly Dictionary<CCSPlayerController, float> _cooldownEnd = new Dictionary<CCSPlayerController, float>();
+	private readonly Dictionary<ulong, float> _cooldownEnd = new Dictionary<ulong, float>();
 
-	private readonly Dictionary<CCSPlayerController, bool> _used = new Dictionary<CCSPlayerController, bool>();
+	private readonly HashSet<ulong> _used = new HashSet<ulong>();
+
+	private readonly HashSet<ulong> _holders = new HashSet<ulong>();
 
 	private bool _timeStopped;
 
 	public override string ClassName => "BeyondHeaven";
 
-
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 2;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int num2 = 0;
-			span[num2] = "OnTick";
-			num2++;
-			span[num2] = "OnPlayerButtonsChanged";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnPlayerButtonsChanged", "OnTick" };
 
 	public BeyondHeaven(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
@@ -47,33 +37,40 @@ public class BeyondHeaven : DiceBlueprint
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
-			_players.Add(player);
-			_used[player] = false;
-			_cooldownEnd[player] = 0f;
-			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
-			{
-				"playerName",
-				((CBasePlayerController)player).PlayerName
-			} });
-			player.PrintToCenterAlert("\ud83c\udf0c 按E键暂停时间9秒！仅可使用一次！");
+			return;
 		}
+		_players.Add(player);
+		_holders.Add(player.SteamID);
+		_used.Remove(player.SteamID);
+		_cooldownEnd[player.SteamID] = 0f;
+		NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+		{
+			"playerName",
+			player.PlayerName
+		} });
+		player.PrintToCenterAlert("🌌 按E键暂停时间9秒！仅可使用一次！");
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
-		EndTimeStop();
+		if (player != null)
+		{
+			_holders.Remove(player.SteamID);
+			_timeStopEnd.Remove(player.SteamID);
+			_cooldownEnd.Remove(player.SteamID);
+			_used.Remove(player.SteamID);
+		}
 		_players.Remove(player);
-		_timeStopEnd.Remove(player);
-		_cooldownEnd.Remove(player);
-		_used.Remove(player);
+		EndTimeStop();
 	}
 
 	public override void Reset()
 	{
 		EndTimeStop();
 		_players.Clear();
+		_holders.Clear();
 		_timeStopEnd.Clear();
 		_cooldownEnd.Clear();
 		_used.Clear();
@@ -85,45 +82,37 @@ public class BeyondHeaven : DiceBlueprint
 		Reset();
 	}
 
-	private void EndTimeStop()
-	{
-		if (!_timeStopped)
-		{
-			return;
-		}
-		_timeStopped = false;
-		foreach (CCSPlayerController item in from p in Utilities.GetPlayers()
-			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0
-			select p)
-		{
-			MoveLockManager.Unlock(item, "BeyondHeaven");
-		}
-	}
-
 	public void OnPlayerButtonsChanged(CCSPlayerController player, PlayerButtons pressed, PlayerButtons released)
 	{
-		//IL_0064: Unknown result type (might be due to invalid IL or missing references)
-		if (_players.Count == 0 || (CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid || !_players.Contains(player) || !((Enum)pressed).HasFlag((Enum)(object)(PlayerButtons)32) || (CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)player.PlayerPawn.Value).IsValid || ((CBaseEntity)player.PlayerPawn.Value).LifeState != 0)
+		if (player == null || !player.IsValid || (pressed & PlayerButtons.Use) == 0)
 		{
 			return;
 		}
-		float num = Server.CurrentTime;
-		if ((_cooldownEnd.TryGetValue(player, out var value) && num < value) || (_used.TryGetValue(player, out var value2) & value2))
+		if (!_holders.Contains(player.SteamID) && !_players.Contains(player))
 		{
 			return;
 		}
-		_timeStopEnd[player] = num + _config.Dices.BeyondHeaven.Duration;
-		_cooldownEnd[player] = num + _config.Dices.BeyondHeaven.Cooldown;
-		_used[player] = true;
+		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
+		if (pawn == null || !pawn.IsValid || pawn.LifeState != 0)
+		{
+			return;
+		}
+		if (_used.Contains(player.SteamID))
+		{
+			return;
+		}
+		float now = Server.CurrentTime;
+		if (_cooldownEnd.TryGetValue(player.SteamID, out var cooldown) && now < cooldown)
+		{
+			return;
+		}
+		_timeStopEnd[player.SteamID] = now + _config.Dices.BeyondHeaven.Duration;
+		_cooldownEnd[player.SteamID] = now + _config.Dices.BeyondHeaven.Cooldown;
+		_used.Add(player.SteamID);
 		_timeStopped = true;
-		foreach (CCSPlayerController item in from p in Utilities.GetPlayers()
-			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && (CEntityInstance)(object)p != (CEntityInstance)(object)player && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0
-			select p)
-		{
-			MoveLockManager.Lock(item, "BeyondHeaven");
-		}
-		player.PrintToCenterAlert("\ud83c\udf0c 超越天堂！时间暂停9s！");
-		Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83c\udf0c {((CBasePlayerController)player).PlayerName} 超越了天堂！时间暂停9秒！");
+		LockOthers(player);
+		player.PrintToCenterAlert("🌌 超越天堂！时间暂停9s！");
+		Server.PrintToChatAll($" {_localizer["command.prefix"].Value}🌌 {player.PlayerName} 超越了天堂！时间暂停9秒！");
 	}
 
 	public void OnTick()
@@ -132,32 +121,73 @@ public class BeyondHeaven : DiceBlueprint
 		{
 			return;
 		}
-		float num = Server.CurrentTime;
-		foreach (KeyValuePair<CCSPlayerController, float> kv in _timeStopEnd.ToList())
+		float now = Server.CurrentTime;
+		foreach (KeyValuePair<ulong, float> kv in _timeStopEnd.ToList())
 		{
-			if (num >= kv.Value)
+			if (now >= kv.Value)
 			{
 				_timeStopEnd.Remove(kv.Key);
 				EndTimeStop();
-				CCSPlayerController key = kv.Key;
-				if (key != null)
-				{
-					key.PrintToCenterAlert("⏰ 时间恢复流动！");
-				}
+				CCSPlayerController expiring = FindBySteamId(kv.Key);
+				expiring?.PrintToCenterAlert("⏰ 时间恢复流动！");
 				break;
 			}
-			foreach (CCSPlayerController item in from p in Utilities.GetPlayers()
-				where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && (CEntityInstance)(object)p != (CEntityInstance)(object)kv.Key && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0
-				select p)
+			foreach (CCSPlayerController other in Utilities.GetPlayers())
 			{
-				MoveLockManager.Lock(item, "BeyondHeaven");
+				if (other == null || !other.IsValid || other.IsHLTV || other.SteamID == kv.Key)
+				{
+					continue;
+				}
+				CCSPlayerPawn otherPawn = other.PlayerPawn?.Value;
+				if (otherPawn == null || !otherPawn.IsValid || otherPawn.LifeState != 0)
+				{
+					continue;
+				}
+				MoveLockManager.Lock(other, "BeyondHeaven");
 			}
-			int value = (int)Math.Ceiling(kv.Value - num);
-			CCSPlayerController key2 = kv.Key;
-			if (key2 != null)
+			CCSPlayerController holder = FindBySteamId(kv.Key);
+			if (holder != null)
 			{
-				key2.PrintToCenterAlert($"\ud83c\udf0c 超越天堂！{value}s 剩余");
+				holder.PrintToCenterAlert($"🌌 超越天堂！{(int)Math.Ceiling(kv.Value - now)}s 剩余");
 			}
 		}
+	}
+
+	private void LockOthers(CCSPlayerController holder)
+	{
+		foreach (CCSPlayerController other in Utilities.GetPlayers())
+		{
+			if (other == null || !other.IsValid || other.IsHLTV || other == holder)
+			{
+				continue;
+			}
+			CCSPlayerPawn otherPawn = other.PlayerPawn?.Value;
+			if (otherPawn == null || !otherPawn.IsValid || otherPawn.LifeState != 0)
+			{
+				continue;
+			}
+			MoveLockManager.Lock(other, "BeyondHeaven");
+		}
+	}
+
+	private void EndTimeStop()
+	{
+		if (!_timeStopped)
+		{
+			return;
+		}
+		_timeStopped = false;
+		foreach (CCSPlayerController player in Utilities.GetPlayers())
+		{
+			if (player != null && player.IsValid)
+			{
+				MoveLockManager.Unlock(player, "BeyondHeaven");
+			}
+		}
+	}
+
+	private static CCSPlayerController? FindBySteamId(ulong steamId)
+	{
+		return Utilities.GetPlayers().FirstOrDefault((CCSPlayerController p) => p != null && p.IsValid && p.SteamID == steamId);
 	}
 }

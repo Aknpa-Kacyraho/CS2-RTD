@@ -44,7 +44,7 @@ public class World : DiceBlueprint
 					{
 						instance.RemoveDiceFromPlayer(captured, "World");
 						instance.RemoveDiceFromPlayer(captured, "Heaven");
-						instance.ForceDiceForPlayer(captured, "BeyondHeaven");
+						instance.GrantComboDice(captured, "BeyondHeaven");
 					}
 				});
 				return;

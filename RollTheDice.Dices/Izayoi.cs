@@ -69,7 +69,7 @@ public class Izayoi : DiceBlueprint
 					{
 						instance.RemoveDiceFromPlayer(captured, "Izayoi");
 						instance.RemoveDiceFromPlayer(captured, "Heaven");
-						instance.ForceDiceForPlayer(captured, "BeyondHeaven");
+						instance.GrantComboDice(captured, "BeyondHeaven");
 					}
 				});
 				return;

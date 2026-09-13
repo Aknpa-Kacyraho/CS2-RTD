@@ -74,7 +74,7 @@ public class Heaven : DiceBlueprint
 							instance.RemoveDiceFromPlayer(captured, "Izayoi");
 						}
 						instance.RemoveDiceFromPlayer(captured, "Heaven");
-						instance.ForceDiceForPlayer(captured, "BeyondHeaven");
+						instance.GrantComboDice(captured, "BeyondHeaven");
 					}
 				});
 				return;
