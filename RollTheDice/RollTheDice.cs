@@ -366,6 +366,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		((BasePlugin)this).RegisterListener<Listeners.OnServerPrecacheResources>(new Listeners.OnServerPrecacheResources(OnServerPrecacheResources));
 		((BasePlugin)this).RegisterListener<Listeners.OnPlayerButtonsChanged>(new Listeners.OnPlayerButtonsChanged(OnPlayerButtonsChanged));
 		((BasePlugin)this).RegisterListener<Listeners.OnPlayerTakeDamagePre>(new Listeners.OnPlayerTakeDamagePre(OnPlayerTakeDamagePreCentral));
+		RegisterCheatGuard();
 		if (hotReload)
 		{
 			Console.WriteLine(((BasePlugin)this).Localizer["core.hotreload"]);
@@ -385,6 +386,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		//IL_00a1: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00ab: Expected O, but got Unknown
 		DestroyModules();
+		DeregisterCheatGuard();
 		ReloadConfigFromDisk();
 		((BasePlugin)this).DeregisterEventHandler<EventRoundStart>((GameEventHandler<EventRoundStart>)OnRoundStart, (HookMode)1);
 		((BasePlugin)this).DeregisterEventHandler<EventRoundFreezeEnd>((GameEventHandler<EventRoundFreezeEnd>)OnRoundFreezeEnd, (HookMode)1);
@@ -396,6 +398,64 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		((BasePlugin)this).RemoveListener<Listeners.OnServerPrecacheResources>(new Listeners.OnServerPrecacheResources(OnServerPrecacheResources));
 		((BasePlugin)this).RemoveListener<Listeners.OnPlayerTakeDamagePre>(new Listeners.OnPlayerTakeDamagePre(OnPlayerTakeDamagePreCentral));
 		Console.WriteLine(((BasePlugin)this).Localizer["core.unload"]);
+	}
+
+	private void RegisterCheatGuard()
+	{
+		CheatGuardConfig guard = Config?.CheatGuard;
+		if (guard == null || !guard.Enabled || guard.BlockedCommands == null)
+		{
+			return;
+		}
+		foreach (string command in guard.BlockedCommands)
+		{
+			if (!string.IsNullOrWhiteSpace(command))
+			{
+				((BasePlugin)this).AddCommandListener(command, OnCheatGuardCommand);
+			}
+		}
+		LogDebug($"{DateTime.Now:HH:mm:ss} CheatGuard: blocked {guard.BlockedCommands.Count} commands (bypass={guard.BypassPermission})\n");
+	}
+
+	private void DeregisterCheatGuard()
+	{
+		CheatGuardConfig guard = Config?.CheatGuard;
+		if (guard == null || guard.BlockedCommands == null)
+		{
+			return;
+		}
+		foreach (string command in guard.BlockedCommands)
+		{
+			if (!string.IsNullOrWhiteSpace(command))
+			{
+				((BasePlugin)this).RemoveCommandListener(command, OnCheatGuardCommand, (HookMode)0);
+			}
+		}
+	}
+
+	private HookResult OnCheatGuardCommand(CCSPlayerController? player, CommandInfo info)
+	{
+		if (player == null || !((CEntityInstance)player).IsValid || player.IsBot || ((CBasePlayerController)player).IsHLTV)
+		{
+			return (HookResult)0;
+		}
+		CheatGuardConfig guard = Config?.CheatGuard;
+		if (guard == null || !guard.Enabled)
+		{
+			return (HookResult)0;
+		}
+		if (!string.IsNullOrWhiteSpace(guard.BypassPermission) && AdminManager.PlayerHasPermissions(player, guard.BypassPermission))
+		{
+			return (HookResult)0;
+		}
+		try
+		{
+			player.PrintToChat($" {((BasePlugin)this).Localizer["command.prefix"].Value}⛔ 该作弊指令已被禁用（仅房主可用）。");
+		}
+		catch
+		{
+		}
+		return (HookResult)3;
 	}
 
 	private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
@@ -1679,6 +1739,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			return false;
 		}
 		var (text, _) = RollTheDiceForPlayer(player, diceClassName);
+		LogDebug($"{DateTime.Now:HH:mm:ss} GrantComboDice {diceClassName} -> {text ?? "null"}\n");
 		if (string.IsNullOrEmpty(text))
 		{
 			return false;

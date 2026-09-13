@@ -205,7 +205,7 @@
   "dice_Glutton_player": "每杀一人+10%伤害+5%移速(即时)，下回合+1骰子(上限+2)",
   "dice_God_name": "神王",
   "dice_God_other": "{purple}[RollTheDice] {green}{playerName} {default}接受神之试炼！",
-  "dice_God_player": "2×移速 +1.5×伤害 +200甲；40s 内未击杀失去全部，击杀刷新",
+  "dice_God_player": "3×移速 +3×伤害 +500甲 +60%减伤；90s 内未击杀失去全部，击杀回150HP并刷新，激活/击杀后1.5s无敌",
   "dice_Goddess_blessed": "{gold}✨ 女神祝福 {green}{names} {gold}，额外+1骰子！",
   "dice_Goddess_name": "神后",
   "dice_Goddess_other": "{purple}[RollTheDice] {green}{playerName} {default}召唤了女神之力！随机2名队友再掷一次！",

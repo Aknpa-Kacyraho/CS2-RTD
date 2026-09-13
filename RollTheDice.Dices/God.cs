@@ -124,7 +124,27 @@ public class God : DiceBlueprint
 			return HookResult.Continue;
 		}
 		Activate(attacker);
+		HealOnKill(attacker);
 		return HookResult.Continue;
+	}
+
+	private void HealOnKill(CCSPlayerController player)
+	{
+		if (player == null || !player.IsValid)
+		{
+			return;
+		}
+		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
+		if (pawn == null || !pawn.IsValid)
+		{
+			return;
+		}
+		int heal = _config.Dices.God.HealOnKill;
+		if (heal > 0)
+		{
+			pawn.Health = Math.Min(pawn.Health + heal, pawn.MaxHealth);
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
+		}
 	}
 
 	private void Activate(CCSPlayerController player)
@@ -139,6 +159,8 @@ public class God : DiceBlueprint
 		state.Active = true;
 		SpeedBonusManager.Register(player, ClassName, cfg.SpeedMultiplier - 1f);
 		DamageBonusManager.Register(player, ClassName, cfg.DamageMultiplier - 1f);
+		DamageReductionManager.Register(player, ClassName, cfg.DamageReduction);
+		Invulnerability.Grant(player, cfg.InvulnSeconds);
 		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
 		if (pawn != null && pawn.IsValid)
 		{
@@ -158,6 +180,7 @@ public class God : DiceBlueprint
 		state.Active = false;
 		SpeedBonusManager.Unregister(player, ClassName);
 		DamageBonusManager.Unregister(player, ClassName);
+		DamageReductionManager.Unregister(player, ClassName);
 		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
 		if (pawn != null && pawn.IsValid)
 		{

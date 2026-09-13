@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 using CounterStrikeSharp.API.Core;
+using RollTheDice.Configs;
 
 namespace RollTheDice;
 
@@ -41,6 +42,9 @@ public class PluginConfig : BasePluginConfig
 
 	[JsonPropertyName("dices")]
 	public DicesConfig Dices { get; set; } = new DicesConfig();
+
+	[JsonPropertyName("cheat_guard")]
+	public CheatGuardConfig CheatGuard { get; set; } = new CheatGuardConfig();
 
 	[JsonPropertyName("sounds")]
 	public SoundConfig Sounds { get; set; } = new SoundConfig();
