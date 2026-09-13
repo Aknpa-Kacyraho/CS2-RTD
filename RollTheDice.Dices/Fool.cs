@@ -1,187 +1,125 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 愚者 Fool：攻击有概率失效；被攻击有概率获得短暂无敌。
+/// 连败保底：连续若干次攻击失效后，下一次必定命中。
+/// </summary>
 public class Fool : DiceBlueprint
 {
-	private readonly Dictionary<ulong, float> _invulEndTime = new Dictionary<ulong, float>();
-
 	private readonly Random _random = new Random(Guid.NewGuid().GetHashCode());
+
+	private readonly Dictionary<ulong, int> _consecutiveWhiffs = new Dictionary<ulong, int>();
 
 	public override string ClassName => "Fool";
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnPlayerTakeDamagePre";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnPlayerTakeDamagePre" };
 
 	public Fool(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
-			_players.Add(player);
-			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+			return;
+		}
+		_players.Add(player);
+		_consecutiveWhiffs[player.SteamID] = 0;
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
-			} });
-		}
+			}
+		});
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
+		_consecutiveWhiffs.Remove(player.SteamID);
 		_players.Remove(player);
-		_invulEndTime.Remove(((CBasePlayerController)player).SteamID);
 	}
 
 	public override void Reset()
 	{
-		foreach (ulong sid in _invulEndTime.Keys.ToList())
-		{
-			CCSPlayerController val = Utilities.GetPlayers().FirstOrDefault((CCSPlayerController x) => ((CBasePlayerController)x).SteamID == sid);
-			CCSPlayerPawn val2 = ((val == null) ? null : val.PlayerPawn?.Value);
-			if (val2 != null && ((CEntityInstance)val2).IsValid)
-			{
-				((CBaseEntity)val2).TakesDamage = true;
-			}
-		}
+		_consecutiveWhiffs.Clear();
 		_players.Clear();
-		_invulEndTime.Clear();
+	}
+
+	public override void Destroy()
+	{
+		Reset();
 	}
 
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
-		//IL_001b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02fa: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02f6: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02b5: Unknown result type (might be due to invalid IL or missing references)
-		if ((CEntityInstance)(object)entity == (CEntityInstance)null || !((CEntityInstance)entity).IsValid)
+		if (_players.Count == 0 || info == null || info.Damage <= 0f)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		CCSPlayerPawn obj = ((NativeObject)entity).As<CCSPlayerPawn>();
-		object obj2;
-		if (obj == null)
+		CCSPlayerController victim = ResolvePlayer(entity);
+		CCSPlayerController attacker = ResolvePlayer(info.Attacker?.Value);
+		FoolConfig cfg = _config.Dices.Fool;
+		bool changed = false;
+		if (attacker != null && attacker.IsValid && _players.Contains(attacker))
 		{
-			obj2 = null;
-		}
-		else
-		{
-			CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj).Controller;
-			if (controller == null)
+			ulong attackerId = attacker.SteamID;
+			int whiffs = _consecutiveWhiffs.TryGetValue(attackerId, out int w) ? w : 0;
+			if (whiffs >= cfg.WhiffPity)
 			{
-				obj2 = null;
+				_consecutiveWhiffs[attackerId] = 0;
 			}
-			else
+			else if (_random.NextDouble() < cfg.AttackWhiffChance)
 			{
-				CBasePlayerController value = controller.Value;
-				obj2 = ((value != null) ? ((NativeObject)value).As<CCSPlayerController>() : null);
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj2;
-		CHandle<CBaseEntity> attacker = info.Attacker;
-		object obj3;
-		if (attacker == null)
-		{
-			obj3 = null;
-		}
-		else
-		{
-			CBaseEntity value2 = attacker.Value;
-			if (value2 == null)
-			{
-				obj3 = null;
-			}
-			else
-			{
-				CCSPlayerPawn obj4 = ((NativeObject)value2).As<CCSPlayerPawn>();
-				if (obj4 == null)
-				{
-					obj3 = null;
-				}
-				else
-				{
-					CHandle<CBasePlayerController> controller2 = ((CBasePlayerPawn)obj4).Controller;
-					if (controller2 == null)
-					{
-						obj3 = null;
-					}
-					else
-					{
-						CBasePlayerController value3 = controller2.Value;
-						obj3 = ((value3 != null) ? ((NativeObject)value3).As<CCSPlayerController>() : null);
-					}
-				}
-			}
-		}
-		CCSPlayerController val2 = (CCSPlayerController)obj3;
-		float num = Server.CurrentTime;
-		if ((CEntityInstance)(object)val2 != (CEntityInstance)null && ((CEntityInstance)val2).IsValid && _players.Contains(val2) && _random.NextDouble() < (double)_config.Dices.Fool.AttackWhiffChance)
-		{
-			info.Damage = 0f;
-		}
-		if ((CEntityInstance)(object)val != (CEntityInstance)null && ((CEntityInstance)val).IsValid && _players.Contains(val) && info.Damage > 0f)
-		{
-			if (_invulEndTime.TryGetValue(((CBasePlayerController)val).SteamID, out var value4) && num >= value4)
-			{
-				CCSPlayerPawn val3 = val.PlayerPawn?.Value;
-				if (val3 != null && ((CEntityInstance)val3).IsValid)
-				{
-					((CBaseEntity)val3).TakesDamage = true;
-				}
-				_invulEndTime.Remove(((CBasePlayerController)val).SteamID);
-			}
-			if (!_invulEndTime.ContainsKey(((CBasePlayerController)val).SteamID) && _random.NextDouble() < (double)_config.Dices.Fool.InvincibilityChance)
-			{
-				CCSPlayerPawn val4 = val.PlayerPawn?.Value;
-				if (val4 != null && ((CEntityInstance)val4).IsValid)
-				{
-					((CBaseEntity)val4).TakesDamage = false;
-					float invincibilitySeconds = _config.Dices.Fool.InvincibilitySeconds;
-					_invulEndTime[((CBasePlayerController)val).SteamID] = num + invincibilitySeconds;
-					val.PrintToCenterAlert($"\ud83c\udccf 愚者庇护！无敌{invincibilitySeconds:F0}秒！");
-					CCSPlayerController capV = val;
-					new Timer(invincibilitySeconds, (Action)delegate
-					{
-						CCSPlayerController obj5 = capV;
-						CCSPlayerPawn val5 = ((obj5 == null) ? null : obj5.PlayerPawn?.Value);
-						if (val5 != null && ((CEntityInstance)val5).IsValid)
-						{
-							((CBaseEntity)val5).TakesDamage = true;
-						}
-						_invulEndTime.Remove(((CBasePlayerController)capV).SteamID);
-					}, (TimerFlags?)null);
-				}
-			}
-			if (_invulEndTime.ContainsKey(((CBasePlayerController)val).SteamID))
-			{
+				_consecutiveWhiffs[attackerId] = whiffs + 1;
 				info.Damage = 0f;
+				changed = true;
+			}
+			else
+			{
+				_consecutiveWhiffs[attackerId] = 0;
 			}
 		}
-		return (info.Damage == 0f) ? HookResult.Changed : HookResult.Continue;
+		if (info.Damage > 0f && victim != null && victim.IsValid && _players.Contains(victim) && !Invulnerability.IsInvulnerable(victim) && _random.NextDouble() < cfg.InvincibilityChance)
+		{
+			Invulnerability.Grant(victim, cfg.InvincibilitySeconds);
+			info.Damage = 0f;
+			victim.PrintToCenterAlert($"🎴 愚者庇护！无敌 {cfg.InvincibilitySeconds:F0} 秒！");
+			changed = true;
+		}
+		return changed ? HookResult.Changed : HookResult.Continue;
+	}
+
+	private static CCSPlayerController ResolvePlayer(CBaseEntity entity)
+	{
+		if (entity == null)
+		{
+			return null;
+		}
+		CCSPlayerPawn pawn = entity.As<CCSPlayerPawn>();
+		if (pawn == null)
+		{
+			return null;
+		}
+		CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)pawn).Controller;
+		if (controller == null || controller.Value == null)
+		{
+			return null;
+		}
+		return controller.Value.As<CCSPlayerController>();
 	}
 }

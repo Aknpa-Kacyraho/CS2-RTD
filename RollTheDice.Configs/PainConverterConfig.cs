@@ -8,13 +8,13 @@ public class PainConverterConfig
 	public bool Enabled { get; set; } = true;
 
 	[JsonPropertyName("max_pain")]
-	public float MaxPain { get; set; } = 250f;
+	public float MaxPain { get; set; } = 100f;
 
 	[JsonPropertyName("decay_per_second")]
-	public float DecayPerSecond { get; set; } = 4f;
+	public float DecayPerSecond { get; set; } = 3f;
 
 	[JsonPropertyName("min_pain_to_activate")]
-	public float MinPainToActivate { get; set; } = 80f;
+	public float MinPainToActivate { get; set; } = 40f;
 
 	[JsonPropertyName("cooldown")]
 	public float Cooldown { get; set; } = 20f;
@@ -23,13 +23,13 @@ public class PainConverterConfig
 	public float BurstDuration { get; set; } = 5f;
 
 	[JsonPropertyName("damage_per_pain")]
-	public float DamagePerPain { get; set; } = 0.01f;
+	public float DamagePerPain { get; set; } = 0.02f;
 
 	[JsonPropertyName("damage_pain_cap")]
-	public float DamagePainCap { get; set; } = 200f;
+	public float DamagePainCap { get; set; } = 100f;
 
 	[JsonPropertyName("speed_per_pain")]
-	public float SpeedPerPain { get; set; } = 0.001f;
+	public float SpeedPerPain { get; set; } = 0.002f;
 
 	[JsonPropertyName("burst_hp_per_second")]
 	public float BurstHpPerSecond { get; set; } = 15f;

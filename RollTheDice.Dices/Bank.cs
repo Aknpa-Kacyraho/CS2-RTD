@@ -1,65 +1,55 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 银行 Bank：每间隔给队内最穷的若干名队友注资（精准支援）。
+/// 与 Miser 组合（资本要塞）：注资金额翻倍。
+/// </summary>
 public class Bank : DiceBlueprint
 {
-	private bool _comboActive;
-
-	private readonly Random _random = new Random(Guid.NewGuid().GetHashCode());
-
 	private float _nextPayout;
 
 	public override string ClassName => "Bank";
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnTick";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnTick" };
 
 	public Bank(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
-			_players.Add(player);
-			_comboActive = DiceSynergy.HasPartner(player, "Miser");
-			if (_comboActive)
-			{
-				DiceSynergy.AnnounceCombo(player, "资本要塞", "资本要塞联动生效！");
-			}
-			if (_nextPayout == 0f)
-			{
-				_nextPayout = Server.CurrentTime + _config.Dices.Bank.Interval;
-			}
-			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+			return;
+		}
+		_players.Add(player);
+		if (DiceSynergy.HasPartner(player, "Miser"))
+		{
+			DiceSynergy.AnnounceCombo(player, "资本要塞", "注资金额翻倍！");
+		}
+		if (_nextPayout == 0f)
+		{
+			_nextPayout = Server.CurrentTime + _config.Dices.Bank.Interval;
+		}
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
-			} });
-		}
+			}
+		});
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
@@ -84,51 +74,44 @@ public class Bank : DiceBlueprint
 		{
 			return;
 		}
-		float num = Server.CurrentTime;
-		if (num < _nextPayout)
+		float now = Server.CurrentTime;
+		if (now < _nextPayout)
 		{
 			return;
 		}
-		_nextPayout = num + _config.Dices.Bank.Interval;
-		int minAmount = _config.Dices.Bank.MinAmount;
-		int maxAmount = _config.Dices.Bank.MaxAmount;
+		_nextPayout = now + _config.Dices.Bank.Interval;
+		BankConfig cfg = _config.Dices.Bank;
 		foreach (CCSPlayerController holder in _players.ToList())
 		{
-			if ((CEntityInstance)(object)holder == (CEntityInstance)null || !((CEntityInstance)holder).IsValid)
+			if (holder == null || !holder.IsValid)
 			{
 				continue;
 			}
-			List<CCSPlayerController> list = (from p in Utilities.GetPlayers()
-				where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && ((CBaseEntity)p).TeamNum == ((CBaseEntity)holder).TeamNum && (CEntityInstance)(object)p != (CEntityInstance)(object)holder && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0
-				select p).ToList();
-			if (list.Count == 0)
+			List<CCSPlayerController> teammates = Utilities.GetPlayers()
+				.Where((CCSPlayerController p) => p != null && p.IsValid && !p.IsHLTV && p != holder && ((CBaseEntity)p).TeamNum == ((CBaseEntity)holder).TeamNum && p.PlayerPawn?.Value != null && p.PlayerPawn.Value.IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0)
+				.OrderBy((CCSPlayerController p) => ((CBasePlayerController)p).SteamID)
+				.ToList();
+			if (teammates.Count == 0)
 			{
 				continue;
 			}
-			int num2 = Math.Min(_config.Dices.Bank.TeammatesCount, list.Count);
-			HashSet<CCSPlayerController> hashSet = new HashSet<CCSPlayerController>();
-			for (int num3 = 0; num3 < num2; num3++)
+			teammates = teammates.OrderBy((CCSPlayerController p) => p.InGameMoneyServices?.Account ?? 0).ToList();
+			int count = Math.Min(cfg.TeammatesCount, teammates.Count);
+			int amount = cfg.Amount;
+			if (DiceSynergy.HasPartner(holder, "Miser"))
 			{
-				int num4 = 0;
-				CCSPlayerController val;
-				do
+				amount *= 2;
+			}
+			for (int i = 0; i < count; i++)
+			{
+				CCSPlayerController target = teammates[i];
+				if (target.InGameMoneyServices == null)
 				{
-					val = list[_random.Next(list.Count)];
-					num4++;
+					continue;
 				}
-				while (hashSet.Contains(val) && num4 < 20);
-				if (!hashSet.Contains(val))
-				{
-					hashSet.Add(val);
-					int num5 = (DiceSynergy.HasPartner(holder, "Miser") ? (_random.Next(minAmount, maxAmount + 1) * 2) : _random.Next(minAmount, maxAmount + 1));
-					val.InGameMoneyServices.Account += num5;
-					if (val.InGameMoneyServices.Account < 0)
-					{
-						val.InGameMoneyServices.Account = 0;
-					}
-					Utilities.SetStateChanged((CBaseEntity)(object)val, "CCSPlayerController", "m_pInGameMoneyServices", 0);
-					val.PrintToChat(" " + _localizer["command.prefix"].Value + _localizer["dice_Bank_payout"].Value.Replace("{amount}", ((num5 >= 0) ? "+" : "") + num5).Replace("{name}", ((CBasePlayerController)val).PlayerName));
-				}
+				target.InGameMoneyServices.Account += amount;
+				Utilities.SetStateChanged(target, "CCSPlayerController", "m_pInGameMoneyServices", 0);
+				target.PrintToChat(" " + _localizer["command.prefix"].Value + _localizer["dice_Bank_payout"].Value.Replace("{amount}", "+" + amount).Replace("{name}", ((CBasePlayerController)target).PlayerName));
 			}
 		}
 	}

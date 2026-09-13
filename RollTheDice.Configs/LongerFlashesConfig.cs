@@ -13,6 +13,9 @@ public class LongerFlashesConfig
 	[JsonPropertyName("max_blindduration_factor")]
 	public float MaxBlinddurationFactor { get; set; } = 3f;
 
-	[JsonPropertyName("slow_multiplier")]
-	public float SlowMultiplier { get; set; } = 0.5f;
+	[JsonPropertyName("self_speed_bonus")]
+	public float SelfSpeedBonus { get; set; } = 0.3f;
+
+	[JsonPropertyName("self_speed_seconds")]
+	public float SelfSpeedSeconds { get; set; } = 3f;
 }

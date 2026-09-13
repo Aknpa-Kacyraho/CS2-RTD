@@ -37,7 +37,7 @@ public class DivineResurrection : DiceBlueprint
 	public DivineResurrection(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
@@ -135,6 +135,7 @@ public class DivineResurrection : DiceBlueprint
 				if (!((CEntityInstance)(object)((obj2 == null) ? null : obj2.PlayerPawn?.Value) == (CEntityInstance)null) && ((CBaseEntity)capturedDead.PlayerPawn.Value).LifeState != 0)
 				{
 					capturedDead.Respawn();
+					Invulnerability.Grant(capturedDead, _config.Dices.DivineResurrection.ReviveInvulnSeconds);
 					Server.NextFrame((Action)delegate
 					{
 						//IL_0089: Unknown result type (might be due to invalid IL or missing references)

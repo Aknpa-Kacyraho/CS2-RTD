@@ -4,7 +4,8 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Timers;
+using CounterStrikeSharp.API.Modules.Memory;
+using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
@@ -13,31 +14,24 @@ namespace RollTheDice.Dices;
 
 /// <summary>
 /// 羁绊 Kinship：队友（同队存活真人）阵亡时自己获得短暂无敌；自己阵亡时所有存活队友获得短暂无敌。
+/// 无敌用 OnPlayerTakeDamagePre 将伤害归零实现（本版本 TakesDamage=false 单独不可靠，Void/Fool/Prophet 均如此）。
 /// </summary>
 public class Kinship : DiceBlueprint
 {
 	private readonly Dictionary<ulong, float> _invulnUntil = new Dictionary<ulong, float>();
 
+	private readonly HashSet<ulong> _holderIds = new HashSet<ulong>();
+
 	public override string ClassName => "Kinship";
 
-	public override List<string> Events
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "EventPlayerDeath";
-			return list;
-		}
-	}
+	public override List<string> Events => new List<string> { "EventPlayerDeath" };
+
+	public override List<string> Listeners => new List<string> { "OnPlayerTakeDamagePre" };
 
 	public Kinship(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
@@ -45,6 +39,7 @@ public class Kinship : DiceBlueprint
 		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
 			_players.Add(player);
+			_holderIds.Add(((CBasePlayerController)player).SteamID);
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
 				"playerName",
@@ -62,13 +57,16 @@ public class Kinship : DiceBlueprint
 		_players.Remove(player);
 		if ((CEntityInstance)(object)player != (CEntityInstance)null && ((CEntityInstance)player).IsValid)
 		{
-			_invulnUntil.Remove(((CBasePlayerController)player).SteamID);
+			ulong steamID = ((CBasePlayerController)player).SteamID;
+			_holderIds.Remove(steamID);
+			_invulnUntil.Remove(steamID);
 		}
 	}
 
 	public override void Reset()
 	{
 		_players.Clear();
+		_holderIds.Clear();
 		_invulnUntil.Clear();
 	}
 
@@ -84,7 +82,7 @@ public class Kinship : DiceBlueprint
 		{
 			return (HookResult)0;
 		}
-		if (_players.Contains(victim))
+		if (_holderIds.Contains(((CBasePlayerController)victim).SteamID))
 		{
 			foreach (CCSPlayerController teammate in GetAliveTeammates(victim))
 			{
@@ -130,21 +128,52 @@ public class Kinship : DiceBlueprint
 		{
 			seconds *= 2f;
 		}
-		ulong sid = ((CBasePlayerController)player).SteamID;
-		_invulnUntil[sid] = Server.CurrentTime + seconds;
-		((CBaseEntity)pawn).TakesDamage = false;
+		_invulnUntil[((CBasePlayerController)player).SteamID] = Server.CurrentTime + seconds;
 		player.PrintToCenterAlert($"\ud83e\udd1d 羁绊庇护！{seconds:F0}s 无敌！");
-		new Timer(seconds, (Action)delegate
+	}
+
+	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
+	{
+		if (_invulnUntil.Count == 0)
 		{
-			if (_invulnUntil.TryGetValue(sid, out float until) && Server.CurrentTime >= until - 0.05f)
-			{
-				_invulnUntil.Remove(sid);
-				CCSPlayerController val = Utilities.GetPlayers().FirstOrDefault((CCSPlayerController p) => ((CEntityInstance)p).IsValid && ((CBasePlayerController)p).SteamID == sid);
-				if ((CEntityInstance)(object)((val == null) ? null : val.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)val.PlayerPawn.Value).IsValid)
-				{
-					((CBaseEntity)val.PlayerPawn.Value).TakesDamage = true;
-				}
-			}
-		}, (TimerFlags?)null);
+			return (HookResult)0;
+		}
+		if ((CEntityInstance)(object)entity == (CEntityInstance)null || !((CEntityInstance)entity).IsValid)
+		{
+			return (HookResult)0;
+		}
+		CCSPlayerPawn pawn = ((NativeObject)entity).As<CCSPlayerPawn>();
+		if (pawn == null)
+		{
+			return (HookResult)0;
+		}
+		object obj;
+		CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)pawn).Controller;
+		if (controller == null)
+		{
+			obj = null;
+		}
+		else
+		{
+			CBasePlayerController value = controller.Value;
+			obj = ((value != null) ? ((NativeObject)value).As<CCSPlayerController>() : null);
+		}
+		CCSPlayerController player = (CCSPlayerController)obj;
+		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid)
+		{
+			return (HookResult)0;
+		}
+		ulong steamID = ((CBasePlayerController)player).SteamID;
+		if (!_invulnUntil.TryGetValue(steamID, out float until))
+		{
+			return (HookResult)0;
+		}
+		if (Server.CurrentTime >= until)
+		{
+			_invulnUntil.Remove(steamID);
+			return (HookResult)0;
+		}
+		info.Damage = 0f;
+		return (HookResult)1;
 	}
 }

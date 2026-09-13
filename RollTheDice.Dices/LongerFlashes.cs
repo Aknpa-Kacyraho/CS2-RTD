@@ -1,70 +1,116 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
+using System.Linq;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Timers;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 闪光大师 LongerFlashes：你的闪光致盲时间延长；你被闪光后 3 秒内移速 +30%（被闪也能反打）。
+/// </summary>
 public class LongerFlashes : DiceBlueprint
 {
-	public readonly Random _random = new Random();
+	private readonly Random _random = new Random(Guid.NewGuid().GetHashCode());
 
 	public override string ClassName => "LongerFlashes";
 
-	public override List<string> Events
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "EventPlayerBlind";
-			return list;
-		}
-	}
+	public override List<string> Events => new List<string> { "EventPlayerBlind" };
 
 	public LongerFlashes(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
+	}
+
+	public override void Add(CCSPlayerController player)
+	{
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
+		{
+			return;
+		}
+		_players.Add(player);
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
+			{
+				"playerName",
+				((CBasePlayerController)player).PlayerName
+			}
+		});
+	}
+
+	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
+	{
+		SpeedBonusManager.Unregister(player, ClassName);
+		_players.Remove(player);
+	}
+
+	public override void Reset()
+	{
+		foreach (CCSPlayerController player in _players.ToList())
+		{
+			SpeedBonusManager.Unregister(player, ClassName);
+		}
+		_players.Clear();
+	}
+
+	public override void Destroy()
+	{
+		Reset();
 	}
 
 	public HookResult EventPlayerBlind(EventPlayerBlind @event, GameEventInfo info)
 	{
-		//IL_0188: Unknown result type (might be due to invalid IL or missing references)
-		//IL_018f: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0061: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0193: Unknown result type (might be due to invalid IL or missing references)
-		CCSPlayerController userid = @event.Userid;
+		CCSPlayerController victim = @event.Userid;
 		CCSPlayerController attacker = @event.Attacker;
-		if (userid == null || !((CEntityInstance)userid).IsValid || attacker == null || !((CEntityInstance)attacker).IsValid || !_players.Contains(attacker) || (CEntityInstance)(object)userid.PlayerPawn.Value == (CEntityInstance)null)
+		if (victim == null || !victim.IsValid)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		float minBlinddurationFactor = _config.Dices.LongerFlashes.MinBlinddurationFactor;
-		float maxBlinddurationFactor = _config.Dices.LongerFlashes.MaxBlinddurationFactor;
-		float num = (float)(_random.NextDouble() * (double)(maxBlinddurationFactor - minBlinddurationFactor) + (double)minBlinddurationFactor);
-		@event.BlindDuration *= num;
-		((CCSPlayerPawnBase)userid.PlayerPawn.Value).FlashDuration = @event.BlindDuration;
-		Utilities.SetStateChanged((CBaseEntity)(object)userid.PlayerPawn.Value, "CCSPlayerPawnBase", "m_flFlashDuration", 0);
-		((CCSPlayerPawnBase)userid.PlayerPawn.Value).BlindUntilTime = Server.CurrentTime + ((CCSPlayerPawnBase)userid.PlayerPawn.Value).FlashDuration;
-		userid.PlayerPawn.Value.VelocityModifier = _config.Dices.LongerFlashes.SlowMultiplier;
-		Utilities.SetStateChanged((CBaseEntity)(object)userid.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
-		CCSPlayerController captured = userid;
-		new Timer(((CCSPlayerPawnBase)userid.PlayerPawn.Value).FlashDuration, (Action)delegate
+		if (attacker != null && attacker.IsValid && _players.Contains(attacker))
 		{
-			CCSPlayerController obj = captured;
-			if ((CEntityInstance)(object)((obj == null) ? null : obj.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)captured.PlayerPawn.Value).IsValid)
+			float factor = (float)(_random.NextDouble() * (_config.Dices.LongerFlashes.MaxBlinddurationFactor - _config.Dices.LongerFlashes.MinBlinddurationFactor) + _config.Dices.LongerFlashes.MinBlinddurationFactor);
+			@event.BlindDuration *= factor;
+			CCSPlayerPawn victimPawn = victim.PlayerPawn?.Value;
+			if (victimPawn != null && victimPawn.IsValid)
 			{
-				captured.PlayerPawn.Value.VelocityModifier = 1f;
-				Utilities.SetStateChanged((CBaseEntity)(object)captured.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+				((CCSPlayerPawnBase)victimPawn).FlashDuration = @event.BlindDuration;
+				Utilities.SetStateChanged(victimPawn, "CCSPlayerPawnBase", "m_flFlashDuration", 0);
+				((CCSPlayerPawnBase)victimPawn).BlindUntilTime = Server.CurrentTime + ((CCSPlayerPawnBase)victimPawn).FlashDuration;
+			}
+		}
+		if (_players.Contains(victim))
+		{
+			GrantSelfSpeed(victim);
+		}
+		return HookResult.Continue;
+	}
+
+	private void GrantSelfSpeed(CCSPlayerController player)
+	{
+		float seconds = _config.Dices.LongerFlashes.SelfSpeedSeconds;
+		SpeedBonusManager.Register(player, ClassName, _config.Dices.LongerFlashes.SelfSpeedBonus, seconds);
+		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
+		if (pawn != null && pawn.IsValid)
+		{
+			pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
+			Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+		}
+		ulong id = player.SteamID;
+		new Timer(seconds, delegate
+		{
+			SpeedBonusManager.UnregisterBySteamId(id, ClassName);
+			CCSPlayerController target = Utilities.GetPlayers().FirstOrDefault((CCSPlayerController p) => p != null && p.IsValid && ((CBasePlayerController)p).SteamID == id);
+			CCSPlayerPawn targetPawn = target?.PlayerPawn?.Value;
+			if (targetPawn != null && targetPawn.IsValid)
+			{
+				targetPawn.VelocityModifier = 1f + SpeedBonusManager.GetEffectiveBySteamId(id, 100f);
+				Utilities.SetStateChanged(targetPawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			}
 		}, (TimerFlags?)null);
-		return (HookResult)0;
 	}
 }

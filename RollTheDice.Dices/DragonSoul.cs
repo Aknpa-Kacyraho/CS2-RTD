@@ -20,8 +20,6 @@ public class DragonSoul : DiceBlueprint
 
 	public override string ClassName => "DragonSoul";
 
-	public override float Weight => 1f;
-
 	public override bool IsSpecial => true;
 
 	public override float SecondRoundProbability => 0.1f;
@@ -43,7 +41,7 @@ public class DragonSoul : DiceBlueprint
 	public DragonSoul(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)

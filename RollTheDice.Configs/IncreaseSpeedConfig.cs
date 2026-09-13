@@ -7,12 +7,9 @@ public class IncreaseSpeedConfig
 	[JsonPropertyName("enabled")]
 	public bool Enabled { get; set; } = true;
 
-	[JsonPropertyName("min_speed")]
-	public float MinSpeed { get; set; } = 1.5f;
+	[JsonPropertyName("max_bonus")]
+	public float MaxBonus { get; set; } = 0.5f;
 
-	[JsonPropertyName("max_speed")]
-	public float MaxSpeed { get; set; } = 2f;
-
-	[JsonPropertyName("reset_on_hostage_rescue")]
-	public bool ResetOnHostageRescue { get; set; } = true;
+	[JsonPropertyName("gain_per_second")]
+	public float GainPerSecond { get; set; } = 0.1f;
 }

@@ -1,97 +1,59 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 吸血鬼 Vampire：造成伤害吸取生命；自身 HP 低于 50% 时吸血翻倍。
+/// 与 SoulEater 组合（噬魂血族）：吸血再提升。
+/// </summary>
 public class Vampire : DiceBlueprint
 {
-	public readonly Random _random = new Random();
-
-	public readonly Dictionary<CCSPlayerController, float> _playerSpeed = new Dictionary<CCSPlayerController, float>();
-
-	private bool _comboActive;
-
-	private readonly Dictionary<CCSPlayerController, int> _originalMaxHealth = new Dictionary<CCSPlayerController, int>();
-
 	public override string ClassName => "Vampire";
 
-	public override List<string> Events
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "EventPlayerHurt";
-			return list;
-		}
-	}
+	public override List<string> Events => new List<string> { "EventPlayerHurt" };
 
 	public Vampire(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
-			_players.Add(player);
-			CCSPlayerPawn value = player.PlayerPawn.Value;
-			_originalMaxHealth[player] = ((CBaseEntity)value).MaxHealth;
-			int maxHp = (int)float.Round(_config.Dices.Vampire.MaxHealth);
-			((CBaseEntity)value).MaxHealth = maxHp;
-			((CBaseEntity)value).Health = Math.Min(((CBaseEntity)value).Health, maxHp);
-			Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iMaxHealth", 0);
-			Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iHealth", 0);
-			_comboActive = DiceSynergy.HasPartner(player, "SoulEater");
-			if (_comboActive)
-			{
-				DiceSynergy.AnnounceCombo(player, "噬魂血族", "HP上限" + maxHp + "！与噬魂者联动吸血翻倍！");
-			}
-			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+			return;
+		}
+		_players.Add(player);
+		if (DiceSynergy.HasPartner(player, "SoulEater"))
+		{
+			DiceSynergy.AnnounceCombo(player, "噬魂血族", "吸血量进一步提升！");
+		}
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
-			} });
-		}
+			}
+		});
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
-		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
-		{
-			CCSPlayerPawn value = player.PlayerPawn.Value;
-			if (_originalMaxHealth.TryGetValue(player, out var value2))
-			{
-				((CBaseEntity)value).MaxHealth = value2;
-				((CBaseEntity)value).Health = Math.Min(((CBaseEntity)value).Health, value2);
-				Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iMaxHealth", 0);
-				Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iHealth", 0);
-				_originalMaxHealth.Remove(player);
-			}
-		}
 		_players.Remove(player);
 	}
 
 	public override void Reset()
 	{
-		foreach (CCSPlayerController item in _players.ToList())
-		{
-			Remove(item);
-		}
 		_players.Clear();
-		_originalMaxHealth.Clear();
 	}
 
 	public override void Destroy()
@@ -101,30 +63,48 @@ public class Vampire : DiceBlueprint
 
 	public HookResult EventPlayerHurt(EventPlayerHurt @event, GameEventInfo info)
 	{
-		//IL_0051: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0114: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0110: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00a5: Unknown result type (might be due to invalid IL or missing references)
-		CCSPlayerController attacker = @event.Attacker;
-		CCSPlayerController userid = @event.Userid;
-		if ((CEntityInstance)(object)attacker == (CEntityInstance)null || (CEntityInstance)(object)userid == (CEntityInstance)null || !_players.Contains(attacker) || (CEntityInstance)(object)attacker.PlayerPawn?.Value == (CEntityInstance)null)
+		if (_players.Count == 0)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		int num = (int)float.Round(@event.DmgHealth);
+		CCSPlayerController attacker = @event.Attacker;
+		CCSPlayerController victim = @event.Userid;
+		if (attacker == null || !attacker.IsValid || victim == null || !victim.IsValid)
+		{
+			return HookResult.Continue;
+		}
+		if (attacker == victim || !_players.Contains(attacker))
+		{
+			return HookResult.Continue;
+		}
+		if (((CBaseEntity)attacker).TeamNum == ((CBaseEntity)victim).TeamNum)
+		{
+			return HookResult.Continue;
+		}
+		VampireConfig cfg = _config.Dices.Vampire;
+		float heal = @event.DmgHealth * cfg.Lifesteal;
+		CCSPlayerPawn pawn = attacker.PlayerPawn?.Value;
+		if (pawn == null || !pawn.IsValid)
+		{
+			return HookResult.Continue;
+		}
+		CBaseEntity entity = pawn;
+		if (entity.Health < entity.MaxHealth / 2)
+		{
+			heal *= cfg.LowHpBonus;
+		}
 		if (DiceSynergy.HasPartner(attacker, "SoulEater"))
 		{
-			num *= 2;
+			heal *= 1.5f;
 		}
-		CCSPlayerPawn val = attacker.PlayerPawn?.Value;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid)
+		int whole = (int)Math.Round(heal);
+		if (whole < 1 || entity.Health >= entity.MaxHealth)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		int maxHp = (int)float.Round(_config.Dices.Vampire.MaxHealth);
-		((CBaseEntity)val).Health = Math.Min(((CBaseEntity)val).Health + num, maxHp);
-		Utilities.SetStateChanged((CBaseEntity)(object)val, "CBaseEntity", "m_iHealth", 0);
-		attacker.PrintToCenterAlert($"+{num} HP!");
-		return (HookResult)0;
+		entity.Health = Math.Min(entity.Health + whole, entity.MaxHealth);
+		Utilities.SetStateChanged(entity, "CBaseEntity", "m_iHealth", 0);
+		attacker.PrintToCenterAlert($"+{whole} HP");
+		return HookResult.Continue;
 	}
 }

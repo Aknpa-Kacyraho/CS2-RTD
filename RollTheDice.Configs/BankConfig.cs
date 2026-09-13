@@ -13,9 +13,6 @@ public class BankConfig
 	[JsonPropertyName("teammates_count")]
 	public int TeammatesCount { get; set; } = 2;
 
-	[JsonPropertyName("min_amount")]
-	public int MinAmount { get; set; } = -1000;
-
-	[JsonPropertyName("max_amount")]
-	public int MaxAmount { get; set; } = 1000;
+	[JsonPropertyName("amount")]
+	public int Amount { get; set; } = 800;
 }

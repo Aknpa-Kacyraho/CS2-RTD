@@ -824,16 +824,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					}
 				}
 			}
-			foreach (ulong steamId in Universe.PendingRestore.ToList())
-			{
-				CCSPlayerController val2 = Utilities.GetPlayers().FirstOrDefault((CCSPlayerController pl) => ((CEntityInstance)pl).IsValid && !((CBasePlayerController)pl).IsHLTV && ((CBasePlayerController)pl).SteamID == steamId);
-				if ((CEntityInstance)(object)val2 != (CEntityInstance)null && ((CEntityInstance)val2).IsValid)
-				{
-					RollTheDiceForPlayer(val2, "Universe");
-					val2.PrintToCenterAlert($"\ud83c\udf0c 宇宙之力已恢复！剩余{Universe.RestoresLeft.GetValueOrDefault(steamId)}次");
-				}
-				Universe.PendingRestore.Remove(steamId);
-			}
 		}, (TimerFlags?)null);
 	}
 
@@ -1000,6 +990,12 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			return HookResult.Continue;
 		}
+		CCSPlayerController invulnVictim = ResolvePlayerController(entity);
+		if (invulnVictim != null && invulnVictim.IsValid && Invulnerability.IsInvulnerable(invulnVictim))
+		{
+			info.Damage = 0f;
+			return HookResult.Changed;
+		}
 		bool changed = false;
 		CCSPlayerController attacker = ResolvePlayerController(info.Attacker?.Value);
 		if ((CEntityInstance)(object)attacker != (CEntityInstance)null && ((CEntityInstance)attacker).IsValid && !attacker.IsBot && !((CBasePlayerController)attacker).IsHLTV)
@@ -1075,6 +1071,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 						_diceUsageCount[diceBlueprint] = 0;
 					}
 					_diceUsageCount[diceBlueprint]++;
+					RefreshCombos(player);
 					return (diceBlueprint.ClassName, diceBlueprint.Description);
 				}
 				catch (Exception value)
@@ -1102,6 +1099,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 						_diceUsageCount[diceBlueprint2] = 0;
 					}
 					_diceUsageCount[diceBlueprint2]++;
+					RefreshCombos(player);
 					return (diceBlueprint2.ClassName, diceBlueprint2.Description);
 				}
 				catch (Exception value2)
@@ -1183,6 +1181,32 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 	}
 
+	private void RefreshCombos(CCSPlayerController trigger)
+	{
+		try
+		{
+			List<CCSPlayerController> affected = Utilities.GetPlayers()
+				.Where((CCSPlayerController p) => p != null && p.IsValid && !p.IsHLTV && (trigger == null || (CEntityInstance)p == (CEntityInstance)trigger || p.TeamNum == trigger.TeamNum))
+				.ToList();
+			foreach (DiceBlueprint dice in _dices)
+			{
+				foreach (CCSPlayerController p in affected)
+				{
+					try
+					{
+						dice.OnDiceSetChanged(p);
+					}
+					catch
+					{
+					}
+				}
+			}
+		}
+		catch
+		{
+		}
+	}
+
 	private void RemoveDicesForPlayers()
 	{
 		foreach (DiceBlueprint dix in _dices)
@@ -1212,6 +1236,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			}
 		}
 		_originalPlayerNames.Clear();
+		Invulnerability.ClearAll();
+		RefreshCombos(null);
 	}
 
 	private void RefreshPlayerDiceName(CCSPlayerController player)
@@ -1563,6 +1589,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		diceBlueprint.Remove(player);
 		_playersThatRolledTheDice.Remove(player);
 		RefreshPlayerDiceName(player);
+		RefreshCombos(player);
 		return true;
 	}
 
@@ -1798,7 +1825,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private static bool RtdDebugEnabled => Instance != null && Instance.Config != null && Instance.Config.Debug;
 
-	private static void LogDebug(string message)
+	internal static void LogDebug(string message)
 	{
 		try
 		{
@@ -1812,7 +1839,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 	}
 
-	private static void LogErr(string message)
+	internal static void LogErr(string message)
 	{
 		try
 		{

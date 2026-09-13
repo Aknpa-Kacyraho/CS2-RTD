@@ -1,72 +1,51 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 手雷王 GrenadeKing：手雷伤害 ×2.5、爆炸范围 +25%；手雷击杀返还一颗手雷。
+/// 与 Martyrdom 组合（爆炸艺术家）：伤害与范围进一步提升。
+/// </summary>
 public class GrenadeKing : DiceBlueprint
 {
-	private bool _comboActive;
-
-	private readonly Random _random = new Random(Guid.NewGuid().GetHashCode());
-
-	private readonly Dictionary<uint, (float Multiplier, float RadiusMult, CCSPlayerController Owner)> _trackedNades = new Dictionary<uint, (float, float, CCSPlayerController)>();
+	private readonly Dictionary<uint, float> _nadeMultiplier = new Dictionary<uint, float>();
 
 	public override string ClassName => "GrenadeKing";
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 2;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int num2 = 0;
-			span[num2] = "OnEntitySpawned";
-			num2++;
-			span[num2] = "OnPlayerTakeDamagePre";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnEntitySpawned", "OnPlayerTakeDamagePre" };
+
+	public override List<string> Events => new List<string> { "EventPlayerDeath" };
 
 	public GrenadeKing(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
-			_players.Add(player);
-			_comboActive = DiceSynergy.HasPartner(player, "Martyrdom");
-			if (_comboActive)
-			{
-				DiceSynergy.AnnounceCombo(player, "爆炸艺术家", "手雷伤害+50% 殉道爆炸范围翻倍");
-			}
-			float multiplierMin = _config.Dices.GrenadeKing.MultiplierMin;
-			float multiplierMax = _config.Dices.GrenadeKing.MultiplierMax;
-			float num = (float)Math.Round(_random.NextDouble() * (double)(multiplierMax - multiplierMin) + (double)multiplierMin, 2);
-			NotifyPlayers(player, ClassName, new Dictionary<string, string>
-			{
-				{
-					"playerName",
-					((CBasePlayerController)player).PlayerName
-				},
-				{
-					"multiplier",
-					num.ToString()
-				}
-			});
+			return;
 		}
+		_players.Add(player);
+		if (DiceSynergy.HasPartner(player, "Martyrdom"))
+		{
+			DiceSynergy.AnnounceCombo(player, "爆炸艺术家", "手雷伤害与爆炸范围大幅提升！");
+		}
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
+			{
+				"playerName",
+				((CBasePlayerController)player).PlayerName
+			}
+		});
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
@@ -76,106 +55,96 @@ public class GrenadeKing : DiceBlueprint
 
 	public override void Reset()
 	{
+		_nadeMultiplier.Clear();
 		_players.Clear();
-		_trackedNades.Clear();
+	}
+
+	public override void Destroy()
+	{
+		Reset();
 	}
 
 	public void OnEntitySpawned(CEntityInstance entity)
 	{
-		if (_players.Count == 0 || entity.DesignerName != "hegrenade_projectile")
+		if (_players.Count == 0 || entity == null || entity.DesignerName != "hegrenade_projectile")
 		{
 			return;
 		}
-		Server.NextFrame((Action)delegate
+		Server.NextFrame(delegate
 		{
-			//IL_0036: Unknown result type (might be due to invalid IL or missing references)
-			//IL_003c: Expected O, but got Unknown
-			if (!(entity == (CEntityInstance)null) && entity.IsValid)
+			if (entity == null || !entity.IsValid)
 			{
-				CHEGrenadeProjectile val = new CHEGrenadeProjectile(((NativeEntity)entity).Handle);
-				if (((CEntityInstance)val).IsValid)
-				{
-					CCSPlayerPawn val2 = ((CBaseGrenade)val).Thrower?.Value;
-					if (!((CEntityInstance)(object)val2 == (CEntityInstance)null) && ((CEntityInstance)val2).IsValid)
-					{
-						CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)val2).Controller;
-						object obj;
-						if (controller == null)
-						{
-							obj = null;
-						}
-						else
-						{
-							CBasePlayerController value = controller.Value;
-							obj = ((value != null) ? ((NativeObject)value).As<CCSPlayerController>() : null);
-						}
-						CCSPlayerController val3 = (CCSPlayerController)obj;
-						if (!((CEntityInstance)(object)val3 == (CEntityInstance)null) && ((CEntityInstance)val3).IsValid && _players.Contains(val3))
-						{
-							float multiplierMin = _config.Dices.GrenadeKing.MultiplierMin;
-							float multiplierMax = _config.Dices.GrenadeKing.MultiplierMax;
-							float num = (float)Math.Round(_random.NextDouble() * (double)(multiplierMax - multiplierMin) + (double)multiplierMin, 2);
-							float num2 = 1f + (num - 1f) * 0.5f;
-							if (DiceSynergy.HasPartner(val3, "Martyrdom"))
-							{
-								num += 0.5f;
-								num2 *= 2f;
-							}
-							((CBaseGrenade)val).Damage *= num;
-							((CBaseGrenade)val).DmgRadius *= num2;
-							_trackedNades[((CEntityInstance)val).Index] = (num, num2, val3);
-						}
-					}
-				}
+				return;
 			}
+			CHEGrenadeProjectile projectile = new CHEGrenadeProjectile(entity.Handle);
+			if (!projectile.IsValid)
+			{
+				return;
+			}
+			CCSPlayerPawn thrower = ((CBaseGrenade)projectile).Thrower?.Value;
+			if (thrower == null || !thrower.IsValid || thrower.Controller?.Value == null)
+			{
+				return;
+			}
+			CCSPlayerController owner = thrower.Controller.Value.As<CCSPlayerController>();
+			if (owner == null || !owner.IsValid || !_players.Contains(owner))
+			{
+				return;
+			}
+			float multiplier = _config.Dices.GrenadeKing.DamageMultiplier;
+			float radius = _config.Dices.GrenadeKing.RadiusMultiplier;
+			if (DiceSynergy.HasPartner(owner, "Martyrdom"))
+			{
+				multiplier += 0.5f;
+				radius *= 1.5f;
+			}
+			((CBaseGrenade)projectile).DmgRadius *= radius;
+			_nadeMultiplier[projectile.Index] = multiplier;
 		});
 	}
 
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
-		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
-		//IL_011b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0037: Unknown result type (might be due to invalid IL or missing references)
-		//IL_009c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0118: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0113: Unknown result type (might be due to invalid IL or missing references)
-		if (_players.Count == 0)
+		if (_players.Count == 0 || info == null || info.Damage <= 0f)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		if ((CEntityInstance)(object)info.Attacker?.Value == (CEntityInstance)null)
+		CBaseEntity inflictor = info.Inflictor?.Value;
+		if (inflictor == null || inflictor.DesignerName != "hegrenade_projectile")
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		CCSPlayerPawn obj = ((NativeObject)info.Attacker.Value).As<CCSPlayerPawn>();
-		object obj2;
-		if (obj == null)
+		if (!_nadeMultiplier.TryGetValue(inflictor.Index, out float multiplier))
 		{
-			obj2 = null;
+			return HookResult.Continue;
 		}
-		else
+		info.Damage *= multiplier;
+		return HookResult.Changed;
+	}
+
+	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
+	{
+		CCSPlayerController attacker = @event.Attacker;
+		CCSPlayerController victim = @event.Userid;
+		if (attacker == null || !attacker.IsValid || victim == null || !victim.IsValid)
 		{
-			CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj).Controller;
-			if (controller == null)
-			{
-				obj2 = null;
-			}
-			else
-			{
-				CBasePlayerController value = controller.Value;
-				obj2 = ((value != null) ? ((NativeObject)value).As<CCSPlayerController>() : null);
-			}
+			return HookResult.Continue;
 		}
-		CCSPlayerController val = (CCSPlayerController)obj2;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
+		if (attacker == victim || !_players.Contains(attacker))
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		if ((CEntityInstance)(object)info.Inflictor?.Value != (CEntityInstance)null && ((CEntityInstance)info.Inflictor.Value).DesignerName == "hegrenade_projectile" && _trackedNades.TryGetValue(((CEntityInstance)info.Inflictor.Value).Index, out (float, float, CCSPlayerController) value2))
+		if (((CBaseEntity)attacker).TeamNum == ((CBaseEntity)victim).TeamNum)
 		{
-			info.Damage *= value2.Item1;
-			return (HookResult)1;
+			return HookResult.Continue;
 		}
-		return (HookResult)0;
+		string weapon = @event.Weapon;
+		if (weapon == null || !weapon.Contains("hegrenade"))
+		{
+			return HookResult.Continue;
+		}
+		attacker.GiveNamedItem("weapon_hegrenade");
+		attacker.PrintToCenterAlert("手雷击杀！返还一颗手雷");
+		return HookResult.Continue;
 	}
 }

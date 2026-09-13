@@ -7,6 +7,9 @@ public class SniperEliteConfig
 	[JsonPropertyName("enabled")]
 	public bool Enabled { get; set; } = true;
 
-	[JsonPropertyName("damage_multiplier")]
-	public float DamageMultiplier { get; set; } = 3f;
+	[JsonPropertyName("max_bonus")]
+	public float MaxBonus { get; set; } = 2f;
+
+	[JsonPropertyName("charge_seconds")]
+	public float ChargeSeconds { get; set; } = 3f;
 }

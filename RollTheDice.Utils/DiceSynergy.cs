@@ -50,7 +50,7 @@ public static class DiceSynergy
 
 	static DiceSynergy()
 	{
-		int num = 66;
+		int num = 65;
 		List<(string, string, string)> list = new List<(string, string, string)>(num);
 		CollectionsMarshal.SetCount(list, num);
 		Span<(string, string, string)> span = CollectionsMarshal.AsSpan(list);
@@ -82,8 +82,6 @@ public static class DiceSynergy
 		span[num2] = ("SniperElite", "DeagleKing", "精准猎杀");
 		num2++;
 		span[num2] = ("Bank", "Miser", "资本要塞");
-		num2++;
-		span[num2] = ("Countdown", "Rewind", "时空主宰");
 		num2++;
 		span[num2] = ("Thorns", "GuardianAngel", "圣光荆棘");
 		num2++;

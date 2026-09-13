@@ -7,9 +7,9 @@ public class RegenerationConfig
 	[JsonPropertyName("enabled")]
 	public bool Enabled { get; set; } = true;
 
-	[JsonPropertyName("heal_per_tick")]
-	public int HealPerTick { get; set; } = 4;
+	[JsonPropertyName("out_of_combat_seconds")]
+	public float OutOfCombatSeconds { get; set; } = 2f;
 
-	[JsonPropertyName("tick_interval")]
-	public float TickInterval { get; set; } = 2f;
+	[JsonPropertyName("heal_per_second")]
+	public float HealPerSecond { get; set; } = 6f;
 }

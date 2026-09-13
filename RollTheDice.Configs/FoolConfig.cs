@@ -15,4 +15,7 @@ public class FoolConfig
 
 	[JsonPropertyName("invincibility_seconds")]
 	public float InvincibilitySeconds { get; set; } = 2f;
+
+	[JsonPropertyName("whiff_pity")]
+	public int WhiffPity { get; set; } = 3;
 }

@@ -21,7 +21,25 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 
 	public virtual bool CanBeDrawn => true;
 
-	public virtual float Weight => 1f;
+	public virtual float Weight
+	{
+		get
+		{
+			var rarity = _globalConfig?.Dices?.Rarity;
+			if (rarity != null)
+			{
+				if (rarity.DiceTier.TryGetValue(ClassName, out string tier) && tier != null && rarity.TierWeights.TryGetValue(tier, out float configured))
+				{
+					return configured;
+				}
+				if (rarity.TierWeights.TryGetValue("common", out float common))
+				{
+					return common;
+				}
+			}
+			return 1f;
+		}
+	}
 
 	public virtual bool IsSpecial => false;
 
@@ -48,6 +66,10 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 	public virtual float GetCooldownRemaining(CCSPlayerController player)
 	{
 		return 0f;
+	}
+
+	public virtual void OnDiceSetChanged(CCSPlayerController player)
+	{
 	}
 
 	public virtual void Add(CCSPlayerController player)

@@ -2,88 +2,81 @@ using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.UserMessages;
-using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 失聪 Deaf：完全听不到声音；受到伤害时透视攻击者一段时间作为补偿。
+/// </summary>
 public class Deaf : DiceBlueprint
 {
-	private readonly Dictionary<CCSPlayerController, float> _cooldowns = new Dictionary<CCSPlayerController, float>();
-
-	private readonly Dictionary<CCSPlayerController, (CDynamicProp? Proxy, CDynamicProp? Glow, CCSPlayerController? Target)> _activeGlows = new Dictionary<CCSPlayerController, (CDynamicProp, CDynamicProp, CCSPlayerController)>();
+	private readonly Dictionary<CCSPlayerController, (CDynamicProp Proxy, CDynamicProp Glow, CCSPlayerController Target)> _activeGlows = new Dictionary<CCSPlayerController, (CDynamicProp, CDynamicProp, CCSPlayerController)>();
 
 	public override string ClassName => "Deaf";
 
-	public override Dictionary<int, HookMode> UserMessages => new Dictionary<int, HookMode> { 
-	{
-		208,
-		(HookMode)0
-	} };
+	public override List<string> Events => new List<string> { "EventPlayerHurt" };
 
-	public override List<string> Listeners
+	public override Dictionary<int, HookMode> UserMessages => new Dictionary<int, HookMode>
 	{
-		get
 		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnPlayerButtonsChanged";
-			return list;
+			208,
+			HookMode.Pre
 		}
-	}
+	};
 
 	public Deaf(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid)
+		if (player == null || !player.IsValid)
 		{
-			_players.Add(player);
-			_cooldowns[player] = 0f;
-			player.ExecuteClientCommand("volume 0");
-			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+			return;
+		}
+		_players.Add(player);
+		player.ExecuteClientCommand("volume 0");
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
-			} });
-			player.PrintToCenterAlert("\ud83d\udd07 完全失聪！按E穿墙透视随机敌人4秒！");
-		}
+			}
+		});
+		player.PrintToCenterAlert("🔇 完全失聪！受到伤害时透视攻击者");
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		RemoveGlowForPlayer(player);
-		player.ExecuteClientCommand("volume 0.5");
+		if (player != null)
+		{
+			player.ExecuteClientCommand("volume 0.5");
+		}
 		_players.Remove(player);
-		_cooldowns.Remove(player);
 	}
 
 	public override void Reset()
 	{
-		foreach (CCSPlayerController item in _players.ToList())
+		foreach (CCSPlayerController player in _players.ToList())
 		{
-			if (item != null)
+			if (player != null)
 			{
-				item.ExecuteClientCommand("volume 0.5");
+				player.ExecuteClientCommand("volume 0.5");
 			}
-			RemoveGlowForPlayer(item);
+			RemoveGlowForPlayer(player);
 		}
 		_players.Clear();
-		_cooldowns.Clear();
 	}
 
 	public override void Destroy()
@@ -91,102 +84,67 @@ public class Deaf : DiceBlueprint
 		Reset();
 	}
 
-	private void RemoveGlowForPlayer(CCSPlayerController holder)
+	public HookResult EventPlayerHurt(EventPlayerHurt @event, GameEventInfo info)
 	{
-		if (_activeGlows.TryGetValue(holder, out (CDynamicProp, CDynamicProp, CCSPlayerController) value))
+		CCSPlayerController victim = @event.Userid;
+		CCSPlayerController attacker = @event.Attacker;
+		if (victim == null || !victim.IsValid || !_players.Contains(victim))
 		{
-			GlowUtil.RemoveGlow((CBaseEntity?)(object)value.Item1, (CBaseEntity?)(object)value.Item2);
-			_activeGlows.Remove(holder);
+			return HookResult.Continue;
 		}
+		if (attacker == null || !attacker.IsValid || attacker == victim)
+		{
+			return HookResult.Continue;
+		}
+		if (((CBaseEntity)attacker).TeamNum == ((CBaseEntity)victim).TeamNum)
+		{
+			return HookResult.Continue;
+		}
+		CCSPlayerPawn attackerPawn = attacker.PlayerPawn?.Value;
+		if (attackerPawn == null || !attackerPawn.IsValid)
+		{
+			return HookResult.Continue;
+		}
+		RemoveGlowForPlayer(victim);
+		(CDynamicProp Proxy, CDynamicProp Glow) glow = GlowUtil.CreateGlow(attackerPawn, Color.Red);
+		if (glow.Proxy == null || glow.Glow == null)
+		{
+			return HookResult.Continue;
+		}
+		_activeGlows[victim] = (glow.Proxy, glow.Glow, attacker);
+		float seconds = _config.Dices.Deaf.RevealSeconds;
+		victim.PrintToCenterAlert($"👁 透视 {((CBasePlayerController)attacker).PlayerName}！{seconds:F0}s");
+		new Timer(seconds, delegate
+		{
+			RemoveGlowForPlayer(victim);
+		}, (TimerFlags?)null);
+		return HookResult.Continue;
 	}
 
 	public HookResult HookUserMessage208(UserMessage um)
 	{
-		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0108: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0105: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e3: Unknown result type (might be due to invalid IL or missing references)
 		if (_players.Count == 0)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		int num = um.ReadInt("source_entity_index", (int?)null);
+		int sourceIndex = um.ReadInt("source_entity_index", null);
 		foreach (CCSPlayerController player in _players)
 		{
-			uint? obj;
-			if (player == null)
-			{
-				obj = null;
-			}
-			else
-			{
-				CHandle<CCSPlayerPawn> playerPawn = player.PlayerPawn;
-				if (playerPawn == null)
-				{
-					obj = null;
-				}
-				else
-				{
-					CCSPlayerPawn value = playerPawn.Value;
-					obj = ((value != null) ? new uint?(((CEntityInstance)value).Index) : ((uint?)null));
-				}
-			}
-			if (obj == num)
+			if (player?.PlayerPawn?.Value != null && player.PlayerPawn.Value.IsValid && player.PlayerPawn.Value.Index == sourceIndex)
 			{
 				um.Recipients.Clear();
-				return (HookResult)4;
+				return HookResult.Stop;
 			}
 		}
-		return (HookResult)0;
+		return HookResult.Continue;
 	}
 
-	public void OnPlayerButtonsChanged(CCSPlayerController player, PlayerButtons pressed, PlayerButtons released)
+	private void RemoveGlowForPlayer(CCSPlayerController holder)
 	{
-		//IL_006b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0348: Unknown result type (might be due to invalid IL or missing references)
-		if (_players.Count == 0 || (CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid || !_players.Contains(player) || !((Enum)pressed).HasFlag((Enum)(object)(PlayerButtons)32) || (CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)player.PlayerPawn.Value).IsValid || ((CBaseEntity)player.PlayerPawn.Value).LifeState != 0)
+		if (holder != null && _activeGlows.TryGetValue(holder, out (CDynamicProp, CDynamicProp, CCSPlayerController) value))
 		{
-			return;
+			GlowUtil.RemoveGlow(value.Item1, value.Item2);
+			_activeGlows.Remove(holder);
 		}
-		float num = Server.CurrentTime;
-		if (_cooldowns.TryGetValue(player, out var value) && num < value)
-		{
-			float value2 = value - num;
-			player.PrintToCenterAlert($"⏳ 冷却中... {value2:F0}秒");
-			return;
-		}
-		List<CCSPlayerController> list = (from p in Utilities.GetPlayers()
-			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && ((CBaseEntity)p).TeamNum != ((CBaseEntity)player).TeamNum && (CEntityInstance)(object)((CBasePlayerController)p).Pawn?.Value != (CEntityInstance)null && ((CEntityInstance)((CBasePlayerController)p).Pawn.Value).IsValid && ((CBaseEntity)((CBasePlayerController)p).Pawn.Value).LifeState == 0
-			select p).ToList();
-		if (list.Count == 0)
-		{
-			player.PrintToCenterAlert("❌ 没有存活的敌人！");
-			return;
-		}
-		CCSPlayerController val = list[Random.Shared.Next(list.Count)];
-		if ((CEntityInstance)(object)val.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)val.PlayerPawn.Value).IsValid)
-		{
-			return;
-		}
-		RemoveGlowForPlayer(player);
-		var (val2, val3) = GlowUtil.CreateGlow((CBaseEntity)(object)val.PlayerPawn.Value, Color.Red);
-		if ((CEntityInstance)(object)val2 == (CEntityInstance)null || (CEntityInstance)(object)val3 == (CEntityInstance)null)
-		{
-			player.PrintToCenterAlert("❌ 透视失败！");
-			return;
-		}
-		float wallhackDuration = _config.Dices.Deaf.WallhackDuration;
-		_activeGlows[player] = (val2, val3, val);
-		_cooldowns[player] = num + _config.Dices.Deaf.Cooldown;
-		player.PrintToCenterAlert($"\ud83d\udc41 透视 {((CBasePlayerController)val).PlayerName}！持续{wallhackDuration}秒");
-		CCSPlayerController captured = player;
-		new Timer(wallhackDuration, (Action)delegate
-		{
-			if (_activeGlows.TryGetValue(captured, out (CDynamicProp, CDynamicProp, CCSPlayerController) value3))
-			{
-				GlowUtil.RemoveGlow((CBaseEntity?)(object)value3.Item1, (CBaseEntity?)(object)value3.Item2);
-				_activeGlows.Remove(captured);
-			}
-		}, (TimerFlags?)null);
 	}
 }

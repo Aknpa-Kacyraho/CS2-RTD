@@ -1,74 +1,73 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 生命之泉 Regeneration：脱离战斗一段时间后每秒回血；受到伤害或开火会打断。
+/// 与 JumpHeal 组合（生命律动）：脱战判定时间减半。
+/// </summary>
 public class Regeneration : DiceBlueprint
 {
-	private readonly Dictionary<CCSPlayerController, float> _nextHealTime = new Dictionary<CCSPlayerController, float>();
+	private readonly Dictionary<CCSPlayerController, float> _lastCombat = new Dictionary<CCSPlayerController, float>();
 
-	private bool _comboActive;
+	private readonly Dictionary<CCSPlayerController, float> _accum = new Dictionary<CCSPlayerController, float>();
 
-	private readonly Random _random = new Random(Guid.NewGuid().GetHashCode());
+	private float _lastTick;
 
 	public override string ClassName => "Regeneration";
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnTick";
-			return list;
-		}
-	}
+	public override List<string> Events => new List<string> { "EventPlayerHurt", "EventWeaponFire" };
+
+	public override List<string> Listeners => new List<string> { "OnTick" };
 
 	public Regeneration(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)((CBasePlayerController)player).Pawn?.Value == (CEntityInstance)null) && ((CEntityInstance)((CBasePlayerController)player).Pawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
-			_players.Add(player);
-			_nextHealTime[player] = 0f;
-			_comboActive = DiceSynergy.HasPartner(player, "JumpHeal");
-			if (_comboActive)
-			{
-				DiceSynergy.AnnounceCombo(player, "生命律动", $"生命之泉每{_config.Dices.Regeneration.TickInterval:0.#}s回{_config.Dices.Regeneration.HealPerTick}HP，联动跳跳糖翻倍！");
-			}
-			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+			return;
+		}
+		_players.Add(player);
+		_lastCombat[player] = Server.CurrentTime;
+		_accum[player] = 0f;
+		if (DiceSynergy.HasPartner(player, "JumpHeal"))
+		{
+			DiceSynergy.AnnounceCombo(player, "生命律动", "脱战判定时间减半，回血更频繁！");
+		}
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
-			} });
-		}
+			}
+		});
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
+		_lastCombat.Remove(player);
+		_accum.Remove(player);
 		_players.Remove(player);
-		_nextHealTime.Remove(player);
 	}
 
 	public override void Reset()
 	{
 		_players.Clear();
-		_nextHealTime.Clear();
+		_lastCombat.Clear();
+		_accum.Clear();
 	}
 
 	public override void Destroy()
@@ -76,38 +75,84 @@ public class Regeneration : DiceBlueprint
 		Reset();
 	}
 
+	public HookResult EventPlayerHurt(EventPlayerHurt @event, GameEventInfo info)
+	{
+		MarkCombat(@event.Userid);
+		return HookResult.Continue;
+	}
+
+	public HookResult EventWeaponFire(EventWeaponFire @event, GameEventInfo info)
+	{
+		MarkCombat(@event.Userid);
+		return HookResult.Continue;
+	}
+
+	private void MarkCombat(CCSPlayerController player)
+	{
+		if (player != null && player.IsValid && _players.Contains(player))
+		{
+			_lastCombat[player] = Server.CurrentTime;
+			_accum[player] = 0f;
+		}
+	}
+
 	public void OnTick()
 	{
-		if (_nextHealTime.Count == 0)
+		if (_players.Count == 0)
 		{
 			return;
 		}
-		float num = Server.CurrentTime;
-		float num2 = _config.Dices.Regeneration.TickInterval;
-		foreach (CCSPlayerController item in _players.ToList())
+		float now = Server.CurrentTime;
+		float dt = (_lastTick <= 0f) ? 0f : Math.Min(now - _lastTick, 0.25f);
+		_lastTick = now;
+		if (dt <= 0f)
+		{
+			return;
+		}
+		RegenerationConfig cfg = _config.Dices.Regeneration;
+		foreach (CCSPlayerController player in _players.ToList())
 		{
 			try
 			{
-				if (!((CEntityInstance)(object)item == (CEntityInstance)null) && ((CEntityInstance)item).IsValid && !((CEntityInstance)(object)item.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)item.PlayerPawn.Value).IsValid && ((CBaseEntity)item.PlayerPawn.Value).LifeState == 0 && _nextHealTime.TryGetValue(item, out var value) && !(value > num))
+				CCSPlayerPawn pawn = player?.PlayerPawn?.Value;
+				if (player == null || !player.IsValid || pawn == null || !pawn.IsValid || ((CBaseEntity)pawn).LifeState != 0)
 				{
-					CCSPlayerPawn value2 = item.PlayerPawn.Value;
-					int num3 = _config.Dices.Regeneration.HealPerTick;
-					if (DiceSynergy.HasPartner(item, "JumpHeal"))
-					{
-						num3 *= 2;
-					}
-					int num4 = Math.Min(((CBaseEntity)value2).Health + num3, ((CBaseEntity)value2).MaxHealth);
-					if (num4 > ((CBaseEntity)value2).Health)
-					{
-						((CBaseEntity)value2).Health = num4;
-						Utilities.SetStateChanged((CBaseEntity)(object)value2, "CBaseEntity", "m_iHealth", 0);
-					}
-					_nextHealTime[item] = num + num2;
+					continue;
 				}
+				if (!_lastCombat.TryGetValue(player, out float lastCombat))
+				{
+					lastCombat = now;
+					_lastCombat[player] = now;
+				}
+				float outOfCombat = cfg.OutOfCombatSeconds;
+				if (DiceSynergy.HasPartner(player, "JumpHeal"))
+				{
+					outOfCombat *= 0.5f;
+				}
+				if (now - lastCombat < outOfCombat)
+				{
+					continue;
+				}
+				float accum = (_accum.TryGetValue(player, out float a) ? a : 0f) + cfg.HealPerSecond * dt;
+				int whole = (int)accum;
+				if (whole <= 0)
+				{
+					_accum[player] = accum;
+					continue;
+				}
+				CBaseEntity entity = pawn;
+				if (entity.Health < entity.MaxHealth)
+				{
+					entity.Health = Math.Min(entity.Health + whole, entity.MaxHealth);
+					Utilities.SetStateChanged(entity, "CBaseEntity", "m_iHealth", 0);
+					accum -= whole;
+				}
+				_accum[player] = accum;
 			}
 			catch
 			{
-				_nextHealTime.Remove(item);
+				_lastCombat.Remove(player);
+				_accum.Remove(player);
 			}
 		}
 	}

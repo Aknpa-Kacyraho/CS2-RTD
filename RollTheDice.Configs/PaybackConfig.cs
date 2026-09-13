@@ -7,9 +7,9 @@ public class PaybackConfig
 	[JsonPropertyName("enabled")]
 	public bool Enabled { get; set; } = true;
 
-	[JsonPropertyName("damage_min")]
-	public int DamageMin { get; set; } = 30;
+	[JsonPropertyName("hp")]
+	public int Hp { get; set; } = 50;
 
-	[JsonPropertyName("damage_max")]
-	public int DamageMax { get; set; } = 80;
+	[JsonPropertyName("clear_money")]
+	public bool ClearMoney { get; set; } = true;
 }

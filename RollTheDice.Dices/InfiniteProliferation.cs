@@ -35,7 +35,7 @@ public class InfiniteProliferation : DiceBlueprint
 	public InfiniteProliferation(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
@@ -150,6 +150,7 @@ public class InfiniteProliferation : DiceBlueprint
 				if (!((CEntityInstance)(object)((obj3 == null) ? null : obj3.PlayerPawn?.Value) == (CEntityInstance)null) && _players.Contains(victim) && ((CBaseEntity)victim.PlayerPawn.Value).LifeState != 0)
 				{
 					victim.Respawn();
+					Invulnerability.Grant(victim, _config.Dices.InfiniteProliferation.ReviveInvulnSeconds);
 					Server.NextFrame((Action)delegate
 					{
 						//IL_013b: Unknown result type (might be due to invalid IL or missing references)

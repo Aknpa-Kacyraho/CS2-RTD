@@ -7,9 +7,9 @@ public class GrenadeKingConfig
 	[JsonPropertyName("enabled")]
 	public bool Enabled { get; set; } = true;
 
-	[JsonPropertyName("multiplier_min")]
-	public float MultiplierMin { get; set; } = 3f;
+	[JsonPropertyName("damage_multiplier")]
+	public float DamageMultiplier { get; set; } = 2.5f;
 
-	[JsonPropertyName("multiplier_max")]
-	public float MultiplierMax { get; set; } = 6f;
+	[JsonPropertyName("radius_multiplier")]
+	public float RadiusMultiplier { get; set; } = 1.25f;
 }

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
@@ -10,48 +9,42 @@ using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 手枪大师 PistolMaster：手枪伤害 +100%；手枪击杀 +$300（ECO 回合经济）。
+/// 与 Disarm 组合（缴械大师）：伤害进一步提升。
+/// </summary>
 public class PistolMaster : DiceBlueprint
 {
-	private bool _comboActive;
-
 	public override string ClassName => "PistolMaster";
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnPlayerTakeDamagePre";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnPlayerTakeDamagePre" };
+
+	public override List<string> Events => new List<string> { "EventPlayerDeath" };
 
 	public PistolMaster(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)((CBasePlayerController)player).Pawn?.Value == (CEntityInstance)null) && ((CEntityInstance)((CBasePlayerController)player).Pawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
-			_players.Add(player);
-			_comboActive = DiceSynergy.HasPartner(player, "Disarm");
-			if (_comboActive)
-			{
-				DiceSynergy.AnnounceCombo(player, "缴械大师", "手枪倍率2→3 缴械率翻倍");
-			}
-			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+			return;
+		}
+		_players.Add(player);
+		if (DiceSynergy.HasPartner(player, "Disarm"))
+		{
+			DiceSynergy.AnnounceCombo(player, "缴械大师", "手枪伤害与缴械概率提升！");
+		}
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
-			} });
-		}
+			}
+		});
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
@@ -59,80 +52,99 @@ public class PistolMaster : DiceBlueprint
 		_players.Remove(player);
 	}
 
+	public override void Reset()
+	{
+		_players.Clear();
+	}
+
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
-		//IL_0019: Unknown result type (might be due to invalid IL or missing references)
-		//IL_019d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_007f: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00c3: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00f0: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0149: Unknown result type (might be due to invalid IL or missing references)
-		//IL_015b: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0199: Unknown result type (might be due to invalid IL or missing references)
-		if ((CEntityInstance)(object)info.Attacker.Value == (CEntityInstance)null)
+		if (_players.Count == 0 || info == null || info.Damage <= 0f)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		CCSPlayerPawn obj = ((NativeObject)info.Attacker.Value).As<CCSPlayerPawn>();
-		object obj2;
-		if (obj == null)
+		CCSPlayerController attacker = ResolvePlayer(info.Attacker?.Value);
+		if (attacker == null || !attacker.IsValid || !_players.Contains(attacker))
 		{
-			obj2 = null;
+			return HookResult.Continue;
 		}
-		else
+		CBasePlayerWeapon weapon = attacker.PlayerPawn?.Value?.WeaponServices?.ActiveWeapon?.Value;
+		if (weapon == null || !weapon.IsValid || !IsPistol(weapon.DesignerName))
 		{
-			CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj).Controller;
-			if (controller == null)
-			{
-				obj2 = null;
-			}
-			else
-			{
-				CBasePlayerController value = controller.Value;
-				obj2 = ((value != null) ? ((NativeObject)value).As<CCSPlayerController>() : null);
-			}
+			return HookResult.Continue;
 		}
-		CCSPlayerController val = (CCSPlayerController)obj2;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
+		float multiplier = _config.Dices.PistolMaster.DamageMultiplier;
+		if (DiceSynergy.HasPartner(attacker, "Disarm"))
 		{
-			return (HookResult)0;
+			multiplier += 1f;
 		}
-		CCSPlayerPawn value2 = val.PlayerPawn.Value;
-		object obj3;
-		if (value2 == null)
+		info.Damage *= multiplier;
+		return HookResult.Changed;
+	}
+
+	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
+	{
+		CCSPlayerController attacker = @event.Attacker;
+		CCSPlayerController victim = @event.Userid;
+		if (attacker == null || !attacker.IsValid || victim == null || !victim.IsValid)
 		{
-			obj3 = null;
+			return HookResult.Continue;
 		}
-		else
+		if (attacker == victim || !_players.Contains(attacker))
 		{
-			CPlayer_WeaponServices weaponServices = ((CBasePlayerPawn)value2).WeaponServices;
-			obj3 = ((weaponServices == null) ? null : weaponServices.ActiveWeapon?.Value);
+			return HookResult.Continue;
 		}
-		if ((CEntityInstance)obj3 == (CEntityInstance)null)
+		if (((CBaseEntity)attacker).TeamNum == ((CBaseEntity)victim).TeamNum)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		string text = ((CEntityInstance)((CBasePlayerPawn)value2).WeaponServices.ActiveWeapon.Value).DesignerName.ToLower();
-		if (text == null)
+		string weapon = @event.Weapon;
+		if (weapon == null || !IsPistol(weapon))
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		bool flag = text.Contains("pistol") || text.Contains("deagle") || text.Contains("elite");
-		bool flag2 = text.Contains("revolver");
-		if (flag2 && !text.Contains("elite"))
+		if (attacker.InGameMoneyServices == null)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		if (!flag | flag2)
+		attacker.InGameMoneyServices.Account += _config.Dices.PistolMaster.KillReward;
+		Utilities.SetStateChanged(attacker, "CCSPlayerController", "m_pInGameMoneyServices", 0);
+		attacker.PrintToCenterAlert($"手枪击杀 +${_config.Dices.PistolMaster.KillReward}");
+		return HookResult.Continue;
+	}
+
+	private static bool IsPistol(string designerName)
+	{
+		if (string.IsNullOrEmpty(designerName))
 		{
-			return (HookResult)0;
+			return false;
 		}
-		float num = _config.Dices.PistolMaster.DamageMultiplier;
-		if (DiceSynergy.HasPartner(val, "Disarm"))
+		string name = designerName.ToLower();
+		bool pistol = name.Contains("pistol") || name.Contains("deagle") || name.Contains("elite");
+		bool revolver = name.Contains("revolver");
+		if (revolver && !name.Contains("elite"))
 		{
-			num++;
+			return false;
 		}
-		info.Damage *= num;
-		return (HookResult)1;
+		return pistol && !revolver;
+	}
+
+	private static CCSPlayerController ResolvePlayer(CBaseEntity entity)
+	{
+		if (entity == null)
+		{
+			return null;
+		}
+		CCSPlayerPawn pawn = entity.As<CCSPlayerPawn>();
+		if (pawn == null)
+		{
+			return null;
+		}
+		CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)pawn).Controller;
+		if (controller == null || controller.Value == null)
+		{
+			return null;
+		}
+		return controller.Value.As<CCSPlayerController>();
 	}
 }

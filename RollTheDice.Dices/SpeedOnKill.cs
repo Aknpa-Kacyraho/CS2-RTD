@@ -43,7 +43,7 @@ namespace RollTheDice.Dices;
 		: base(GlobalConfig, Config, Localizer)
 	{
 		Instance = this;
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public void TriggerBoost(CCSPlayerController attacker)

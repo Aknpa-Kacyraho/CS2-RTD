@@ -7,9 +7,9 @@ public class GaiaConfig
 	[JsonPropertyName("enabled")]
 	public bool Enabled { get; set; } = true;
 
-	[JsonPropertyName("hp_per_second")]
-	public int HpPerSecond { get; set; } = 1;
+	[JsonPropertyName("gain_per_second")]
+	public float GainPerSecond { get; set; } = 2f;
 
-	[JsonPropertyName("max_hp")]
-	public int MaxHP { get; set; } = 500;
+	[JsonPropertyName("max_bonus")]
+	public int MaxBonus { get; set; } = 200;
 }

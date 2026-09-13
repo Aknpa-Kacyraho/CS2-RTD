@@ -9,4 +9,7 @@ public class PistolMasterConfig
 
 	[JsonPropertyName("damage_multiplier")]
 	public float DamageMultiplier { get; set; } = 2f;
+
+	[JsonPropertyName("kill_reward")]
+	public int KillReward { get; set; } = 300;
 }

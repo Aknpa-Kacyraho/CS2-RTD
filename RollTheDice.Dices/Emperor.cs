@@ -36,7 +36,7 @@ public class Emperor : DiceBlueprint
 	public Emperor(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
@@ -135,6 +135,7 @@ public class Emperor : DiceBlueprint
 				if (!((CEntityInstance)(object)((obj2 == null) ? null : obj2.PlayerPawn?.Value) == (CEntityInstance)null) && ((CBaseEntity)victim.PlayerPawn.Value).LifeState != 0)
 				{
 					victim.Respawn();
+					Invulnerability.Grant(victim, _config.Dices.Emperor.ReviveInvulnSeconds);
 					Server.NextFrame((Action)delegate
 					{
 						//IL_0094: Unknown result type (might be due to invalid IL or missing references)

@@ -1,102 +1,75 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 疾风步 IncreaseSpeed：持续移动时移速递增到上限；受到伤害立即清零。
+/// </summary>
 public class IncreaseSpeed : DiceBlueprint
 {
-	public readonly Random _random = new Random();
+	private const float MoveSpeedThreshold = 30f;
 
-	public readonly Dictionary<CCSPlayerController, float> _playerSpeed = new Dictionary<CCSPlayerController, float>();
+	private readonly Dictionary<CCSPlayerController, float> _bonus = new Dictionary<CCSPlayerController, float>();
+
+	private float _lastTick;
 
 	public override string ClassName => "IncreaseSpeed";
 
-	public override List<string> Events
-	{
-		get
-		{
-			int num = 4;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int num2 = 0;
-			span[num2] = "EventPlayerHurt";
-			num2++;
-			span[num2] = "EventPlayerFalldamage";
-			num2++;
-			span[num2] = "EventHostageFollows";
-			num2++;
-			span[num2] = "EventHostageStopsFollowing";
-			return list;
-		}
-	}
+	public override List<string> Events => new List<string> { "EventPlayerHurt" };
+
+	public override List<string> Listeners => new List<string> { "OnTick" };
 
 	public IncreaseSpeed(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
-		{
-			float num = _random.NextSingle() * (_config.Dices.IncreaseSpeed.MaxSpeed - _config.Dices.IncreaseSpeed.MinSpeed) + _config.Dices.IncreaseSpeed.MinSpeed;
-			_playerSpeed.Add(player, num);
-			_players.Add(player);
-			SpeedBonusManager.Register(player, "IncreaseSpeed", num - 1f);
-			SetPlayerSpeed(player);
-			NotifyPlayers(player, ClassName, new Dictionary<string, string>
-			{
-				{
-					"playerName",
-					((CBasePlayerController)player).PlayerName
-				},
-				{
-					"percentageIncrease",
-					Math.Round(((double)num - 1.0) * 100.0, 2).ToString()
-				}
-			});
-		}
-	}
-
-	public override void Remove(CCSPlayerController? player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
-	{
-		if ((CEntityInstance)(object)player == (CEntityInstance)null)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
 			return;
 		}
-		CHandle<CCSPlayerPawn> playerPawn = player.PlayerPawn;
-		if (playerPawn != null)
+		_players.Add(player);
+		_bonus[player] = 0f;
+		SpeedBonusManager.Register(player, ClassName, 0f);
+		WriteSpeed(player);
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
 		{
-			CCSPlayerPawn value = playerPawn.Value;
-			if (((value != null) ? new bool?(((CEntityInstance)value).IsValid) : ((bool?)null)) == false)
 			{
-				return;
+				"playerName",
+				((CBasePlayerController)player).PlayerName
 			}
-		}
-		SpeedBonusManager.Unregister(player, "IncreaseSpeed");
-		SetPlayerSpeed(player, force: true);
-		_playerSpeed.Remove(player);
+		});
+	}
+
+	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
+	{
+		SpeedBonusManager.Unregister(player, ClassName);
+		_bonus.Remove(player);
 		_players.Remove(player);
+		WriteSpeed(player);
 	}
 
 	public override void Reset()
 	{
-		foreach (CCSPlayerController item in _players.ToList())
+		foreach (CCSPlayerController player in _players.ToList())
 		{
-			Remove(item);
+			SpeedBonusManager.Unregister(player, ClassName);
+			WriteSpeed(player);
 		}
-		_playerSpeed.Clear();
 		_players.Clear();
+		_bonus.Clear();
 	}
 
 	public override void Destroy()
@@ -106,75 +79,77 @@ public class IncreaseSpeed : DiceBlueprint
 
 	public HookResult EventPlayerHurt(EventPlayerHurt @event, GameEventInfo info)
 	{
-		//IL_0015: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0018: Unknown result type (might be due to invalid IL or missing references)
-		SetPlayerSpeed(@event.Userid);
-		return (HookResult)0;
-	}
-
-	public HookResult EventPlayerFalldamage(EventPlayerFalldamage @event, GameEventInfo info)
-	{
-		//IL_0015: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0018: Unknown result type (might be due to invalid IL or missing references)
-		SetPlayerSpeed(@event.Userid);
-		return (HookResult)0;
-	}
-
-	public HookResult EventHostageFollows(EventHostageFollows @event, GameEventInfo info)
-	{
-		//IL_0036: Unknown result type (might be due to invalid IL or missing references)
-		//IL_001f: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0039: Unknown result type (might be due to invalid IL or missing references)
-		if (!_config.Dices.IncreaseSpeed.ResetOnHostageRescue)
+		CCSPlayerController player = @event.Userid;
+		if (player == null || !player.IsValid || !_players.Contains(player))
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		SpeedBonusManager.Unregister(@event.Userid, "IncreaseSpeed");
-		SetPlayerSpeed(@event.Userid);
-		return (HookResult)0;
+		if (_bonus.TryGetValue(player, out float current) && current != 0f)
+		{
+			_bonus[player] = 0f;
+			SpeedBonusManager.Register(player, ClassName, 0f);
+			WriteSpeed(player);
+		}
+		return HookResult.Continue;
 	}
 
-	public HookResult EventHostageStopsFollowing(EventHostageStopsFollowing @event, GameEventInfo info)
+	public void OnTick()
 	{
-		//IL_0015: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0018: Unknown result type (might be due to invalid IL or missing references)
-		SetPlayerSpeed(@event.Userid);
-		return (HookResult)0;
-	}
-
-	private void SetPlayerSpeed(CCSPlayerController? player, float speed = -1f, bool force = false)
-	{
-		CCSPlayerController? obj = player;
-		if (obj == null || !((CEntityInstance)obj).IsValid)
+		if (_players.Count == 0)
 		{
 			return;
 		}
-		float speedToApply = 1f + SpeedBonusManager.GetEffective(player, 100f);
-		Server.NextFrame((Action)delegate
+		float now = Server.CurrentTime;
+		float dt = (_lastTick <= 0f) ? 0f : Math.Min(now - _lastTick, 0.25f);
+		_lastTick = now;
+		if (dt <= 0f)
 		{
-			Server.NextFrame((Action)delegate
+			return;
+		}
+		IncreaseSpeedConfig cfg = _config.Dices.IncreaseSpeed;
+		foreach (CCSPlayerController player in _players.ToList())
+		{
+			try
 			{
-				Server.NextFrame((Action)delegate
+				CCSPlayerPawn pawn = player?.PlayerPawn?.Value;
+				if (player == null || !player.IsValid || pawn == null || !pawn.IsValid || ((CBaseEntity)pawn).LifeState != 0)
 				{
-					if (!((CEntityInstance)(object)player == (CEntityInstance)null))
-					{
-						CCSPlayerController? obj2 = player;
-						if (obj2 == null || ((CEntityInstance)obj2).IsValid)
-						{
-							CCSPlayerController? obj3 = player;
-							if (obj3 == null || obj3.PlayerPawn?.IsValid != false)
-							{
-								CCSPlayerController? obj4 = player;
-								if (!((CEntityInstance)(object)((obj4 == null) ? null : obj4.PlayerPawn?.Value) == (CEntityInstance)null) && (_players.Contains(player) || force))
-								{
-									player.PlayerPawn.Value.VelocityModifier = speedToApply;
-									Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
-								}
-							}
-						}
-					}
-				});
-			});
-		});
+					continue;
+				}
+				if (!_bonus.TryGetValue(player, out float current))
+				{
+					current = 0f;
+				}
+				CBaseEntity entity = pawn;
+				Vector velocity = entity.AbsVelocity;
+				float horizontal = (velocity == null) ? 0f : MathF.Sqrt(velocity.X * velocity.X + velocity.Y * velocity.Y);
+				if (horizontal <= MoveSpeedThreshold)
+				{
+					continue;
+				}
+				float next = Math.Min(current + cfg.GainPerSecond * dt, cfg.MaxBonus);
+				if (Math.Abs(next - current) > 0.005f)
+				{
+					_bonus[player] = next;
+					SpeedBonusManager.Register(player, ClassName, next);
+					WriteSpeed(player);
+				}
+			}
+			catch
+			{
+				_bonus.Remove(player);
+			}
+		}
+	}
+
+	private static void WriteSpeed(CCSPlayerController player)
+	{
+		CCSPlayerPawn pawn = player?.PlayerPawn?.Value;
+		if (pawn == null || !pawn.IsValid)
+		{
+			return;
+		}
+		pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
+		Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 	}
 }

@@ -1,113 +1,84 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 神王 God：神之试炼——获得高额移速/伤害/护甲，但限时内未击杀则失去全部；每次击杀刷新时限。
+/// 与 Goddess 组合（神之共鸣）。
+/// </summary>
 public class God : DiceBlueprint
 {
-	private bool _comboActive;
+	private sealed class TrialState
+	{
+		public int OriginalArmor;
 
-	private readonly Dictionary<CCSPlayerController, int> _originalMaxHealth = new Dictionary<CCSPlayerController, int>();
+		public float Deadline;
 
-	private readonly Dictionary<CCSPlayerController, int> _originalArmor = new Dictionary<CCSPlayerController, int>();
+		public bool Active;
+	}
+
+	private readonly Dictionary<CCSPlayerController, TrialState> _states = new Dictionary<CCSPlayerController, TrialState>();
 
 	public override string ClassName => "God";
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int num2 = 0;
-			span[num2] = "OnTick";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnTick" };
+
+	public override List<string> Events => new List<string> { "EventPlayerDeath" };
 
 	public God(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
-			CCSPlayerPawn value = player.PlayerPawn.Value;
-			_originalMaxHealth[player] = ((CBaseEntity)value).MaxHealth;
-			_originalArmor[player] = value.ArmorValue;
-			((CBaseEntity)value).MaxHealth = 666;
-			((CBaseEntity)value).Health = 666;
-			value.ArmorValue = 666;
-			Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iMaxHealth", 0);
-			Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iHealth", 0);
-			Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_ArmorValue", 0);
-			SpeedBonusManager.Register(player, "God", 1f);
-			value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
-			Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
-			_players.Add(player);
-			_comboActive = DiceSynergy.HasPartner(player, "Goddess");
-			DamageBonusManager.Register(player, "God", _comboActive ? 2f : 0.5f);
-			if (_comboActive)
-			{
-				DiceSynergy.AnnounceCombo(player, "神之共鸣", "上帝伤害翻倍+女神多祝福一人！");
-			}
-			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+			return;
+		}
+		_players.Add(player);
+		_states[player] = new TrialState
+		{
+			OriginalArmor = player.PlayerPawn.Value.ArmorValue
+		};
+		Activate(player);
+		if (DiceSynergy.HasPartner(player, "Goddess"))
+		{
+			DiceSynergy.AnnounceCombo(player, "神之共鸣", "神之力时限延长！");
+		}
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
-			} });
-		}
+			}
+		});
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
-		DamageBonusManager.Unregister(player, "God");
-		SpeedBonusManager.Unregister(player, "God");
-		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
-		{
-			CCSPlayerPawn value = player.PlayerPawn.Value;
-			if (_originalMaxHealth.TryGetValue(player, out var value2))
-			{
-				((CBaseEntity)value).MaxHealth = value2;
-				((CBaseEntity)value).Health = Math.Min(((CBaseEntity)value).Health, value2);
-				Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iMaxHealth", 0);
-				Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iHealth", 0);
-				_originalMaxHealth.Remove(player);
-			}
-			if (_originalArmor.TryGetValue(player, out var value3))
-			{
-				value.ArmorValue = Math.Min(value.ArmorValue, value3);
-				Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_ArmorValue", 0);
-				_originalArmor.Remove(player);
-			}
-			value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
-			Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
-		}
+		Expire(player);
+		_states.Remove(player);
 		_players.Remove(player);
 	}
 
 	public override void Reset()
 	{
-		foreach (CCSPlayerController item in _players.ToList())
+		foreach (CCSPlayerController player in _players.ToList())
 		{
-			Remove(item);
+			Expire(player);
 		}
+		_states.Clear();
 		_players.Clear();
-		_originalMaxHealth.Clear();
-		_originalArmor.Clear();
 	}
 
 	public override void Destroy()
@@ -121,24 +92,82 @@ public class God : DiceBlueprint
 		{
 			return;
 		}
-		foreach (CCSPlayerController item in _players.ToList())
+		float now = Server.CurrentTime;
+		foreach (CCSPlayerController player in _players.ToList())
 		{
-			try
+			if (!_states.TryGetValue(player, out TrialState state) || !state.Active)
 			{
-				if (!((CEntityInstance)(object)item == (CEntityInstance)null) && ((CEntityInstance)item).IsValid && !((CEntityInstance)(object)item.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)item.PlayerPawn.Value).IsValid)
-				{
-					CCSPlayerPawn value = item.PlayerPawn.Value;
-					float expected = 1f + SpeedBonusManager.GetEffective(item, 100f);
-					if (value.VelocityModifier < expected - 0.5f)
-					{
-						value.VelocityModifier = expected;
-						Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
-					}
-				}
+				continue;
 			}
-			catch
+			if (now >= state.Deadline)
 			{
+				Expire(player);
+				player?.PrintToCenterAlert("神之试炼失败！失去全部神力");
 			}
+		}
+	}
+
+	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
+	{
+		CCSPlayerController attacker = @event.Attacker;
+		CCSPlayerController victim = @event.Userid;
+		if (attacker == null || !attacker.IsValid || victim == null || !victim.IsValid)
+		{
+			return HookResult.Continue;
+		}
+		if (attacker == victim || !_states.ContainsKey(attacker))
+		{
+			return HookResult.Continue;
+		}
+		if (((CBaseEntity)attacker).TeamNum == ((CBaseEntity)victim).TeamNum)
+		{
+			return HookResult.Continue;
+		}
+		Activate(attacker);
+		return HookResult.Continue;
+	}
+
+	private void Activate(CCSPlayerController player)
+	{
+		if (player == null || !player.IsValid || !_states.TryGetValue(player, out TrialState state))
+		{
+			return;
+		}
+		GodConfig cfg = _config.Dices.God;
+		float duration = DiceSynergy.HasPartner(player, "Goddess") ? cfg.Duration * 1.5f : cfg.Duration;
+		state.Deadline = Server.CurrentTime + duration;
+		state.Active = true;
+		SpeedBonusManager.Register(player, ClassName, cfg.SpeedMultiplier - 1f);
+		DamageBonusManager.Register(player, ClassName, cfg.DamageMultiplier - 1f);
+		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
+		if (pawn != null && pawn.IsValid)
+		{
+			pawn.ArmorValue = state.OriginalArmor + cfg.ArmorBonus;
+			Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_ArmorValue", 0);
+			pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
+			Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+		}
+	}
+
+	private void Expire(CCSPlayerController player)
+	{
+		if (player == null || !player.IsValid || !_states.TryGetValue(player, out TrialState state))
+		{
+			return;
+		}
+		state.Active = false;
+		SpeedBonusManager.Unregister(player, ClassName);
+		DamageBonusManager.Unregister(player, ClassName);
+		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
+		if (pawn != null && pawn.IsValid)
+		{
+			if (pawn.ArmorValue > state.OriginalArmor)
+			{
+				pawn.ArmorValue = state.OriginalArmor;
+				Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_ArmorValue", 0);
+			}
+			pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
+			Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
 	}
 }

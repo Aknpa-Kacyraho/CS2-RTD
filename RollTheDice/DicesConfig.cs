@@ -5,6 +5,9 @@ namespace RollTheDice;
 
 public class DicesConfig
 {
+	[JsonPropertyName("rarity")]
+	public RarityConfig Rarity { get; set; } = new RarityConfig();
+
 	[JsonPropertyName("high_gravity")]
 	public HighGravityConfig HighGravity { get; set; } = new HighGravityConfig();
 
@@ -335,17 +338,11 @@ public class DicesConfig
 	[JsonPropertyName("sniper_elite")]
 	public SniperEliteConfig SniperElite { get; set; } = new SniperEliteConfig();
 
-	[JsonPropertyName("rewind")]
-	public RewindConfig Rewind { get; set; } = new RewindConfig();
-
 	[JsonPropertyName("nirvana")]
 	public NirvanaConfig Nirvana { get; set; } = new NirvanaConfig();
 
 	[JsonPropertyName("skyline")]
 	public SkylineConfig Skyline { get; set; } = new SkylineConfig();
-
-	[JsonPropertyName("universe")]
-	public UniverseConfig Universe { get; set; } = new UniverseConfig();
 
 	[JsonPropertyName("black_hole")]
 	public BlackHoleConfig BlackHole { get; set; } = new BlackHoleConfig();
@@ -502,4 +499,22 @@ public class DicesConfig
 
 	[JsonPropertyName("reload_gap")]
 	public ReloadGapConfig ReloadGap { get; set; } = new ReloadGapConfig();
+
+	[JsonPropertyName("rally")]
+	public RallyConfig Rally { get; set; } = new RallyConfig();
+
+	[JsonPropertyName("swap")]
+	public SwapConfig Swap { get; set; } = new SwapConfig();
+
+	[JsonPropertyName("echo")]
+	public EchoConfig Echo { get; set; } = new EchoConfig();
+
+	[JsonPropertyName("curse")]
+	public CurseConfig Curse { get; set; } = new CurseConfig();
+
+	[JsonPropertyName("yagorou")]
+	public YagorouConfig Yagorou { get; set; } = new YagorouConfig();
+
+	[JsonPropertyName("teneril")]
+	public TenerilConfig Teneril { get; set; } = new TenerilConfig();
 }

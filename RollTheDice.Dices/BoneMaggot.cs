@@ -1,54 +1,51 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.Runtime.InteropServices;
+using System.Linq;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 附骨之疽 BoneMaggot：命中敌人使其被标记（隔墙可见）；被标记目标受到额外伤害；击杀标记目标回血并补一颗手雷。
+/// </summary>
 public class BoneMaggot : DiceBlueprint
 {
 	private readonly Dictionary<ulong, float> _markedVictims = new Dictionary<ulong, float>();
 
 	public override string ClassName => "BoneMaggot";
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnPlayerTakeDamagePre";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnPlayerTakeDamagePre" };
+
+	public override List<string> Events => new List<string> { "EventPlayerDeath" };
 
 	public BoneMaggot(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
-			_players.Add(player);
-			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+			return;
+		}
+		_players.Add(player);
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
-			} });
-		}
+			}
+		});
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
@@ -62,130 +59,131 @@ public class BoneMaggot : DiceBlueprint
 		_markedVictims.Clear();
 	}
 
+	public override void Destroy()
+	{
+		Reset();
+	}
+
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
-		//IL_001c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0315: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00e4: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0122: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0155: Unknown result type (might be due to invalid IL or missing references)
-		//IL_030a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0311: Unknown result type (might be due to invalid IL or missing references)
-		//IL_027d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02a0: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02aa: Expected O, but got Unknown
-		//IL_02aa: Expected O, but got Unknown
-		//IL_02df: Unknown result type (might be due to invalid IL or missing references)
-		if (_players.Count == 0)
+		if (_players.Count == 0 || info == null || info.Damage <= 0f)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		CHandle<CBaseEntity> attacker = info.Attacker;
-		object obj;
-		if (attacker == null)
+		CCSPlayerController attacker = ResolvePlayer(info.Attacker?.Value);
+		CCSPlayerController victim = ResolvePlayer(entity);
+		if (attacker == null || !attacker.IsValid || !_players.Contains(attacker) || victim == null || !victim.IsValid)
 		{
-			obj = null;
+			return HookResult.Continue;
 		}
-		else
+		if (attacker == victim || ((CBaseEntity)victim).TeamNum == ((CBaseEntity)attacker).TeamNum)
 		{
-			CBaseEntity value = attacker.Value;
-			if (value == null)
-			{
-				obj = null;
-			}
-			else
-			{
-				CCSPlayerPawn obj2 = ((NativeObject)value).As<CCSPlayerPawn>();
-				if (obj2 == null)
-				{
-					obj = null;
-				}
-				else
-				{
-					CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj2).Controller;
-					if (controller == null)
-					{
-						obj = null;
-					}
-					else
-					{
-						CBasePlayerController value2 = controller.Value;
-						obj = ((value2 != null) ? ((NativeObject)value2).As<CCSPlayerController>() : null);
-					}
-				}
-			}
+			return HookResult.Continue;
 		}
-		CCSPlayerController val = (CCSPlayerController)obj;
-		CCSPlayerPawn obj3 = ((NativeObject)entity).As<CCSPlayerPawn>();
-		object obj4;
-		if (obj3 == null)
+		CCSPlayerPawn victimPawn = victim.PlayerPawn?.Value;
+		if (victimPawn == null || !victimPawn.IsValid)
 		{
-			obj4 = null;
+			return HookResult.Continue;
 		}
-		else
+		BoneMaggotConfig cfg = _config.Dices.BoneMaggot;
+		float now = Server.CurrentTime;
+		ulong victimId = victim.SteamID;
+		bool marked = _markedVictims.TryGetValue(victimId, out float until) && now < until;
+		if (!marked)
 		{
-			CHandle<CBasePlayerController> controller2 = ((CBasePlayerPawn)obj3).Controller;
-			if (controller2 == null)
-			{
-				obj4 = null;
-			}
-			else
-			{
-				CBasePlayerController value3 = controller2.Value;
-				obj4 = ((value3 != null) ? ((NativeObject)value3).As<CCSPlayerController>() : null);
-			}
+			_markedVictims[victimId] = now + cfg.MarkDuration;
+			MarkVictim(victim, victimPawn, cfg.MarkDuration);
+			return HookResult.Continue;
 		}
-		CCSPlayerController val2 = (CCSPlayerController)obj4;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val) || (CEntityInstance)(object)val2 == (CEntityInstance)null || !((CEntityInstance)val2).IsValid || (CEntityInstance)(object)val2 == (CEntityInstance)(object)val || ((CBaseEntity)val2).TeamNum == ((CBaseEntity)val).TeamNum)
+		info.Damage *= 1f + cfg.MarkDamageBonus;
+		return HookResult.Changed;
+	}
+
+	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
+	{
+		CCSPlayerController attacker = @event.Attacker;
+		CCSPlayerController victim = @event.Userid;
+		if (attacker == null || !attacker.IsValid || victim == null || !victim.IsValid)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		if ((CEntityInstance)(object)val2.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)val2.PlayerPawn.Value).IsValid)
+		if (attacker == victim || !_players.Contains(attacker))
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		float num = Server.CurrentTime;
-		if (_markedVictims.TryGetValue(((CBasePlayerController)val2).SteamID, out var value4) && num < value4)
+		ulong victimId = victim.SteamID;
+		if (!_markedVictims.TryGetValue(victimId, out float until) || Server.CurrentTime >= until)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		float markDuration = _config.Dices.BoneMaggot.MarkDuration;
-		_markedVictims[((CBasePlayerController)val2).SteamID] = num + markDuration;
-		CCSPlayerPawn value5 = val2.PlayerPawn.Value;
-		var (glowProxy, glow) = GlowUtil.CreateGlow((CBaseEntity)(object)value5, Color.FromArgb(255, 50, 255, 50));
-		if ((CEntityInstance)(object)glow != (CEntityInstance)null)
+		_markedVictims.Remove(victimId);
+		BoneMaggotConfig cfg = _config.Dices.BoneMaggot;
+		CCSPlayerPawn pawn = attacker.PlayerPawn?.Value;
+		if (pawn != null && pawn.IsValid)
 		{
-			((CBaseModelEntity)glow).Glow.GlowType = 3;
-			((CBaseModelEntity)glow).Glow.GlowRange = 5000;
-			((CBaseModelEntity)glow).Glow.GlowRangeMin = 0;
+			CBaseEntity attackerEntity = pawn;
+			attackerEntity.Health = Math.Min(attackerEntity.Health + cfg.KillHeal, attackerEntity.MaxHealth);
+			Utilities.SetStateChanged(attackerEntity, "CBaseEntity", "m_iHealth", 0);
+		}
+		attacker.GiveNamedItem("weapon_hegrenade");
+		attacker.PrintToCenterAlert($"🐛 击杀标记目标！+{cfg.KillHeal} HP +手雷");
+		return HookResult.Continue;
+	}
+
+	private void MarkVictim(CCSPlayerController victim, CCSPlayerPawn pawn, float duration)
+	{
+		(CDynamicProp Proxy, CDynamicProp Glow) glow = GlowUtil.CreateGlow(pawn, Color.FromArgb(255, 50, 255, 50));
+		if (glow.Glow != null && glow.Glow.IsValid)
+		{
+			glow.Glow.Glow.GlowType = 3;
+			glow.Glow.Glow.GlowRange = 5000;
+			glow.Glow.Glow.GlowRangeMin = 0;
 		}
 		CParticleSystem particle = Utilities.CreateEntityByName<CParticleSystem>("info_particle_system");
-		if ((CEntityInstance)(object)particle != (CEntityInstance)null)
+		if (particle != null && particle.IsValid)
 		{
 			particle.EffectName = "particles/critters/chicken/chicken_impact_burst_zombie.vpcf";
-			((CBaseEntity)particle).Teleport(((CBaseEntity)value5).AbsOrigin, new QAngle((float?)null, (float?)null, (float?)null), new Vector((float?)null, (float?)null, (float?)null));
+			particle.Teleport(((CBaseEntity)pawn).AbsOrigin, null, null);
 			particle.StartActive = true;
-			((CBaseEntity)particle).DispatchSpawn();
-			new Timer(2f, (Action)delegate
+			particle.DispatchSpawn();
+			new Timer(2f, delegate
 			{
-				if ((CEntityInstance)(object)particle != (CEntityInstance)null && ((CEntityInstance)particle).IsValid)
+				if (particle != null && particle.IsValid)
 				{
-					((CEntityInstance)particle).Remove();
+					particle.Remove();
 				}
 			}, (TimerFlags?)null);
 		}
-		val2.PrintToCenterAlert("\ud83d\udc1b 你被标记了!");
-		new Timer(markDuration, (Action)delegate
+		victim.PrintToCenterAlert("🐛 你被标记了！");
+		new Timer(duration, delegate
 		{
-			if ((CEntityInstance)(object)glowProxy != (CEntityInstance)null && ((CEntityInstance)glowProxy).IsValid)
+			if (glow.Proxy != null && glow.Proxy.IsValid)
 			{
-				((CEntityInstance)glowProxy).Remove();
+				glow.Proxy.Remove();
 			}
-			if ((CEntityInstance)(object)glow != (CEntityInstance)null && ((CEntityInstance)glow).IsValid)
+			if (glow.Glow != null && glow.Glow.IsValid)
 			{
-				((CEntityInstance)glow).Remove();
+				glow.Glow.Remove();
 			}
 		}, (TimerFlags?)null);
-		return (HookResult)0;
+	}
+
+	private static CCSPlayerController ResolvePlayer(CBaseEntity entity)
+	{
+		if (entity == null)
+		{
+			return null;
+		}
+		CCSPlayerPawn pawn = entity.As<CCSPlayerPawn>();
+		if (pawn == null)
+		{
+			return null;
+		}
+		CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)pawn).Controller;
+		if (controller == null || controller.Value == null)
+		{
+			return null;
+		}
+		return controller.Value.As<CCSPlayerController>();
 	}
 }

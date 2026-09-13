@@ -1,73 +1,75 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 枪神 GunGod：免疫投掷物/燃烧/刀伤；每击杀叠加减伤（上限 max_reduction），自身死亡清零。
+/// 与 NoRecoil 组合（完美枪械）。
+/// </summary>
 public class GunGod : DiceBlueprint
 {
-	private static readonly HashSet<string> _grenadeTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "hegrenade_projectile", "flashbang_projectile", "smokegrenade_projectile", "molotov_projectile", "incendiarygrenade_projectile", "decoy_projectile" };
+	private static readonly HashSet<string> GrenadeTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+	{
+		"hegrenade_projectile",
+		"flashbang_projectile",
+		"smokegrenade_projectile",
+		"molotov_projectile",
+		"incendiarygrenade_projectile",
+		"decoy_projectile"
+	};
 
 	public override string ClassName => "GunGod";
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 2;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int num2 = 0;
-			span[num2] = "OnPlayerTakeDamagePre";
-			num2++;
-			span[num2] = "OnTick";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnPlayerTakeDamagePre" };
+
+	public override List<string> Events => new List<string> { "EventPlayerDeath" };
 
 	public GunGod(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
-			_players.Add(player);
-			float reduction = (DiceSynergy.HasPartner(player, "NoRecoil") ? 0.75f : 0.66f);
-			DamageReductionManager.Register(player, "GunGod", reduction);
-			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+			return;
+		}
+		_players.Add(player);
+		DamageReductionManager.Register(player, ClassName, 0f, _config.Dices.GunGod.MaxReduction);
+		if (DiceSynergy.HasPartner(player, "NoRecoil"))
+		{
+			DiceSynergy.AnnounceCombo(player, "完美枪械", "减伤上限提高，任意武器零扩散！");
+		}
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
-			} });
-			if (DiceSynergy.HasPartner(player, "NoRecoil"))
-			{
-				DiceSynergy.AnnounceCombo(player, "完美枪械", "减伤提升至 75%，任意武器零扩散！");
 			}
-		}
+		});
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
+		DamageReductionManager.Unregister(player, ClassName);
 		_players.Remove(player);
-		DamageReductionManager.Unregister(player, "GunGod");
 	}
 
 	public override void Reset()
 	{
-		foreach (CCSPlayerController item in _players)
+		foreach (CCSPlayerController player in _players)
 		{
-			DamageReductionManager.Unregister(item, "GunGod");
+			DamageReductionManager.Unregister(player, ClassName);
 		}
 		_players.Clear();
 	}
@@ -77,83 +79,75 @@ public class GunGod : DiceBlueprint
 		Reset();
 	}
 
-	public void OnTick()
-	{
-		foreach (CCSPlayerController player in _players)
-		{
-			if (player == null || !player.IsValid)
-			{
-				continue;
-			}
-			float reduction = (DiceSynergy.HasPartner(player, "NoRecoil") ? 0.75f : 0.66f);
-			DamageReductionManager.Register(player, "GunGod", reduction);
-		}
-	}
-
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
-		//IL_0027: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0146: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0083: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00ce: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00f2: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0142: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0116: Unknown result type (might be due to invalid IL or missing references)
-		if (_players.Count == 0 || info.Damage <= 0f)
+		if (_players.Count == 0 || info == null || info.Damage <= 0f)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		CCSPlayerPawn obj = ((NativeObject)entity).As<CCSPlayerPawn>();
-		object obj2;
-		if (obj == null)
+		CCSPlayerController victim = ResolvePlayer(entity);
+		if (victim == null || !victim.IsValid || !_players.Contains(victim))
 		{
-			obj2 = null;
+			return HookResult.Continue;
 		}
-		else
-		{
-			CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)obj).Controller;
-			if (controller == null)
-			{
-				obj2 = null;
-			}
-			else
-			{
-				CBasePlayerController value = controller.Value;
-				obj2 = ((value != null) ? ((NativeObject)value).As<CCSPlayerController>() : null);
-			}
-		}
-		CCSPlayerController val = (CCSPlayerController)obj2;
-		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
-		{
-			return (HookResult)0;
-		}
-		CHandle<CBaseEntity> inflictor = info.Inflictor;
-		object obj3;
-		if (inflictor == null)
-		{
-			obj3 = null;
-		}
-		else
-		{
-			CBaseEntity value2 = inflictor.Value;
-			obj3 = ((value2 != null) ? ((CEntityInstance)value2).DesignerName : null);
-		}
-		string text = (string)obj3;
-		if (text != null && _grenadeTypes.Contains(text))
+		string inflictorName = info.Inflictor?.Value?.DesignerName;
+		if (inflictorName != null && GrenadeTypes.Contains(inflictorName))
 		{
 			info.Damage = 0f;
-			return (HookResult)1;
+			return HookResult.Changed;
 		}
-		if (((uint)info.BitsDamageType & 8u) != 0)
+		if (((uint)info.BitsDamageType & 8u) != 0 || ((uint)info.BitsDamageType & 4u) != 0)
 		{
 			info.Damage = 0f;
-			return (HookResult)1;
+			return HookResult.Changed;
 		}
-		if (((uint)info.BitsDamageType & 4u) != 0)
+		return HookResult.Continue;
+	}
+
+	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
+	{
+		CCSPlayerController victim = @event.Userid;
+		CCSPlayerController attacker = @event.Attacker;
+		if (victim != null && victim.IsValid && _players.Contains(victim))
 		{
-			info.Damage = 0f;
-			return (HookResult)1;
+			DamageReductionManager.Register(victim, ClassName, 0f, _config.Dices.GunGod.MaxReduction);
 		}
-		return (HookResult)1;
+		if (attacker == null || !attacker.IsValid || victim == null || !victim.IsValid)
+		{
+			return HookResult.Continue;
+		}
+		if (attacker == victim || !_players.Contains(attacker))
+		{
+			return HookResult.Continue;
+		}
+		if (((CBaseEntity)attacker).TeamNum == ((CBaseEntity)victim).TeamNum)
+		{
+			return HookResult.Continue;
+		}
+		GunGodConfig cfg = _config.Dices.GunGod;
+		float current = DamageReductionManager.GetSource(attacker, ClassName);
+		float next = Math.Min(current + cfg.PerKill, cfg.MaxReduction);
+		DamageReductionManager.Register(attacker, ClassName, next, cfg.MaxReduction);
+		attacker.PrintToCenterAlert($"枪神减伤 {next * 100f:F0}%");
+		return HookResult.Continue;
+	}
+
+	private static CCSPlayerController ResolvePlayer(CBaseEntity entity)
+	{
+		if (entity == null)
+		{
+			return null;
+		}
+		CCSPlayerPawn pawn = entity.As<CCSPlayerPawn>();
+		if (pawn == null)
+		{
+			return null;
+		}
+		CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)pawn).Controller;
+		if (controller == null || controller.Value == null)
+		{
+			return null;
+		}
+		return controller.Value.As<CCSPlayerController>();
 	}
 }

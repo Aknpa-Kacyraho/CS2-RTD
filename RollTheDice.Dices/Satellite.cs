@@ -1,120 +1,87 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 卫星 Satellite：极低重力 + 空中射击精准；滞空时移速提升（滑翔）。
+/// 与 Drone 组合（天网）。
+/// </summary>
 public class Satellite : DiceBlueprint
 {
-	private bool _comboActive;
-
 	private readonly HashSet<ulong> _airNoSpread = new HashSet<ulong>();
+
+	private readonly HashSet<ulong> _airSpeed = new HashSet<ulong>();
 
 	public override string ClassName => "Satellite";
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnTick";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnTick" };
 
-	public override List<string> Events
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "EventWeaponFire";
-			return list;
-		}
-	}
+	public override List<string> Events => new List<string> { "EventWeaponFire" };
 
 	public Satellite(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
-			_players.Add(player);
-			_comboActive = DiceSynergy.HasPartner(player, "Drone");
-			if (_comboActive)
-			{
-				DiceSynergy.AnnounceCombo(player, "天网", "无人机伤害+50%！卫星浮空！");
-			}
-			float gravity = _config.Dices.Satellite.Gravity;
-			((CBaseEntity)player.PlayerPawn.Value).GravityScale = gravity;
-			((CBaseEntity)player.PlayerPawn.Value).ActualGravityScale = gravity;
-			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+			return;
+		}
+		_players.Add(player);
+		if (DiceSynergy.HasPartner(player, "Drone"))
+		{
+			DiceSynergy.AnnounceCombo(player, "天网", "无人机伤害提升，卫星浮空！");
+		}
+		float gravity = _config.Dices.Satellite.Gravity;
+		((CBaseEntity)player.PlayerPawn.Value).ActualGravityScale = gravity;
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
-			} });
-		}
+			}
+		});
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		_players.Remove(player);
-		if (player != null && player.IsValid && _airNoSpread.Remove(player.SteamID))
+		if (player != null && player.IsValid)
 		{
+			_airNoSpread.Remove(player.SteamID);
+			_airSpeed.Remove(player.SteamID);
 			RestoreNoSpread(player);
-		}
-		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
-		{
-			((CBaseEntity)player.PlayerPawn.Value).ActualGravityScale = 1f;
+			SpeedBonusManager.Unregister(player, ClassName);
+			CCSPlayerPawn pawn = player.PlayerPawn?.Value;
+			if (pawn != null && pawn.IsValid)
+			{
+				((CBaseEntity)pawn).ActualGravityScale = 1f;
+				pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
+				Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+			}
 		}
 	}
 
 	public override void Reset()
 	{
-		foreach (CCSPlayerController item in _players.ToList())
+		foreach (CCSPlayerController player in _players.ToList())
 		{
-			if (item != null && item.IsValid && _airNoSpread.Remove(item.SteamID))
-			{
-				RestoreNoSpread(item);
-			}
-			if ((CEntityInstance)(object)((item == null) ? null : item.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)item.PlayerPawn.Value).IsValid)
-			{
-				((CBaseEntity)item.PlayerPawn.Value).ActualGravityScale = 1f;
-			}
+			Remove(player);
 		}
 		_airNoSpread.Clear();
+		_airSpeed.Clear();
 		_players.Clear();
-	}
-
-	private static void RestoreNoSpread(CCSPlayerController player)
-	{
-		if (player == null || !player.IsValid)
-		{
-			return;
-		}
-		if (RollTheDice.Instance?.HasDiceActive(player, "NoRecoil") == true)
-		{
-			return;
-		}
-		player.ReplicateConVar("weapon_accuracy_nospread", "0");
 	}
 
 	public override void Destroy()
@@ -128,81 +95,87 @@ public class Satellite : DiceBlueprint
 		{
 			return;
 		}
-		foreach (CCSPlayerController item in _players.ToList())
+		float airBonus = _config.Dices.Satellite.AirSpeedBonus;
+		foreach (CCSPlayerController player in _players.ToList())
 		{
-			if ((CEntityInstance)(object)((item == null) ? null : item.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)item.PlayerPawn.Value).IsValid)
+			CCSPlayerPawn pawn = player?.PlayerPawn?.Value;
+			if (pawn == null || !pawn.IsValid || ((CBaseEntity)pawn).LifeState != 0)
 			{
-				CCSPlayerPawn value = item.PlayerPawn.Value;
-				float num = _config.Dices.Satellite.Gravity * (DiceSynergy.HasPartner(item, "Drone") ? 0.3f : 1f);
-				((CBaseEntity)value).GravityScale = num;
-				((CBaseEntity)value).ActualGravityScale = num;
-				bool airborne = (((CBaseEntity)value).Flags & 1u) == 0;
-				bool applied = _airNoSpread.Contains(item.SteamID);
-				if (airborne && !applied)
+				continue;
+			}
+			float gravity = _config.Dices.Satellite.Gravity * (DiceSynergy.HasPartner(player, "Drone") ? 0.3f : 1f);
+			((CBaseEntity)pawn).ActualGravityScale = gravity;
+			bool airborne = (((CBaseEntity)pawn).Flags & 1u) == 0;
+			bool applied = _airNoSpread.Contains(player.SteamID);
+			if (airborne && !applied)
+			{
+				player.ReplicateConVar("weapon_accuracy_nospread", "1");
+				_airNoSpread.Add(player.SteamID);
+			}
+			else if (!airborne && applied)
+			{
+				_airNoSpread.Remove(player.SteamID);
+				RestoreNoSpread(player);
+			}
+			if (airborne)
+			{
+				CBasePlayerWeapon weapon = pawn.WeaponServices?.ActiveWeapon?.Value;
+				if (weapon != null && weapon.IsValid)
 				{
-					item.ReplicateConVar("weapon_accuracy_nospread", "1");
-					_airNoSpread.Add(item.SteamID);
-				}
-				else if (!airborne && applied)
-				{
-					_airNoSpread.Remove(item.SteamID);
-					RestoreNoSpread(item);
-				}
-				if (airborne)
-				{
-					CBasePlayerWeapon weapon = ((CBasePlayerPawn)value).WeaponServices?.ActiveWeapon?.Value;
-					if (weapon != null && ((CEntityInstance)weapon).IsValid)
+					CCSWeaponBase weaponBase = weapon.As<CCSWeaponBase>();
+					if (weaponBase != null)
 					{
-						CCSWeaponBase weaponBase = ((NativeObject)weapon).As<CCSWeaponBase>();
-						if (weaponBase != null)
-						{
-							weaponBase.AccuracyPenalty = 0f;
-							weaponBase.FlRecoilIndex = 0f;
-						}
+						weaponBase.AccuracyPenalty = 0f;
+						weaponBase.FlRecoilIndex = 0f;
 					}
 				}
+				if (!_airSpeed.Contains(player.SteamID))
+				{
+					_airSpeed.Add(player.SteamID);
+					SpeedBonusManager.Register(player, ClassName, airBonus);
+				}
+				pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
+				Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+			}
+			else if (_airSpeed.Remove(player.SteamID))
+			{
+				SpeedBonusManager.Unregister(player, ClassName);
+				pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
+				Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 			}
 		}
 	}
 
 	public HookResult EventWeaponFire(EventWeaponFire @event, GameEventInfo info)
 	{
-		//IL_0028: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0099: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0095: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0071: Unknown result type (might be due to invalid IL or missing references)
 		CCSPlayerController userid = @event.Userid;
-		if ((CEntityInstance)(object)userid == (CEntityInstance)null || !_players.Contains(userid))
+		if (userid == null || !_players.Contains(userid))
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		CHandle<CCSPlayerPawn> playerPawn = userid.PlayerPawn;
-		object obj;
-		if (playerPawn == null)
+		CBasePlayerWeapon weapon = userid.PlayerPawn?.Value?.WeaponServices?.ActiveWeapon?.Value;
+		if (weapon != null && weapon.IsValid)
 		{
-			obj = null;
-		}
-		else
-		{
-			CCSPlayerPawn value = playerPawn.Value;
-			if (value == null)
+			CCSWeaponBase weaponBase = weapon.As<CCSWeaponBase>();
+			if (weaponBase != null)
 			{
-				obj = null;
-			}
-			else
-			{
-				CPlayer_WeaponServices weaponServices = ((CBasePlayerPawn)value).WeaponServices;
-				obj = ((weaponServices == null) ? null : weaponServices.ActiveWeapon?.Value);
+				weaponBase.AccuracyPenalty = 0f;
+				weaponBase.FlRecoilIndex = 0f;
 			}
 		}
-		CBasePlayerWeapon val = (CBasePlayerWeapon)obj;
-		if (val == null)
+		return HookResult.Continue;
+	}
+
+	private static void RestoreNoSpread(CCSPlayerController player)
+	{
+		if (player == null || !player.IsValid)
 		{
-			return (HookResult)0;
+			return;
 		}
-		CCSWeaponBase val2 = ((NativeObject)val).As<CCSWeaponBase>();
-		val2.AccuracyPenalty = 0f;
-		val2.FlRecoilIndex = 0f;
-		return (HookResult)0;
+		if (RollTheDice.Instance?.HasDiceActive(player, "NoRecoil") == true)
+		{
+			return;
+		}
+		player.ReplicateConVar("weapon_accuracy_nospread", "0");
 	}
 }

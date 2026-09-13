@@ -1,66 +1,68 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 资本家 Capitalist：存活时每 interval 秒产生利息收入，单回合累计有上限（死亡不清，回合重置）。
+/// 与 Bounty 组合（赏金猎人）：利息翻倍。
+/// </summary>
 public class Capitalist : DiceBlueprint
 {
-	private bool _comboActive;
+	private readonly Dictionary<CCSPlayerController, float> _nextTick = new Dictionary<CCSPlayerController, float>();
+
+	private readonly Dictionary<CCSPlayerController, int> _earned = new Dictionary<CCSPlayerController, int>();
 
 	public override string ClassName => "Capitalist";
 
-	public override List<string> Events
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "EventPlayerDeath";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnTick" };
 
 	public Capitalist(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)((CBasePlayerController)player).Pawn?.Value == (CEntityInstance)null) && ((CEntityInstance)((CBasePlayerController)player).Pawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
-			_players.Add(player);
-			_comboActive = DiceSynergy.HasPartner(player, "Bounty");
-			if (_comboActive)
-			{
-				DiceSynergy.AnnounceCombo(player, "赏金猎人", "赏金猎人联动生效！");
-			}
-			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+			return;
+		}
+		_players.Add(player);
+		_nextTick[player] = Server.CurrentTime + _config.Dices.Capitalist.Interval;
+		_earned[player] = 0;
+		if (DiceSynergy.HasPartner(player, "Bounty"))
+		{
+			DiceSynergy.AnnounceCombo(player, "赏金猎人", "资本利息翻倍！");
+		}
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
-			} });
-		}
+			}
+		});
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
+		_nextTick.Remove(player);
+		_earned.Remove(player);
 		_players.Remove(player);
 	}
 
 	public override void Reset()
 	{
+		_nextTick.Clear();
+		_earned.Clear();
 		_players.Clear();
 	}
 
@@ -69,19 +71,40 @@ public class Capitalist : DiceBlueprint
 		Reset();
 	}
 
-	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
+	public void OnTick()
 	{
-		//IL_00f4: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00f8: Unknown result type (might be due to invalid IL or missing references)
-		foreach (CCSPlayerController item in _players.ToList())
+		if (_players.Count == 0)
 		{
-			if (!((CEntityInstance)(object)item == (CEntityInstance)null) && ((CEntityInstance)item).IsValid && !((CEntityInstance)(object)item.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)item.PlayerPawn.Value).IsValid && ((CBaseEntity)item.PlayerPawn.Value).LifeState == 0)
-			{
-				int num = (DiceSynergy.HasPartner(item, "Bounty") ? (_config.Dices.Capitalist.MoneyPerDeath * 2) : _config.Dices.Capitalist.MoneyPerDeath);
-				item.InGameMoneyServices.Account += num;
-				Utilities.SetStateChanged((CBaseEntity)(object)item, "CCSPlayerController", "m_pInGameMoneyServices", 0);
-			}
+			return;
 		}
-		return (HookResult)0;
+		CapitalistConfig cfg = _config.Dices.Capitalist;
+		float now = Server.CurrentTime;
+		foreach (CCSPlayerController player in _players.ToList())
+		{
+			CCSPlayerPawn pawn = player?.PlayerPawn?.Value;
+			if (player == null || !player.IsValid || pawn == null || !pawn.IsValid || ((CBaseEntity)pawn).LifeState != 0)
+			{
+				continue;
+			}
+			if (!_nextTick.TryGetValue(player, out float next) || now < next)
+			{
+				continue;
+			}
+			_nextTick[player] = now + cfg.Interval;
+			int earned = _earned.TryGetValue(player, out int e) ? e : 0;
+			if (earned >= cfg.MaxTotal || player.InGameMoneyServices == null)
+			{
+				continue;
+			}
+			int amount = Math.Min(cfg.AmountPerTick, cfg.MaxTotal - earned);
+			if (DiceSynergy.HasPartner(player, "Bounty"))
+			{
+				amount *= 2;
+			}
+			player.InGameMoneyServices.Account += amount;
+			Utilities.SetStateChanged(player, "CCSPlayerController", "m_pInGameMoneyServices", 0);
+			_earned[player] = earned + amount;
+			player.PrintToCenterAlert($"💰 资本利息 +${amount}");
+		}
 	}
 }

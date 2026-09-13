@@ -10,6 +10,6 @@ public class SatelliteConfig
 	[JsonPropertyName("gravity")]
 	public float Gravity { get; set; } = 0.08f;
 
-	[JsonPropertyName("damage_multiplier")]
-	public float DamageMultiplier { get; set; } = 1.5f;
+	[JsonPropertyName("air_speed_bonus")]
+	public float AirSpeedBonus { get; set; } = 0.3f;
 }

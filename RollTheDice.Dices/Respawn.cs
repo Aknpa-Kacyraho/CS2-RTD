@@ -37,7 +37,7 @@ public class Respawn : DiceBlueprint
 	public Respawn(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
@@ -154,6 +154,7 @@ public class Respawn : DiceBlueprint
 						if (!((CEntityInstance)(object)((obj4 == null) ? null : obj4.PlayerPawn?.Value) == (CEntityInstance)null) && _players.Contains(victim) && ((CBaseEntity)victim.PlayerPawn.Value).LifeState != 0)
 						{
 							victim.Respawn();
+							Invulnerability.Grant(victim, _config.Dices.Respawn.ReviveInvulnSeconds);
 							if (savedDeathPos != null)
 							{
 								CCSPlayerPawn value4 = victim.PlayerPawn.Value;

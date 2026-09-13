@@ -6,4 +6,7 @@ public class EmperorConfig
 {
 	[JsonPropertyName("enabled")]
 	public bool Enabled { get; set; } = true;
+
+	[JsonPropertyName("revive_invuln_seconds")]
+	public float ReviveInvulnSeconds { get; set; } = 2f;
 }

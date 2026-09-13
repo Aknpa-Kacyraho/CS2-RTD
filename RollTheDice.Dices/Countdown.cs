@@ -1,25 +1,27 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 倒计时 Countdown：按 E 启动倒计时，结束后回到出生点、满血满甲并还原武器。
+/// 与 Rewind 组合（时空主宰）。
+/// </summary>
 public class Countdown : DiceBlueprint
 {
-	private class CountdownState
+	private sealed class CountdownState
 	{
-		public float EndTime;
+		public Vector SpawnPosition;
 
-		public Vector SpawnPosition = null;
-
-		public QAngle SpawnAngles = null;
+		public QAngle SpawnAngles;
 
 		public List<string> OriginalWeapons = new List<string>();
 
@@ -29,7 +31,11 @@ public class Countdown : DiceBlueprint
 
 		public bool OriginalHelmet;
 
-		public bool Triggered;
+		public float EndTime;
+
+		public float CooldownUntil;
+
+		public bool Active;
 
 		public bool ComboActive;
 	}
@@ -38,100 +44,72 @@ public class Countdown : DiceBlueprint
 
 	public override string ClassName => "Countdown";
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnTick";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnPlayerButtonsChanged", "OnTick" };
 
 	public Countdown(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		//IL_0133: Unknown result type (might be due to invalid IL or missing references)
-		//IL_019d: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01a7: Expected O, but got Unknown
-		//IL_01db: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01e5: Expected O, but got Unknown
-		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid || (CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
 			return;
 		}
-		CCSPlayerPawn value = player.PlayerPawn.Value;
-		List<string> list = new List<string>();
-		CPlayer_WeaponServices weaponServices = ((CBasePlayerPawn)value).WeaponServices;
-		if (((weaponServices != null) ? weaponServices.MyWeapons : null) != null)
+		CCSPlayerPawn pawn = player.PlayerPawn.Value;
+		List<string> weapons = new List<string>();
+		CPlayer_WeaponServices weaponServices = ((CBasePlayerPawn)pawn).WeaponServices;
+		if (weaponServices?.MyWeapons != null)
 		{
-			foreach (CHandle<CBasePlayerWeapon> myWeapon in ((CBasePlayerPawn)value).WeaponServices.MyWeapons)
+			foreach (CHandle<CBasePlayerWeapon> handle in weaponServices.MyWeapons)
 			{
-				object obj;
-				if (myWeapon == null)
+				string designerName = handle?.Value?.DesignerName;
+				if (designerName != null && !designerName.Contains("knife") && !designerName.Contains("bayonet"))
 				{
-					obj = null;
-				}
-				else
-				{
-					CBasePlayerWeapon value2 = myWeapon.Value;
-					obj = ((value2 != null) ? ((CEntityInstance)value2).DesignerName : null);
-				}
-				if (obj != null)
-				{
-					string designerName = ((CEntityInstance)myWeapon.Value).DesignerName;
-					if (!designerName.Contains("knife") && !designerName.Contains("bayonet"))
-					{
-						list.Add(designerName);
-					}
+					weapons.Add(designerName);
 				}
 			}
 		}
-		int armorValue = value.ArmorValue;
-		bool originalHelmet = ((CBasePlayerPawn)value).ItemServices != null && new CCSPlayer_ItemServices(((NativeObject)((CBasePlayerPawn)value).ItemServices).Handle).HasHelmet;
-		CountdownState countdownState = new CountdownState
+		Vector origin = ((CBaseEntity)pawn).AbsOrigin;
+		QAngle rotation = ((CBaseEntity)pawn).AbsRotation;
+		CountdownState state = new CountdownState
 		{
-			EndTime = Server.CurrentTime + _config.Dices.Countdown.Countdown,
-			SpawnPosition = new Vector((float?)((CBaseEntity)value).AbsOrigin.X, (float?)((CBaseEntity)value).AbsOrigin.Y, (float?)((CBaseEntity)value).AbsOrigin.Z),
-			SpawnAngles = new QAngle((float?)((CBaseEntity)value).AbsRotation.X, (float?)((CBaseEntity)value).AbsRotation.Y, (float?)((CBaseEntity)value).AbsRotation.Z),
-			OriginalWeapons = list,
-			OriginalHP = ((CBaseEntity)value).Health,
-			OriginalArmor = armorValue,
-			OriginalHelmet = originalHelmet,
-			Triggered = false
+			SpawnPosition = new Vector(origin?.X ?? 0f, origin?.Y ?? 0f, origin?.Z ?? 0f),
+			SpawnAngles = new QAngle(rotation?.X ?? 0f, rotation?.Y ?? 0f, rotation?.Z ?? 0f),
+			OriginalWeapons = weapons,
+			OriginalHP = ((CBaseEntity)pawn).Health,
+			OriginalArmor = pawn.ArmorValue,
+			OriginalHelmet = ((CBasePlayerPawn)pawn).ItemServices != null && new CCSPlayer_ItemServices(((CBasePlayerPawn)pawn).ItemServices.Handle).HasHelmet
 		};
-		_players.Add(player);
-		if (countdownState.ComboActive = DiceSynergy.HasPartner(player, "Rewind"))
+		state.ComboActive = DiceSynergy.HasPartner(player, "Rewind");
+		if (state.ComboActive)
 		{
-			DiceSynergy.AnnounceCombo(player, "时空主宰", "时空主宰联动生效！");
+			DiceSynergy.AnnounceCombo(player, "时空主宰", "倒计时结束获得额外生命！");
 		}
-		_states[player] = countdownState;
-		NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+		_states[player] = state;
+		_players.Add(player);
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
 		{
-			"playerName",
-			((CBasePlayerController)player).PlayerName
-		} });
+			{
+				"playerName",
+				((CBasePlayerController)player).PlayerName
+			}
+		});
+		player.PrintToCenterAlert("按 E 启动倒计时回溯");
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
-		_players.Remove(player);
 		_states.Remove(player);
+		_players.Remove(player);
 	}
 
 	public override void Reset()
 	{
-		_players.Clear();
 		_states.Clear();
+		_players.Clear();
 	}
 
 	public override void Destroy()
@@ -139,80 +117,86 @@ public class Countdown : DiceBlueprint
 		Reset();
 	}
 
+	public void OnPlayerButtonsChanged(CCSPlayerController player, PlayerButtons pressed, PlayerButtons released)
+	{
+		if (player == null || !player.IsValid || !_states.TryGetValue(player, out CountdownState state))
+		{
+			return;
+		}
+		if (!pressed.HasFlag(PlayerButtons.Use) || state.Active)
+		{
+			return;
+		}
+		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
+		if (pawn == null || !pawn.IsValid || ((CBaseEntity)pawn).LifeState != 0)
+		{
+			return;
+		}
+		float now = Server.CurrentTime;
+		if (now < state.CooldownUntil)
+		{
+			player.PrintToCenterAlert($"倒计时冷却中… {state.CooldownUntil - now:F0}s");
+			return;
+		}
+		state.Active = true;
+		state.EndTime = now + _config.Dices.Countdown.Seconds;
+		player.PrintToCenterAlert($"倒计时启动！{_config.Dices.Countdown.Seconds:F0}s 后回溯");
+	}
+
 	public void OnTick()
 	{
-		//IL_01e1: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01eb: Expected O, but got Unknown
-		//IL_0303: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0309: Invalid comparison between Unknown and I4
-		//IL_02f5: Unknown result type (might be due to invalid IL or missing references)
-		//IL_032b: Unknown result type (might be due to invalid IL or missing references)
 		if (_states.Count == 0)
 		{
 			return;
 		}
-		float num = Server.CurrentTime;
-		foreach (KeyValuePair<CCSPlayerController, CountdownState> item in _states.ToList())
+		float now = Server.CurrentTime;
+		foreach (KeyValuePair<CCSPlayerController, CountdownState> entry in _states.ToList())
 		{
-			CCSPlayerController key = item.Key;
-			CountdownState value = item.Value;
-			if (value.Triggered)
+			CCSPlayerController player = entry.Key;
+			CountdownState state = entry.Value;
+			if (!state.Active)
 			{
 				continue;
 			}
-			float num2 = value.EndTime - num;
-			if (num2 > 0f)
+			float remaining = state.EndTime - now;
+			if (remaining > 0f)
 			{
-				if (Server.TickCount % 64 == 0)
+				if (Server.TickCount % 64 == 0 && player != null)
 				{
-					int value2 = (int)Math.Ceiling(num2);
-					if (key != null)
-					{
-						key.PrintToCenterAlert($"倒计时: {value2}秒");
-					}
+					player.PrintToCenterAlert($"倒计时 {Math.Ceiling(remaining):F0}s");
 				}
 				continue;
 			}
-			value.Triggered = true;
-			if ((CEntityInstance)(object)key == (CEntityInstance)null || !((CEntityInstance)key).IsValid || (CEntityInstance)(object)key.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)key.PlayerPawn.Value).IsValid)
+			state.Active = false;
+			state.CooldownUntil = now + _config.Dices.Countdown.Cooldown;
+			CCSPlayerPawn pawn = player?.PlayerPawn?.Value;
+			if (pawn == null || !pawn.IsValid || ((CBaseEntity)pawn).LifeState != 0)
 			{
-				_states.Remove(key);
 				continue;
 			}
-			if (((CBaseEntity)key.PlayerPawn.Value).LifeState != 0)
+			int hp = state.ComboActive ? (Math.Max(state.OriginalHP, 100) + 50) : Math.Max(state.OriginalHP, 100);
+			((CBaseEntity)pawn).Teleport(state.SpawnPosition, state.SpawnAngles, new Vector(0f, 0f, 0f));
+			((CBaseEntity)pawn).MaxHealth = Math.Max(((CBaseEntity)pawn).MaxHealth, hp);
+			((CBaseEntity)pawn).Health = hp;
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iMaxHealth", 0);
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
+			player.RemoveWeapons();
+			player.GiveNamedItem("weapon_knife");
+			foreach (string weapon in state.OriginalWeapons)
 			{
-				_states.Remove(key);
-				continue;
+				player.GiveNamedItem(weapon);
 			}
-			CCSPlayerPawn value3 = key.PlayerPawn.Value;
-			int num3 = (value.ComboActive ? (Math.Max(value.OriginalHP, 100) + 50) : Math.Max(value.OriginalHP, 100));
-			((CBaseEntity)value3).Teleport(value.SpawnPosition, value.SpawnAngles, new Vector((float?)0f, (float?)0f, (float?)0f));
-			((CBaseEntity)value3).Health = num3;
-			((CBaseEntity)value3).MaxHealth = Math.Max(((CBaseEntity)value3).MaxHealth, num3);
-			Utilities.SetStateChanged((CBaseEntity)(object)value3, "CBaseEntity", "m_iHealth", 0);
-			Utilities.SetStateChanged((CBaseEntity)(object)value3, "CBaseEntity", "m_iMaxHealth", 0);
-			key.RemoveWeapons();
-			key.GiveNamedItem("weapon_knife");
-			if (value.OriginalWeapons.Count > 0)
+			pawn.ArmorValue = (state.OriginalArmor > 0) ? state.OriginalArmor : 100;
+			Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_ArmorValue", 0);
+			if (state.OriginalHelmet && ((CBasePlayerPawn)pawn).ItemServices != null)
 			{
-				foreach (string originalWeapon in value.OriginalWeapons)
-				{
-					key.GiveNamedItem(originalWeapon);
-				}
+				new CCSPlayer_ItemServices(((CBasePlayerPawn)pawn).ItemServices.Handle).HasHelmet = true;
 			}
-			value3.ArmorValue = ((value.OriginalArmor > 0) ? value.OriginalArmor : 100);
-			Utilities.SetStateChanged((CBaseEntity)(object)value3, "CCSPlayerPawn", "m_ArmorValue", 0);
-			if (value.OriginalHelmet && ((CBasePlayerPawn)value3).ItemServices != null)
+			if ((int)player.Team == 3 && ((CBasePlayerPawn)pawn).ItemServices != null)
 			{
-				new CCSPlayer_ItemServices(((NativeObject)((CBasePlayerPawn)value3).ItemServices).Handle).HasHelmet = true;
+				new CCSPlayer_ItemServices(((CBasePlayerPawn)pawn).ItemServices.Handle).HasDefuser = true;
 			}
-			if ((int)key.Team == 3 && ((CBasePlayerPawn)value3).ItemServices != null)
-			{
-				new CCSPlayer_ItemServices(((NativeObject)((CBasePlayerPawn)value3).ItemServices).Handle).HasDefuser = true;
-			}
-			key.PrintToCenterAlert("倒计时结束！已回溯至出生点！满血满甲！");
-			_states.Remove(key);
-			_players.Remove(key);
+			player.PrintToCenterAlert("倒计时结束！已回溯至出生点，满血满甲！");
 		}
 	}
 }

@@ -1,84 +1,50 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Timers;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 哑火 NoExplosives：持有者附近的敌人投掷的爆炸物会被替换成无害道具（光环判定，非随机点名）。
+/// </summary>
 public class NoExplosives : DiceBlueprint
 {
 	private readonly HashSet<string> _grenadeProjectiles = new HashSet<string> { "smokegrenade_projectile", "hegrenade_projectile", "molotov_projectile", "decoy_projectile", "flashbang_projectile" };
-
-	public readonly Random _random = new Random();
 
 	private readonly Dictionary<nint, CCSPlayerController> _grenadesThrownByPlayers = new Dictionary<nint, CCSPlayerController>();
 
 	public override string ClassName => "NoExplosives";
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 2;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int num2 = 0;
-			span[num2] = "OnEntitySpawned";
-			num2++;
-			span[num2] = "OnEntityTakeDamagePre";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnEntitySpawned", "OnEntityTakeDamagePre" };
 
 	public NoExplosives(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)
 	{
-		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid || (CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
 			return;
 		}
-		Server.NextFrame((Action)delegate
+		_players.Add(player);
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
 		{
-			List<CCSPlayerController> list = (from p in Utilities.GetPlayers()
-				where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && ((CBaseEntity)p).TeamNum != ((CBaseEntity)player).TeamNum && (CEntityInstance)(object)((CBasePlayerController)p).Pawn?.Value != (CEntityInstance)null && ((CEntityInstance)((CBasePlayerController)p).Pawn.Value).IsValid && ((CBaseEntity)((CBasePlayerController)p).Pawn.Value).LifeState == 0
-				select p).ToList();
-			if (list.Count == 0)
 			{
-				return;
-			}
-			Random rng = new Random();
-			int count = Math.Min(2, list.Count);
-			List<CCSPlayerController> list2 = list.OrderBy((CCSPlayerController _) => rng.Next()).Take(count).ToList();
-			foreach (CCSPlayerController item in list2)
-			{
-				if ((CEntityInstance)(object)item != (CEntityInstance)null && ((CEntityInstance)item).IsValid)
-				{
-					_players.Add(item);
-					NotifyPlayers(item, ClassName, new Dictionary<string, string> { 
-					{
-						"playerName",
-						((CBasePlayerController)item).PlayerName
-					} });
-				}
+				"playerName",
+				((CBasePlayerController)player).PlayerName
 			}
 		});
-		NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
-		{
-			"playerName",
-			((CBasePlayerController)player).PlayerName
-		} });
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
@@ -99,80 +65,102 @@ public class NoExplosives : DiceBlueprint
 
 	public void OnEntitySpawned(CEntityInstance entity)
 	{
-		if (_players.Count != 0 && _grenadeProjectiles.Contains(entity.DesignerName))
+		if (_players.Count != 0 && entity != null && _grenadeProjectiles.Contains(entity.DesignerName))
 		{
-			DiceNoExplosivesHandle(((NativeEntity)entity).Handle);
+			DiceNoExplosivesHandle(entity.Handle);
 		}
 	}
 
 	public HookResult OnEntityTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
-		//IL_00aa: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0067: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00ad: Unknown result type (might be due to invalid IL or missing references)
-		if (entity == null || !((CEntityInstance)entity).IsValid || info.Inflictor == null || !info.Inflictor.IsValid || info.Inflictor.Value == null || !((CEntityInstance)info.Inflictor.Value).IsValid || !_grenadesThrownByPlayers.ContainsKey(((NativeEntity)info.Inflictor.Value).Handle))
+		if (entity == null || !entity.IsValid || info.Inflictor == null || !info.Inflictor.IsValid || info.Inflictor.Value == null || !info.Inflictor.Value.IsValid || !_grenadesThrownByPlayers.ContainsKey(info.Inflictor.Value.Handle))
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
 		}
-		nint handle = ((NativeEntity)info.Inflictor.Value).Handle;
-		info.Attacker.Raw = ((CBasePlayerController)_grenadesThrownByPlayers[handle]).Pawn.Raw;
+		nint handle = info.Inflictor.Value.Handle;
+		info.Attacker.Raw = _grenadesThrownByPlayers[handle].Pawn.Raw;
 		info.BitsDamageType = (DamageTypes_t)524288;
-		return (HookResult)1;
+		return HookResult.Changed;
 	}
 
 	private void DiceNoExplosivesHandle(nint handle)
 	{
-		Server.NextFrame((Action)delegate
+		Server.NextFrame(delegate
 		{
-			//IL_001d: Unknown result type (might be due to invalid IL or missing references)
-			//IL_0023: Expected O, but got Unknown
-			//IL_018a: Unknown result type (might be due to invalid IL or missing references)
-			//IL_01c2: Unknown result type (might be due to invalid IL or missing references)
-			//IL_01cc: Expected O, but got Unknown
-			//IL_01cc: Expected O, but got Unknown
-			//IL_0215: Unknown result type (might be due to invalid IL or missing references)
-			if (handle != IntPtr.Zero)
+			if (handle == IntPtr.Zero)
 			{
-				CBaseGrenade val = new CBaseGrenade((IntPtr)handle);
-				if (((CEntityInstance)val).IsValid && ((NativeEntity)val).Handle != (IntPtr)IntPtr.Zero && ((CBaseEntity)val).AbsOrigin != null)
+				return;
+			}
+			CBaseGrenade grenade = new CBaseGrenade((IntPtr)handle);
+			if (!grenade.IsValid || grenade.Handle == IntPtr.Zero)
+			{
+				return;
+			}
+			Vector origin = ((CBaseEntity)grenade).AbsOrigin;
+			CCSPlayerPawn thrower = grenade.OriginalThrower?.Value;
+			if (origin == null || thrower == null || !thrower.IsValid || thrower.Controller?.Value == null)
+			{
+				return;
+			}
+			CCSPlayerController throwerController = thrower.Controller.Value.As<CCSPlayerController>();
+			if (throwerController == null || !throwerController.IsValid || !IsDisabledByAura(throwerController, origin))
+			{
+				return;
+			}
+			NoExplosivesConfig cfg = _config.Dices.NoExplosives;
+			if (cfg.RandomModels.Count != 0)
+			{
+				string model = cfg.RandomModels[new Random().Next(cfg.RandomModels.Count)];
+				nint inflictorHandle = CreatePhysicsModel(model, cfg.ModelScale, origin, new QAngle(0f, 0f, 0f), new Vector(((CBaseEntity)grenade).Velocity.X, ((CBaseEntity)grenade).Velocity.Y, ((CBaseEntity)grenade).Velocity.Z));
+				_grenadesThrownByPlayers.Add(inflictorHandle, throwerController);
+				new Timer(10f, delegate
 				{
-					CCSPlayerPawn val2 = val.OriginalThrower?.Value;
-					if (!((CEntityInstance)(object)val2 == (CEntityInstance)null) && ((CEntityInstance)val2).IsValid && (CEntityInstance)(object)((CBasePlayerPawn)val2).Controller?.Value != (CEntityInstance)null && ((IEnumerable<CBasePlayerController>)_players).Contains(((CBasePlayerPawn)val2).Controller.Value))
-					{
-						if (_config.Dices.NoExplosives.RandomModels.Count != 0)
-						{
-							string model = _config.Dices.NoExplosives.RandomModels[new Random().Next(_config.Dices.NoExplosives.RandomModels.Count)];
-							nint inflictorHandler = CreatePhysicsModel(model, _config.Dices.NoExplosives.ModelScale, ((CBaseEntity)val).AbsOrigin, new QAngle((float?)0f, (float?)0f, (float?)0f), new Vector((float?)((CBaseEntity)val).Velocity.X, (float?)((CBaseEntity)val).Velocity.Y, (float?)((CBaseEntity)val).Velocity.Z));
-							_grenadesThrownByPlayers.Add(inflictorHandler, ((NativeObject)((CBasePlayerPawn)val2).Controller.Value).As<CCSPlayerController>());
-							new Timer(10f, (Action)delegate
-							{
-								_grenadesThrownByPlayers.Remove(inflictorHandler);
-							}, (TimerFlags?)null);
-							((CBaseEntity)val).EmitSound("StopSoundEvents.StopAllExceptMusic", (RecipientFilter)null, 1f, 0f);
-							((CEntityInstance)val).AcceptInput("Kill", (CEntityInstance)null, (CEntityInstance)null, "", 0);
-						}
-					}
-				}
+					_grenadesThrownByPlayers.Remove(inflictorHandle);
+				}, (TimerFlags?)null);
+				((CBaseEntity)grenade).EmitSound("StopSoundEvents.StopAllExceptMusic", null, 1f, 0f);
+				grenade.AcceptInput("Kill", null, null, "", 0);
+				throwerController.PrintToCenterAlert("🚫 你在哑火力场内，爆炸物失效！");
 			}
 		});
 	}
 
+	private bool IsDisabledByAura(CCSPlayerController thrower, Vector position)
+	{
+		float radius = _config.Dices.NoExplosives.Radius;
+		foreach (CCSPlayerController holder in _players.ToList())
+		{
+			if (holder == null || !holder.IsValid || ((CBaseEntity)holder).TeamNum == ((CBaseEntity)thrower).TeamNum)
+			{
+				continue;
+			}
+			CCSPlayerPawn pawn = holder.PlayerPawn?.Value;
+			if (pawn == null || !pawn.IsValid || ((CBaseEntity)pawn).LifeState != 0)
+			{
+				continue;
+			}
+			Vector holderPos = ((CBaseEntity)pawn).AbsOrigin;
+			if (holderPos != null && Vectors.GetDistance(holderPos, position) <= radius)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private static nint CreatePhysicsModel(string model, float scale, Vector origin, QAngle angles, Vector velocity)
 	{
-		//IL_002e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0034: Expected O, but got Unknown
-		CPhysicsProp val = Utilities.CreateEntityByName<CPhysicsProp>("prop_physics_multiplayer");
-		if ((CEntityInstance)(object)val == (CEntityInstance)null)
+		CPhysicsProp prop = Utilities.CreateEntityByName<CPhysicsProp>("prop_physics_multiplayer");
+		if (prop == null || !prop.IsValid)
 		{
 			return 0;
 		}
-		((CBaseEntity)val).Health = 10;
-		((CBaseEntity)val).MaxHealth = 10;
-		CEntityKeyValues val2 = new CEntityKeyValues();
-		val2.SetFloat("modelscale", scale);
-		((CBaseModelEntity)val).SetModel(model);
-		((CBaseEntity)val).DispatchSpawn(val2);
-		((CBaseEntity)val).Teleport(origin, angles, velocity);
-		return ((NativeEntity)val).Handle;
+		((CBaseEntity)prop).Health = 10;
+		((CBaseEntity)prop).MaxHealth = 10;
+		CEntityKeyValues keyValues = new CEntityKeyValues();
+		keyValues.SetFloat("modelscale", scale);
+		((CBaseModelEntity)prop).SetModel(model);
+		((CBaseEntity)prop).DispatchSpawn(keyValues);
+		((CBaseEntity)prop).Teleport(origin, angles, velocity);
+		return prop.Handle;
 	}
 }

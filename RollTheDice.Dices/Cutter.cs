@@ -121,7 +121,7 @@ public class Cutter : DiceBlueprint
 			((CsItem)501).ToString(),
 			((CsItem)500).ToString()
 		};
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public HookResult EventPlayerHurt(EventPlayerHurt @event, GameEventInfo info)

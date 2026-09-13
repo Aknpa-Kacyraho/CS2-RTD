@@ -7,6 +7,12 @@ public class CapitalistConfig
 	[JsonPropertyName("enabled")]
 	public bool Enabled { get; set; } = true;
 
-	[JsonPropertyName("money_per_death")]
-	public int MoneyPerDeath { get; set; } = 500;
+	[JsonPropertyName("interval")]
+	public float Interval { get; set; } = 5f;
+
+	[JsonPropertyName("amount_per_tick")]
+	public int AmountPerTick { get; set; } = 150;
+
+	[JsonPropertyName("max_total")]
+	public int MaxTotal { get; set; } = 3000;
 }

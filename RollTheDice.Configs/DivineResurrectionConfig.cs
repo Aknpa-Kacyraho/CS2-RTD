@@ -12,4 +12,7 @@ public class DivineResurrectionConfig
 
 	[JsonPropertyName("cooldown")]
 	public float Cooldown { get; set; } = 30f;
+
+	[JsonPropertyName("revive_invuln_seconds")]
+	public float ReviveInvulnSeconds { get; set; } = 2f;
 }

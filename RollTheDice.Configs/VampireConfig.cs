@@ -7,6 +7,9 @@ public class VampireConfig
 	[JsonPropertyName("enabled")]
 	public bool Enabled { get; set; } = true;
 
-	[JsonPropertyName("max_health")]
-	public int MaxHealth { get; set; } = 200;
+	[JsonPropertyName("lifesteal")]
+	public float Lifesteal { get; set; } = 0.4f;
+
+	[JsonPropertyName("low_hp_bonus")]
+	public float LowHpBonus { get; set; } = 2f;
 }

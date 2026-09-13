@@ -12,4 +12,7 @@ public class InfiniteProliferationConfig
 
 	[JsonPropertyName("base_armor")]
 	public int BaseArmor { get; set; } = 100;
+
+	[JsonPropertyName("revive_invuln_seconds")]
+	public float ReviveInvulnSeconds { get; set; } = 1f;
 }

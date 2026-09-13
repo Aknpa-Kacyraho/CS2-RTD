@@ -9,4 +9,7 @@ public class NecromancerConfig
 
 	[JsonPropertyName("revive_hp_cost")]
 	public int ReviveHPCost { get; set; } = 50;
+
+	[JsonPropertyName("revive_invuln_seconds")]
+	public float ReviveInvulnSeconds { get; set; } = 1f;
 }

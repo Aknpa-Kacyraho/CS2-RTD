@@ -25,7 +25,6 @@ public class DeathKnightComplete : DiceBlueprint
 
 	public override string ClassName => "DeathKnightComplete";
 
-	public override bool CanBeDrawn => false;
 
 	public override List<string> Listeners
 	{
@@ -58,7 +57,7 @@ public class DeathKnightComplete : DiceBlueprint
 	public DeathKnightComplete(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{
-		Console.WriteLine(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName));
+		RollTheDice.LogDebug(_localizer["dice.class.initialize"].Value.Replace("{name}", ClassName) + "\n");
 	}
 
 	public override void Add(CCSPlayerController player)

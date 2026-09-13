@@ -12,4 +12,7 @@ public class RespawnConfig
 
 	[JsonPropertyName("default_secondary_weapon")]
 	public string DefaultSecondaryWeapon { get; set; } = "weapon_deagle";
+
+	[JsonPropertyName("revive_invuln_seconds")]
+	public float ReviveInvulnSeconds { get; set; } = 2f;
 }

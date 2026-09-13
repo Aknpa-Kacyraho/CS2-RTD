@@ -56,7 +56,7 @@ public class PainConverter : DiceBlueprint
 		}
 		if (DiceSynergy.HasPartner(player, "DeathKnight"))
 		{
-			DiceSynergy.AnnounceCombo(player, "伤痛铠甲", "每 25 点痛觉转化为 5% 减伤！");
+			DiceSynergy.AnnounceCombo(player, "伤痛铠甲", "每 10 点痛觉转化为 5% 减伤！");
 		}
 		if (DiceSynergy.HasPartner(player, "Miser"))
 		{
@@ -126,8 +126,8 @@ public class PainConverter : DiceBlueprint
 			return HookResult.Continue;
 		}
 		ulong id = victim.SteamID;
-		float gain = damage;
 		CCSPlayerPawn victimPawn = victim.PlayerPawn?.Value;
+		float gain = (victimPawn != null && victimPawn.IsValid && victimPawn.MaxHealth > 0) ? (damage / victimPawn.MaxHealth * 100f) : damage;
 		if (DiceSynergy.HasPartner(victim, "Adrenaline") && victimPawn != null && victimPawn.IsValid && victimPawn.Health <= victimPawn.MaxHealth * 0.4f)
 		{
 			gain *= 2f;
@@ -216,7 +216,7 @@ public class PainConverter : DiceBlueprint
 				continue;
 			}
 			float pain = _pain.TryGetValue(player.SteamID, out float stored) ? stored : 0f;
-			float reduction = Math.Min(pain / 25f * 0.05f, 0.5f);
+			float reduction = Math.Min(pain / 10f * 0.05f, 0.5f);
 			if (reduction > 0.001f)
 			{
 				DamageReductionManager.Register(player, "PainConverterDK", reduction);
