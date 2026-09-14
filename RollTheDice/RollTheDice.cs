@@ -448,6 +448,12 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			return (HookResult)0;
 		}
+		int humanCount = Utilities.GetPlayers().Count((CCSPlayerController p) => p != null && ((CEntityInstance)p).IsValid && !p.IsBot && !((CBasePlayerController)p).IsHLTV);
+		if (humanCount <= 1)
+		{
+			return (HookResult)0;
+		}
+		LogDebug($"{DateTime.Now:HH:mm:ss} CheatGuard blocked '{info.GetCommandString}' from {((CBasePlayerController)player).PlayerName}\n");
 		try
 		{
 			player.PrintToChat($" {((BasePlugin)this).Localizer["command.prefix"].Value}⛔ 该作弊指令已被禁用（仅房主可用）。");
