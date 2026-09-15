@@ -199,6 +199,22 @@ public static class Effects
 		}
 	}
 
+	/// <summary>把已存在的粒子实体移动到新位置（用于"持续附着 / 环绕"这类不挂 Parent、每 tick 跟随的特效）。</summary>
+	public static void MoveTo(CParticleSystem? system, Vector? position)
+	{
+		if (system == null || position == null || !system.IsValid)
+		{
+			return;
+		}
+		try
+		{
+			((CBaseEntity)system).Teleport(position, new QAngle(0f, 0f, 0f), new Vector(0f, 0f, 0f));
+		}
+		catch
+		{
+		}
+	}
+
 	public static void Remove(CEntityInstance? entity)
 	{
 		if (entity == null)

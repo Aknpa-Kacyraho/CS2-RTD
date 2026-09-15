@@ -105,27 +105,55 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 	}
 
-	[ConsoleCommand("rtdeffect", "Play a particle effect (debug)")]
+	// 粒子菜单：类别关键词 → (粒子, 默认位置)。方便按设计框架预览各类特效。
+	private static readonly Dictionary<string, (string Particle, string Mode)> EffectPresets = new Dictionary<string, (string, string)>(StringComparer.OrdinalIgnoreCase)
+	{
+		{ "muzzle", (ParticlePaths.MuzzleSpark, "crosshair") },
+		{ "tracer", (ParticlePaths.MuzzlePistol, "crosshair") },
+		{ "kill", (ParticlePaths.FireCoverage, "near") },
+		{ "killer", (ParticlePaths.ShellRifle, "self") },
+		{ "headshot", (ParticlePaths.BloodHeadshot, "near") },
+		{ "hurt", (ParticlePaths.Blood, "self") },
+		{ "hit", (ParticlePaths.ImpactArmor, "near") },
+		{ "aura", (ParticlePaths.ShieldGlow, "self") },
+		{ "orbit", (ParticlePaths.GoldHaloFlare, "self") },
+		{ "trail", (ParticlePaths.FireTiny, "near") },
+		{ "roundstart", (ParticlePaths.ExperienceAward, "self") },
+		{ "roundend", (ParticlePaths.ExperienceMax, "self") },
+		{ "death", (ParticlePaths.ExplosionHegrenade, "near") },
+	};
+
+	[ConsoleCommand("rtdeffect", "Play a particle effect (debug / particle menu)")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
-	[CommandHelper(1, "<particles/....vpcf> [self|crosshair|near] [seconds]")]
+	[CommandHelper(1, "<particles/....vpcf | preset> [self|crosshair|near] [seconds]")]
 	public void CommandEffect(CCSPlayerController player, CommandInfo command)
 	{
 		if (player == null || !player.IsValid)
 		{
 			return;
 		}
-		string path = command.GetArg(1);
-		if (string.IsNullOrWhiteSpace(path))
+		string arg = command.GetArg(1);
+		if (string.IsNullOrWhiteSpace(arg) || string.Equals(arg, "menu", StringComparison.OrdinalIgnoreCase))
 		{
-			command.ReplyToCommand("rtdeffect <particles/....vpcf> [self|crosshair|near] [seconds]");
+			command.ReplyToCommand("rtdeffect <particles/....vpcf | preset> [self|crosshair|near] [seconds]");
+			command.ReplyToCommand("preset: " + string.Join(", ", EffectPresets.Keys));
 			return;
+		}
+		string mode = command.GetArg(2).ToLowerInvariant();
+		string path = arg;
+		if (EffectPresets.TryGetValue(arg, out var preset))
+		{
+			path = preset.Particle;
+			if (string.IsNullOrEmpty(mode))
+			{
+				mode = preset.Mode;
+			}
 		}
 		float seconds = 3f;
 		if (float.TryParse(command.GetArg(3), NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed) && parsed > 0f)
 		{
 			seconds = parsed;
 		}
-		string mode = command.GetArg(2).ToLowerInvariant();
 		CParticleSystem system = mode switch
 		{
 			"self" => Effects.PlayOnPlayer(player, path, seconds),
@@ -391,6 +419,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		((BasePlugin)this).RegisterEventHandler<EventRoundEnd>((GameEventHandler<EventRoundEnd>)OnRoundEnd, (HookMode)1);
 		((BasePlugin)this).RegisterEventHandler<EventPlayerDeath>((GameEventHandler<EventPlayerDeath>)OnPlayerDeath, (HookMode)1);
 		((BasePlugin)this).RegisterEventHandler<EventPlayerHurt>((GameEventHandler<EventPlayerHurt>)OnPlayerHurtReveal, (HookMode)1);
+		((BasePlugin)this).RegisterEventHandler<EventWeaponFire>((GameEventHandler<EventWeaponFire>)OnWeaponFireCentral, (HookMode)1);
 		((BasePlugin)this).RegisterEventHandler<EventPlayerDisconnect>((GameEventHandler<EventPlayerDisconnect>)OnPlayerDisconnect, (HookMode)1);
 		((BasePlugin)this).RegisterListener<Listeners.OnMapStart>(new Listeners.OnMapStart(OnMapStart));
 		((BasePlugin)this).RegisterListener<Listeners.OnMapEnd>(new Listeners.OnMapEnd(OnMapEnd));
@@ -425,6 +454,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		((BasePlugin)this).DeregisterEventHandler<EventRoundEnd>((GameEventHandler<EventRoundEnd>)OnRoundEnd, (HookMode)1);
 		((BasePlugin)this).DeregisterEventHandler<EventPlayerDeath>((GameEventHandler<EventPlayerDeath>)OnPlayerDeath, (HookMode)1);
 		((BasePlugin)this).DeregisterEventHandler<EventPlayerHurt>((GameEventHandler<EventPlayerHurt>)OnPlayerHurtReveal, (HookMode)1);
+		((BasePlugin)this).DeregisterEventHandler<EventWeaponFire>((GameEventHandler<EventWeaponFire>)OnWeaponFireCentral, (HookMode)1);
 		((BasePlugin)this).DeregisterEventHandler<EventPlayerDisconnect>((GameEventHandler<EventPlayerDisconnect>)OnPlayerDisconnect, (HookMode)1);
 		((BasePlugin)this).RemoveListener<Listeners.OnMapStart>(new Listeners.OnMapStart(OnMapStart));
 		((BasePlugin)this).RemoveListener<Listeners.OnMapEnd>(new Listeners.OnMapEnd(OnMapEnd));
@@ -869,6 +899,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		LogDebug($"{DateTime.Now:HH:mm:ss} RoundStart: {value} alive, {count} rolling, pool={drawablePool.Count}d, special=[{string.Join(",", list3.Select((DiceBlueprint d) => d.ClassName))}], P_total={1.0 - list3.Aggregate(1.0, (double m, DiceBlueprint st) => m * (1.0 - (double)st.SecondRoundProbability)):F3}\n");
 		((BasePlugin)this).AddTimer(3f, (Action)delegate
 		{
+			// 此时本回合的 dice 已发放完毕 → 播放"回合开始"特效。
+			DiceEffects.OnRoundStart();
 			Dictionary<CCSPlayerController, int> dictionary3 = new Dictionary<CCSPlayerController, int>();
 			foreach (CCSPlayerController item10 in Utilities.GetPlayers().Where(delegate(CCSPlayerController p)
 			{
@@ -1009,6 +1041,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		//IL_00c8: Unknown result type (might be due to invalid IL or missing references)
 		Server.ExecuteCommand("host_timescale 1.0");
 		_isDuringRound = false;
+		// 移除 dice 之前播放"回合结束"特效。
+		DiceEffects.OnRoundEnd();
 		try
 		{
 			RemoveDicesForPlayers();
@@ -1050,8 +1084,15 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			}
 		}
 		DiceEffects.OnPlayerDeath(userid);
-		DiceEffects.OnPlayerKill(attacker, userid);
+		DiceEffects.OnPlayerKill(attacker, userid, @event.Headshot);
 		RemoveDiceForPlayer(userid, DiceRemoveReason.Death);
+		return (HookResult)0;
+	}
+
+	/// <summary>枪口 / 弹道特效：EventWeaponFire 由 DiceEffects 按玩家节流。</summary>
+	private HookResult OnWeaponFireCentral(EventWeaponFire @event, GameEventInfo info)
+	{
+		DiceEffects.OnWeaponFire(@event.Userid);
 		return (HookResult)0;
 	}
 
@@ -1061,6 +1102,11 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		//IL_0025: Unknown result type (might be due to invalid IL or missing references)
 		CCSPlayerController disconnected = @event.Userid;
 		RemoveDiceForPlayer(disconnected, DiceRemoveReason.Disconnect);
+		// 控制器可能已失效（RemoveDiceForPlayer 会 early-return），用 xuid 兜底清理特效状态。
+		if (@event.Xuid != 0UL)
+		{
+			DiceEffects.OnPlayerLeft(@event.Xuid);
+		}
 		if (disconnected != null)
 		{
 			// 控制器句柄可能被新加入的玩家复用，必须清掉所有以 controller 为键的状态，否则新玩家会继承
@@ -1170,7 +1216,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				changed = true;
 			}
 		}
-		DiceEffects.OnPlayerDamaged(victim, attacker);
+		DiceEffects.OnPlayerDamaged(victim, attacker, info.GetHitGroup() == HitGroup_t.HITGROUP_HEAD);
 		return changed ? HookResult.Changed : HookResult.Continue;
 	}
 
@@ -1388,6 +1434,12 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			}
 			string prefix = ((BasePlugin)this).Localizer["command.prefix"].Value;
 			player.PrintToChat($" {prefix}{color}🎲 你抽到了 [{label}] {localized}");
+			if (Config?.Effects?.Hud ?? true)
+			{
+				string effects = DiceEffects.DescribeEffects(dice.ClassName);
+				string effectLine = string.IsNullOrEmpty(effects) ? "" : $"<br/><span style=\"font-size:16px;color:#9ad\">特效：{effects}</span>";
+				player.PrintToCenterHtml($"<div style=\"font-size:22px\"><b>🎲 {localized}</b><br/><span style=\"font-size:16px;color:#fd6\">[{label}]</span>{effectLine}</div>", 4);
+			}
 			if ((tier == "legendary" || tier == "combo") && (CurrentRarity?.BroadcastLegendary ?? true))
 			{
 				Server.PrintToChatAll($" {prefix}{color}🌟 传说骰子降临！{((CBasePlayerController)player).PlayerName} 抽到了【{localized}】！");
@@ -1496,7 +1548,9 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 		_originalPlayerNames.Clear();
 		Invulnerability.ClearAll();
-		Effects.ClearAll();
+		// 注意：这里不能 Effects.ClearAll()——回合结束的 RoundEnd 特效与本函数里 dice 移除时的
+		// Remove 特效都是刚生成的实体，会被立刻清掉导致完全不显示。遗留粒子靠自身生命周期到期，
+		// 以及 OnRoundStart / OnMapEnd / Unload 的 Effects.ClearAll() 清理。
 		DiceEffects.ClearAll();
 		RefreshCombos(null);
 	}

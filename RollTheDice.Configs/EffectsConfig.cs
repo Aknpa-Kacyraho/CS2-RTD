@@ -12,7 +12,11 @@ public class EffectsConfig
 	[JsonPropertyName("enabled")]
 	public bool Enabled { get; set; } = true;
 
-	/// <summary>脚底周期痕迹（旧版是"常驻光环"，2026-09-15 重做后改为脚底周期小粒子）。</summary>
+	/// <summary>持续类特效（脚底痕迹 / 持续附着 / 环绕）。关掉后只保留抽到/击杀等触发特效。</summary>
 	[JsonPropertyName("trails")]
 	public bool Trails { get; set; } = true;
+
+	/// <summary>抽到 dice 时在屏幕中央显示一块 HUD 信息面板（骰子名 + 档位 + 覆盖的特效类别）。</summary>
+	[JsonPropertyName("hud")]
+	public bool Hud { get; set; } = true;
 }
