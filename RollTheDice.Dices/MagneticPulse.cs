@@ -362,22 +362,8 @@ public class MagneticPulse : DiceBlueprint
 		//IL_0201: Expected O, but got Unknown
 		//IL_0201: Expected O, but got Unknown
 		//IL_0267: Unknown result type (might be due to invalid IL or missing references)
-		CParticleSystem val = Utilities.CreateEntityByName<CParticleSystem>("info_particle_system");
-		if ((CEntityInstance)(object)val != (CEntityInstance)null)
-		{
-			val.EffectName = "particles/ui/ui_experience_award_innerpoint.vpcf";
-			val.StartActive = true;
-			((CBaseEntity)val).Teleport(pos, new QAngle((float?)null, (float?)null, (float?)null), new Vector((float?)null, (float?)null, (float?)null));
-			((CBaseEntity)val).DispatchSpawn();
-			CParticleSystem captured = val;
-			new Timer(1.5f, (Action)delegate
-			{
-				if ((CEntityInstance)(object)captured != (CEntityInstance)null && ((CEntityInstance)captured).IsValid)
-				{
-					((CEntityInstance)captured).Remove();
-				}
-			}, (TimerFlags?)null);
-		}
+		// 走统一特效系统（预缓存 + 生命周期管理），替代原来直接 spawn info_particle_system。
+		Effects.Play(pos, ParticlePaths.ExperienceRing, 1.5f);
 		int num = 12;
 		float num2 = 60f;
 		for (int num3 = 0; num3 < num; num3++)

@@ -139,21 +139,9 @@ public class BoneMaggot : DiceBlueprint
 			glow.Glow.Glow.GlowRange = 5000;
 			glow.Glow.Glow.GlowRangeMin = 0;
 		}
-		CParticleSystem particle = Utilities.CreateEntityByName<CParticleSystem>("info_particle_system");
-		if (particle != null && particle.IsValid)
-		{
-			particle.EffectName = "particles/critters/chicken/chicken_impact_burst_zombie.vpcf";
-			particle.Teleport(((CBaseEntity)pawn).AbsOrigin, null, null);
-			particle.StartActive = true;
-			particle.DispatchSpawn();
-			new Timer(2f, delegate
-			{
-				if (particle != null && particle.IsValid)
-				{
-					particle.Remove();
-				}
-			}, (TimerFlags?)null);
-		}
+		// 走统一特效系统：路径已知、会被预缓存、生命周期由 Effects 管理
+		// （原来硬编码 particles/critters/chicken/chicken_impact_burst_zombie.vpcf，未预缓存且用全局 Timer）。
+		Effects.Play(((CBaseEntity)pawn).AbsOrigin, ParticlePaths.PoisonSpores, 1.5f);
 		victim.PrintToCenterAlert("🐛 你被标记了！");
 		new Timer(duration, delegate
 		{

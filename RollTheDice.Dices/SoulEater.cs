@@ -95,25 +95,8 @@ public class SoulEater : DiceBlueprint
 			return (HookResult)0;
 		}
 		Vector absOrigin = ((CBaseEntity)userid.PlayerPawn.Value).AbsOrigin;
-		CParticleSystem particle = Utilities.CreateEntityByName<CParticleSystem>("info_particle_system");
-		if ((CEntityInstance)(object)particle != (CEntityInstance)null)
-		{
-			particle.EffectName = "particles/ui/ui_experience_award_innerpoint.vpcf";
-			((CBaseEntity)particle).Teleport(absOrigin, new QAngle((float?)null, (float?)null, (float?)null), new Vector((float?)null, (float?)null, (float?)null));
-			particle.StartActive = true;
-			((CBaseEntity)particle).DispatchSpawn();
-			if (attacker.PlayerPawn.IsValid && ((CBaseEntity)attacker.PlayerPawn.Value).AbsOrigin != null)
-			{
-				((CEntityInstance)particle).AcceptInput("SetParent", (CEntityInstance)(object)attacker.PlayerPawn.Value, (CEntityInstance)(object)attacker.PlayerPawn.Value, "!activator", 0);
-			}
-			new Timer(2f, (Action)delegate
-			{
-				if ((CEntityInstance)(object)particle != (CEntityInstance)null && ((CEntityInstance)particle).IsValid)
-				{
-					((CEntityInstance)particle).Remove();
-				}
-			}, (TimerFlags?)null);
-		}
+		// 走统一特效系统（预缓存 + 生命周期管理；仍挂到击杀者身上跟随）。
+		Effects.PlayOnPlayer(attacker, ParticlePaths.ExperienceRing, 2f);
 		int num = _random.Next(_config.Dices.SoulEater.HealMin, _config.Dices.SoulEater.HealMax + 1);
 		CCSPlayerPawn value2 = attacker.PlayerPawn.Value;
 		int num2 = Math.Min(((CBaseEntity)value2).Health + num, ((CBaseEntity)value2).MaxHealth);
