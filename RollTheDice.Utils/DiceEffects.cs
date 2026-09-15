@@ -32,9 +32,9 @@ public enum FxTier
 ///   <see cref="Profile.OnHitHeadshot"/>（伤害反馈 / 命中标记）；
 ///   回合事件：<see cref="Profile.Burst"/>（dice 触发）、<see cref="Profile.RoundStart"/>、<see cref="Profile.RoundEnd"/>、
 ///   <see cref="Profile.Remove"/>（效果结束）。</item>
-/// <item><b>稀有度驱动覆盖范围</b>：每个 dice 只写"主粒子 theme"和少量显式覆盖，
-/// 其余按档位自动补齐（<see cref="Filler"/>）：普通=只有触发；稀有=+击杀；史诗=+击杀者/阵亡/受击/命中/回合开始；
-/// 传说=+爆头/命中爆头/回合结束。每个 dice 也可以显式覆盖任意类别。</item>
+/// <item><b>稀有度驱动覆盖范围</b>：<b>普通 / 稀有</b>只写主粒子 theme，其余按 <see cref="Filler"/> 自动补少量类别
+/// （普通=只有触发；稀有=+击杀），属"大众化"；<b>史诗 / 传说</b>则<b>逐条特调</b>——每个 dice 的每个事件都单独选贴合语义的粒子，
+/// 不做 theme 自动填充，避免高稀有度 dice 之间同质化。</item>
 /// </list>
 ///
 /// 粒子路径必须在 CS2 VPK 里真实存在（见 <see cref="ParticlePaths"/>），写错会静默失败。
@@ -663,48 +663,197 @@ public static class DiceEffects
 			});
 		}
 
-		// ── 传说 / 组合（覆盖最全：持续附着/环绕 + 枪口 + 击杀/击杀者/爆头 + 阵亡 + 受击/命中/爆头标记 + 回合开始/结束）──
-		A("Cthulhu", FxTier.Legendary, ParticlePaths.DangerZoneBlack, orbit: ParticlePaths.AmbientEmbersBlack, onKill: ParticlePaths.AmbientEmbersBlack, onKillSelf: ParticlePaths.AmbientEmbersBlack, onDeath: ParticlePaths.DangerZoneBlack);
-		A("Fate", FxTier.Legendary, ParticlePaths.ExperienceAward, orbit: ParticlePaths.GoldHaloFlare, onDeath: ParticlePaths.GoldHaloFlare);
-		A("FourHorsemen", FxTier.Legendary, ParticlePaths.DangerZoneBlack, orbit: ParticlePaths.AmbientEmbersBlack, onKill: ParticlePaths.DangerZoneBlack, onKillSelf: ParticlePaths.AmbientEmbersBlack, onHurt: ParticlePaths.ImpactArmor);
-		A("God", FxTier.Legendary, ParticlePaths.GoldHaloRays, onKill: ParticlePaths.GoldHaloFlare, onHurt: ParticlePaths.GoldHaloFlare);
-		A("Ragnarok", FxTier.Legendary, ParticlePaths.StormLightning, orbit: ParticlePaths.ElectricGlow, onKill: ParticlePaths.StormLightning, onHurt: ParticlePaths.StormLightning);
-		A("WheelOfFate", FxTier.Legendary, ParticlePaths.ExperienceAward, orbit: ParticlePaths.ExperienceRollingRings, onDeath: ParticlePaths.ExperienceAward);
-		A("WolfKing", FxTier.Legendary, ParticlePaths.Nature, trail: ParticlePaths.Nature, trailInterval: 2.6f, orbit: ParticlePaths.Nature, onKill: ParticlePaths.Nature);
-		A("World", FxTier.Legendary, ParticlePaths.EnergyCircle, onDeath: ParticlePaths.EnergyCircle);
-		A("BeyondHeaven", FxTier.Legendary, ParticlePaths.EnergyCircle, orbit: ParticlePaths.EnergyCircle, onKill: ParticlePaths.ExplosionDistort, remove: ParticlePaths.ExplosionDistort);
-		A("DeathKnightComplete", FxTier.Legendary, ParticlePaths.ShieldGlowHigh, hold: ParticlePaths.ShieldGlowHigh, orbit: ParticlePaths.ShieldGlowHigh, onHurt: ParticlePaths.ShieldGlowHigh);
-		A("FireDragon", FxTier.Legendary, ParticlePaths.FireTiny, burst: ParticlePaths.MolotovExplosion, trail: ParticlePaths.FireTiny, trailInterval: 2.0f, onKill: ParticlePaths.ExplosionHegrenade, onDeath: ParticlePaths.FireLarge, onHit: ParticlePaths.FireCoverage);
-		A("IceDragon", FxTier.Legendary, ParticlePaths.Snow, burst: ParticlePaths.SnowBurst, trail: ParticlePaths.Snow, trailInterval: 2.2f, orbit: ParticlePaths.Snow, onKill: ParticlePaths.SnowBurst, onHit: ParticlePaths.SnowBurst);
-		A("Phoenix", FxTier.Legendary, ParticlePaths.FireLarge, burst: ParticlePaths.FireLarge, onKill: ParticlePaths.FireCoverage, onKillSelf: ParticlePaths.FireGlow, onDeath: ParticlePaths.FireLarge, onHurt: ParticlePaths.FireGlow, roundStart: ParticlePaths.FireGlow);
-		A("RadarStation", FxTier.Legendary, ParticlePaths.PingGroundRings, trail: ParticlePaths.PingGroundRings, trailInterval: 2.0f, orbit: ParticlePaths.PingGroundRings);
+		// ── 传说 / 组合：逐条特调，每个事件用贴合该 dice 语义的粒子（不做 theme 自动填充）──
+		A("Cthulhu", FxTier.Legendary, ParticlePaths.DangerZoneBlack,
+			orbit: ParticlePaths.AmbientEmbersBlack,
+			onKill: ParticlePaths.DangerZoneBlack, onKillSelf: ParticlePaths.AmbientEmbersBlack, onKillHeadshot: ParticlePaths.AmbientEmbersBright,
+			onDeath: ParticlePaths.DangerZoneBlack, onHurt: ParticlePaths.AmbientEmbersBlack, onHit: ParticlePaths.ExplosionDistort, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.DangerZoneBlack, roundEnd: ParticlePaths.DangerZoneBlack);
+		A("Fate", FxTier.Legendary, ParticlePaths.ExperienceAward,
+			orbit: ParticlePaths.GoldHaloFlare,
+			onKill: ParticlePaths.ExperienceRollingRings, onKillSelf: ParticlePaths.GoldHaloFlare, onKillHeadshot: ParticlePaths.GoldHaloFlare,
+			onDeath: ParticlePaths.GoldHaloRays, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.ExperienceRing, onHitHeadshot: ParticlePaths.GoldHaloFlare,
+			roundStart: ParticlePaths.ExperienceAward, roundEnd: ParticlePaths.GoldHaloFlare);
+		A("FourHorsemen", FxTier.Legendary, ParticlePaths.DangerZoneBlack,
+			orbit: ParticlePaths.AmbientEmbersBlack,
+			onKill: ParticlePaths.DangerZoneBlack, onKillSelf: ParticlePaths.AmbientEmbersBlack, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.ExplosionDistort, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.ExplosionDistort, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.DangerZoneLoop, roundEnd: ParticlePaths.DangerZoneBlack);
+		A("God", FxTier.Legendary, ParticlePaths.GoldHaloRays,
+			orbit: ParticlePaths.GoldHaloFlare,
+			onKill: ParticlePaths.GoldHaloFlare, onKillSelf: ParticlePaths.GoldHaloRays, onKillHeadshot: ParticlePaths.GoldHaloRays,
+			onDeath: ParticlePaths.GoldHaloRays, onHurt: ParticlePaths.ShieldGlow, onHit: ParticlePaths.GoldHaloFlare, onHitHeadshot: ParticlePaths.GoldHaloRays,
+			roundStart: ParticlePaths.GoldHaloFlare, roundEnd: ParticlePaths.GoldHaloRays);
+		A("Ragnarok", FxTier.Legendary, ParticlePaths.StormLightning,
+			orbit: ParticlePaths.ElectricGlow,
+			onKill: ParticlePaths.StormLightning, onKillSelf: ParticlePaths.ElectricGlow, onKillHeadshot: ParticlePaths.ElectricArc,
+			onDeath: ParticlePaths.StormLightning, onHurt: ParticlePaths.ElectricArc, onHit: ParticlePaths.LightningStatus, onHitHeadshot: ParticlePaths.ElectricArc,
+			roundStart: ParticlePaths.StormLightning, roundEnd: ParticlePaths.StormLightning);
+		A("WheelOfFate", FxTier.Legendary, ParticlePaths.ExperienceAward,
+			orbit: ParticlePaths.ExperienceRollingRings,
+			onKill: ParticlePaths.ExperienceRollingRings, onKillSelf: ParticlePaths.ExperienceAward, onKillHeadshot: ParticlePaths.ExperienceOuter,
+			onDeath: ParticlePaths.ExperienceMax, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.ExperienceRing, onHitHeadshot: ParticlePaths.ExperienceOuter,
+			roundStart: ParticlePaths.ExperienceAward, roundEnd: ParticlePaths.ExperienceRollingRings);
+		A("WolfKing", FxTier.Legendary, ParticlePaths.Nature,
+			trail: ParticlePaths.Nature, trailInterval: 2.6f, orbit: ParticlePaths.Nature,
+			onKill: ParticlePaths.Blood, onKillSelf: ParticlePaths.Nature, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.Nature, onHurt: ParticlePaths.Blood, onHit: ParticlePaths.Blood, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.Nature, roundEnd: ParticlePaths.Nature);
+		A("World", FxTier.Legendary, ParticlePaths.EnergyCircle,
+			orbit: ParticlePaths.EnergyCircle,
+			onKill: ParticlePaths.ExplosionDistort, onKillSelf: ParticlePaths.EnergyCircle, onKillHeadshot: ParticlePaths.ExplosionDistort,
+			onDeath: ParticlePaths.EnergyCircle, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.ExplosionDistort, onHitHeadshot: ParticlePaths.ExplosionDistort,
+			roundStart: ParticlePaths.EnergyCircle, roundEnd: ParticlePaths.ExplosionDistort, remove: ParticlePaths.ExplosionDistort);
+		A("BeyondHeaven", FxTier.Legendary, ParticlePaths.EnergyCircle,
+			orbit: ParticlePaths.EnergyCircle,
+			onKill: ParticlePaths.ExplosionDistort, onKillSelf: ParticlePaths.EnergyCircle, onKillHeadshot: ParticlePaths.ExplosionDistort,
+			onDeath: ParticlePaths.EnergyCircle, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.ExplosionDistort, onHitHeadshot: ParticlePaths.ExplosionDistort,
+			roundStart: ParticlePaths.EnergyCircle, roundEnd: ParticlePaths.ExplosionDistort, remove: ParticlePaths.ExplosionDistort);
+		A("DeathKnightComplete", FxTier.Legendary, ParticlePaths.ShieldGlowHigh,
+			hold: ParticlePaths.ShieldGlowHigh, orbit: ParticlePaths.ShieldGlowHigh,
+			onKill: ParticlePaths.ShieldGlowHigh, onKillSelf: ParticlePaths.ShieldGlow, onKillHeadshot: ParticlePaths.ShieldGlowHigh,
+			onDeath: ParticlePaths.ExplosionDistort, onHurt: ParticlePaths.ShieldGlowHigh, onHit: ParticlePaths.ImpactArmor, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.ShieldGlowHigh, roundEnd: ParticlePaths.ShieldGlowHigh);
+		A("FireDragon", FxTier.Legendary, ParticlePaths.FireTiny,
+			burst: ParticlePaths.MolotovExplosion, trail: ParticlePaths.FireTiny, trailInterval: 2.0f,
+			onKill: ParticlePaths.ExplosionHegrenade, onKillSelf: ParticlePaths.FireTiny, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.FireLarge, onHurt: ParticlePaths.FireGlow, onHit: ParticlePaths.FireCoverage, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.FireCoverage, roundEnd: ParticlePaths.FireLarge);
+		A("IceDragon", FxTier.Legendary, ParticlePaths.Snow,
+			burst: ParticlePaths.SnowBurst, trail: ParticlePaths.Snow, trailInterval: 2.2f, orbit: ParticlePaths.Snow,
+			onKill: ParticlePaths.SnowBurst, onKillSelf: ParticlePaths.Snow, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.SnowBurst, onHurt: ParticlePaths.SnowBurst, onHit: ParticlePaths.Snow, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.Snow, roundEnd: ParticlePaths.SnowBurst);
+		A("Phoenix", FxTier.Legendary, ParticlePaths.FireLarge,
+			burst: ParticlePaths.FireLarge, trail: ParticlePaths.FireTiny, trailInterval: 2.5f,
+			onKill: ParticlePaths.FireCoverage, onKillSelf: ParticlePaths.FireGlow, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.FireLarge, onHurt: ParticlePaths.FireGlow, onHit: ParticlePaths.FireCoverage, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.FireGlow, roundEnd: ParticlePaths.FireCoverage);
+		A("RadarStation", FxTier.Legendary, ParticlePaths.PingGroundRings,
+			trail: ParticlePaths.PingGroundRings, trailInterval: 2.0f, orbit: ParticlePaths.PingGroundRings,
+			onKill: ParticlePaths.PingTopRings, onKillSelf: ParticlePaths.PingGroundRings, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.PingGroundRings, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.PingTopRings, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.PingGroundRings, roundEnd: ParticlePaths.PingGroundRings);
 
-		// ── 史诗（+ 击杀者 / 阵亡 / 受击 / 命中 / 回合开始）──
-		A("Awakener", FxTier.Epic, ParticlePaths.ExperienceAward, onKill: ParticlePaths.ExperienceAward);
-		A("DeathKnight", FxTier.Epic, ParticlePaths.ShieldGlow, hold: ParticlePaths.ShieldGlow, onKill: ParticlePaths.ShieldGlow);
-		A("DivineResurrection", FxTier.Epic, ParticlePaths.GoldHaloFlare, onDeath: ParticlePaths.GoldHaloFlare);
-		A("Dragonborn", FxTier.Epic, ParticlePaths.FireCoverage, trail: ParticlePaths.FireTiny, trailInterval: 2.5f, onKill: ParticlePaths.FireTiny);
-		A("Drone", FxTier.Epic, ParticlePaths.ElectricGlow);
-		A("Emperor", FxTier.Epic, ParticlePaths.GoldHaloRays, onKill: ParticlePaths.GoldHaloFlare, onHurt: ParticlePaths.ImpactArmor);
-		A("Forsaken", FxTier.Epic, ParticlePaths.BloodHeadshot, onHit: ParticlePaths.BloodHeadshot, onFire: ParticlePaths.MuzzleSpark);
-		A("FourtyTwo", FxTier.Epic, ParticlePaths.GhostWhisps, onHurt: ParticlePaths.GhostWhisps);
-		A("GunGod", FxTier.Epic, ParticlePaths.ShieldGlow, hold: ParticlePaths.ShieldGlow, onKill: ParticlePaths.ShieldGlow, onHurt: ParticlePaths.ImpactArmor, onFire: ParticlePaths.MuzzleSpark);
-		A("ImposterSyndrome", FxTier.Epic, ParticlePaths.PingGroundRings);
-		A("InfiniteProliferation", FxTier.Epic, ParticlePaths.ExperienceMax, onDeath: ParticlePaths.ExperienceMax);
-		A("Izayoi", FxTier.Epic, ParticlePaths.EnergyCircle);
-		A("Kinship", FxTier.Epic, ParticlePaths.GoldHaloFlare, onHurt: ParticlePaths.GoldHaloFlare);
-		A("Mosquito", FxTier.Epic, ParticlePaths.Blood, trail: ParticlePaths.Blood, trailInterval: 2.2f, onHit: ParticlePaths.Blood);
-		A("NukeLeak", FxTier.Epic, ParticlePaths.DangerZoneLoop, onDeath: ParticlePaths.DangerZoneLoop, onHurt: ParticlePaths.ImpactDirt, onHit: ParticlePaths.ExplosionSmokeDistort);
-		A("Pope", FxTier.Epic, ParticlePaths.ExperienceMax, onKill: ParticlePaths.ExperienceMax);
-		A("Prophet", FxTier.Epic, ParticlePaths.PingTopRings);
-		A("Reincarnation", FxTier.Epic, ParticlePaths.ExperienceAward, onDeath: ParticlePaths.ExperienceAward);
-		A("RoyalBarrier", FxTier.Epic, ParticlePaths.ShieldGlow, hold: ParticlePaths.ShieldGlow, onHurt: ParticlePaths.ImpactArmor);
-		A("Singularity", FxTier.Epic, ParticlePaths.AmbientEmbersBlack, onKill: ParticlePaths.AmbientEmbersBlack);
-		A("SwordSaint", FxTier.Epic, ParticlePaths.ShieldGlow, onHurt: ParticlePaths.ImpactArmor, onFire: ParticlePaths.MuzzleSpark);
-		A("Tactician", FxTier.Epic, ParticlePaths.PingTopRings, onKill: ParticlePaths.PingTopRings);
-		A("Taotie", FxTier.Epic, ParticlePaths.Blood, onKill: ParticlePaths.Blood);
-		A("Titanfall", FxTier.Epic, ParticlePaths.CopterLandDust, onDeath: ParticlePaths.CopterLandDust, onHurt: ParticlePaths.ImpactDirt);
-		A("Void", FxTier.Epic, ParticlePaths.GhostWhisps, trail: ParticlePaths.GhostWhisps, trailInterval: 2.2f);
+		// ── 史诗：逐条特调（每个事件单独选粒子，不做 theme 自动填充）──
+		A("Awakener", FxTier.Epic, ParticlePaths.ExperienceAward,
+			trail: ParticlePaths.ExperienceRing, trailInterval: 2.5f,
+			onKill: ParticlePaths.ExperienceAward, onKillSelf: ParticlePaths.ExperienceRing, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.ExperienceAward, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.ExperienceRing, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.ExperienceAward, roundEnd: ParticlePaths.ExperienceMax);
+		A("DeathKnight", FxTier.Epic, ParticlePaths.ShieldGlow,
+			hold: ParticlePaths.ShieldGlow,
+			onKill: ParticlePaths.ShieldGlow, onKillSelf: ParticlePaths.ShieldGlow, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.ExplosionDistort, onHurt: ParticlePaths.ShieldGlow, onHit: ParticlePaths.ImpactArmor, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.ShieldGlow, roundEnd: ParticlePaths.ShieldGlow);
+		A("DivineResurrection", FxTier.Epic, ParticlePaths.GoldHaloFlare,
+			onKill: ParticlePaths.GoldHaloFlare, onKillSelf: ParticlePaths.GoldHaloRays, onKillHeadshot: ParticlePaths.GoldHaloFlare,
+			onDeath: ParticlePaths.GoldHaloRays, onHurt: ParticlePaths.ShieldGlow, onHit: ParticlePaths.GoldHaloFlare, onHitHeadshot: ParticlePaths.GoldHaloFlare,
+			roundStart: ParticlePaths.GoldHaloFlare, roundEnd: ParticlePaths.GoldHaloRays);
+		A("Dragonborn", FxTier.Epic, ParticlePaths.FireCoverage,
+			trail: ParticlePaths.FireTiny, trailInterval: 2.5f,
+			onKill: ParticlePaths.FireTiny, onKillSelf: ParticlePaths.FireCoverage, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.FireLarge, onHurt: ParticlePaths.FireGlow, onHit: ParticlePaths.FireCoverage, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.FireTiny, roundEnd: ParticlePaths.FireCoverage);
+		A("Drone", FxTier.Epic, ParticlePaths.ElectricGlow,
+			trail: ParticlePaths.ElectricTrail, trailInterval: 2.2f,
+			onKill: ParticlePaths.ElectricArc, onKillSelf: ParticlePaths.ElectricGlow, onKillHeadshot: ParticlePaths.ElectricArc,
+			onDeath: ParticlePaths.ElectricFollow, onHurt: ParticlePaths.ElectricGlow, onHit: ParticlePaths.ElectricArc, onHitHeadshot: ParticlePaths.ElectricArc,
+			roundStart: ParticlePaths.ElectricGlow, roundEnd: ParticlePaths.ElectricGlow);
+		A("Emperor", FxTier.Epic, ParticlePaths.GoldHaloRays,
+			orbit: ParticlePaths.GoldHaloFlare,
+			onKill: ParticlePaths.GoldHaloFlare, onKillSelf: ParticlePaths.GoldHaloRays, onKillHeadshot: ParticlePaths.GoldHaloRays,
+			onDeath: ParticlePaths.GoldHaloRays, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.GoldHaloFlare, onHitHeadshot: ParticlePaths.GoldHaloRays,
+			roundStart: ParticlePaths.GoldHaloFlare, roundEnd: ParticlePaths.GoldHaloRays);
+		A("Forsaken", FxTier.Epic, ParticlePaths.BloodHeadshot,
+			trail: ParticlePaths.GhostWhisps, trailInterval: 2.4f, onFire: ParticlePaths.MuzzleSpark,
+			onKill: ParticlePaths.BloodHeadshot, onKillSelf: ParticlePaths.GhostWhisps, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.Blood, onHurt: ParticlePaths.Blood, onHit: ParticlePaths.BloodHeadshot, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.GhostWhisps, roundEnd: ParticlePaths.GhostWhisps);
+		A("FourtyTwo", FxTier.Epic, ParticlePaths.GhostWhisps,
+			trail: ParticlePaths.GhostWhisps, trailInterval: 2.4f,
+			onKill: ParticlePaths.GhostWhisps, onKillSelf: ParticlePaths.ExperienceAward, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.GhostWhisps, onHurt: ParticlePaths.GhostWhisps, onHit: ParticlePaths.GhostWhisps, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.GhostWhisps, roundEnd: ParticlePaths.ExperienceMax);
+		A("GunGod", FxTier.Epic, ParticlePaths.ShieldGlow,
+			hold: ParticlePaths.ShieldGlow, onFire: ParticlePaths.MuzzleSpark,
+			onKill: ParticlePaths.ShieldGlow, onKillSelf: ParticlePaths.ShellRifle, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.ShieldGlow, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.MuzzleSpark, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.ShieldGlow, roundEnd: ParticlePaths.ShieldGlow);
+		A("ImposterSyndrome", FxTier.Epic, ParticlePaths.PingGroundRings,
+			onKill: ParticlePaths.PingTopRings, onKillSelf: ParticlePaths.PingTopRings, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.ExplosionSmokeDistort, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.PingTopRings, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.PingGroundRings, roundEnd: ParticlePaths.ExplosionSmokeDistort);
+		A("InfiniteProliferation", FxTier.Epic, ParticlePaths.ExperienceMax,
+			trail: ParticlePaths.ExperienceRing, trailInterval: 2.5f,
+			onKill: ParticlePaths.ExperienceAward, onKillSelf: ParticlePaths.ExperienceRing, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.ExperienceMax, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.ExperienceRing, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.ExperienceAward, roundEnd: ParticlePaths.ExperienceMax);
+		A("Izayoi", FxTier.Epic, ParticlePaths.EnergyCircle,
+			onKill: ParticlePaths.ExplosionDistort, onKillSelf: ParticlePaths.EnergyCircle, onKillHeadshot: ParticlePaths.ExplosionDistort,
+			onDeath: ParticlePaths.ExplosionDistort, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.ExplosionDistort, onHitHeadshot: ParticlePaths.ExplosionDistort,
+			roundStart: ParticlePaths.EnergyCircle, roundEnd: ParticlePaths.EnergyCircle);
+		A("Kinship", FxTier.Epic, ParticlePaths.GoldHaloFlare,
+			onKill: ParticlePaths.GoldHaloFlare, onKillSelf: ParticlePaths.GoldHaloFlare, onKillHeadshot: ParticlePaths.GoldHaloFlare,
+			onDeath: ParticlePaths.GoldHaloRays, onHurt: ParticlePaths.GoldHaloFlare, onHit: ParticlePaths.GoldHaloFlare, onHitHeadshot: ParticlePaths.GoldHaloFlare,
+			roundStart: ParticlePaths.GoldHaloFlare, roundEnd: ParticlePaths.GoldHaloFlare);
+		A("Mosquito", FxTier.Epic, ParticlePaths.Blood,
+			trail: ParticlePaths.Blood, trailInterval: 2.2f,
+			onKill: ParticlePaths.Blood, onKillSelf: ParticlePaths.Blood, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.Blood, onHurt: ParticlePaths.Blood, onHit: ParticlePaths.Blood, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.Blood, roundEnd: ParticlePaths.Blood);
+		A("NukeLeak", FxTier.Epic, ParticlePaths.DangerZoneLoop,
+			trail: ParticlePaths.AmbientEmbersFalling, trailInterval: 2.4f,
+			onKill: ParticlePaths.ExplosionHegrenade, onKillSelf: ParticlePaths.AmbientEmbersBright, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.DangerZoneLoop, onHurt: ParticlePaths.ImpactDirt, onHit: ParticlePaths.ExplosionSmokeDistort, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.DangerZoneLoop, roundEnd: ParticlePaths.DangerZoneLoop);
+		A("Pope", FxTier.Epic, ParticlePaths.ExperienceMax,
+			orbit: ParticlePaths.GoldHaloFlare,
+			onKill: ParticlePaths.ExperienceMax, onKillSelf: ParticlePaths.GoldHaloRays, onKillHeadshot: ParticlePaths.GoldHaloRays,
+			onDeath: ParticlePaths.GoldHaloRays, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.GoldHaloFlare, onHitHeadshot: ParticlePaths.GoldHaloRays,
+			roundStart: ParticlePaths.GoldHaloFlare, roundEnd: ParticlePaths.ExperienceMax);
+		A("Prophet", FxTier.Epic, ParticlePaths.PingTopRings,
+			orbit: ParticlePaths.ExperienceRollingRings,
+			onKill: ParticlePaths.PingTopRings, onKillSelf: ParticlePaths.PingTopRings, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.PingGroundRings, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.PingTopRings, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.PingTopRings, roundEnd: ParticlePaths.PingGroundRings);
+		A("Reincarnation", FxTier.Epic, ParticlePaths.ExperienceAward,
+			onKill: ParticlePaths.ExperienceAward, onKillSelf: ParticlePaths.ExperienceRing, onKillHeadshot: ParticlePaths.ExperienceOuter,
+			onDeath: ParticlePaths.ExperienceMax, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.ExperienceRing, onHitHeadshot: ParticlePaths.ExperienceOuter,
+			roundStart: ParticlePaths.ExperienceAward, roundEnd: ParticlePaths.ExperienceRollingRings);
+		A("RoyalBarrier", FxTier.Epic, ParticlePaths.ShieldGlow,
+			hold: ParticlePaths.ShieldGlow,
+			onKill: ParticlePaths.ShieldGlow, onKillSelf: ParticlePaths.ShieldGlow, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.ShieldGlowHigh, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.ShieldGlow, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.ShieldGlow, roundEnd: ParticlePaths.ShieldGlow);
+		A("Singularity", FxTier.Epic, ParticlePaths.AmbientEmbersBlack,
+			orbit: ParticlePaths.AmbientEmbersBlack,
+			onKill: ParticlePaths.AmbientEmbersBlack, onKillSelf: ParticlePaths.AmbientEmbersBlack, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.DangerZoneBlack, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.ExplosionDistort, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.AmbientEmbersBlack, roundEnd: ParticlePaths.DangerZoneBlack);
+		A("SwordSaint", FxTier.Epic, ParticlePaths.ShieldGlow,
+			onFire: ParticlePaths.MuzzleSpark,
+			onKill: ParticlePaths.BloodHeadshot, onKillSelf: ParticlePaths.ShieldGlow, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.Blood, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.Blood, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.ShieldGlow, roundEnd: ParticlePaths.ShieldGlow);
+		A("Tactician", FxTier.Epic, ParticlePaths.PingTopRings,
+			onKill: ParticlePaths.PingTopRings, onKillSelf: ParticlePaths.PingTopRings, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.PingGroundRings, onHurt: ParticlePaths.ImpactArmor, onHit: ParticlePaths.PingTopRings, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.PingGroundRings, roundEnd: ParticlePaths.PingGroundRings);
+		A("Taotie", FxTier.Epic, ParticlePaths.Blood,
+			trail: ParticlePaths.Blood, trailInterval: 2.4f,
+			onKill: ParticlePaths.Blood, onKillSelf: ParticlePaths.Blood, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.Blood, onHurt: ParticlePaths.Blood, onHit: ParticlePaths.Blood, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.Blood, roundEnd: ParticlePaths.Blood);
+		A("Titanfall", FxTier.Epic, ParticlePaths.CopterLandDust,
+			onKill: ParticlePaths.ImpactDirt, onKillSelf: ParticlePaths.CopterLandDust, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.CopterLandDust, onHurt: ParticlePaths.ImpactDirt, onHit: ParticlePaths.ImpactDirt, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.CopterLandDust, roundEnd: ParticlePaths.CopterLandDust);
+		A("Void", FxTier.Epic, ParticlePaths.GhostWhisps,
+			trail: ParticlePaths.GhostWhisps, trailInterval: 2.2f,
+			onKill: ParticlePaths.GhostWhisps, onKillSelf: ParticlePaths.GhostWhisps, onKillHeadshot: ParticlePaths.BloodHeadshot,
+			onDeath: ParticlePaths.GhostWhisps, onHurt: ParticlePaths.GhostWhisps, onHit: ParticlePaths.GhostWhisps, onHitHeadshot: ParticlePaths.BloodHeadshot,
+			roundStart: ParticlePaths.GhostWhisps, roundEnd: ParticlePaths.GhostWhisps);
 
 		// ── 稀有（+ 击杀）──
 		A("Afterimage", FxTier.Rare, ParticlePaths.GhostWhisps, onHurt: ParticlePaths.GhostWhisps);
@@ -843,33 +992,16 @@ public static class DiceEffects
 		return map;
 	}
 
-	/// <summary>按稀有度补齐缺失的类别覆盖（显式指定的优先，不会被覆盖）。</summary>
+	/// <summary>
+	/// 只给"普通 / 稀有"按 theme 自动补齐少量类别（大众化即可）。
+	/// <b>史诗 / 传说一律逐条显式指定（特调）</b>，这里不做任何 theme 自动填充——
+	/// 否则高稀有度 dice 会退化成"同一个主题粒子到处用"的同质化特效。
+	/// </summary>
 	private static Profile Filler(Profile p)
 	{
-		string? theme = p.Theme;
-		if (string.IsNullOrEmpty(theme))
+		if (p.Tier == FxTier.Rare)
 		{
-			return p;
-		}
-		if (p.Tier >= FxTier.Rare)
-		{
-			p.OnKill ??= theme;
-		}
-		if (p.Tier >= FxTier.Epic)
-		{
-			p.OnKillSelf ??= theme;
-			p.OnDeath ??= theme;
-			p.RoundStart ??= theme;
-			// 伤害反馈统一用通用装甲火花，避免把"大面积 / 火焰"主题粒子挂在每次受伤 / 命中上。
-			p.OnHurt ??= ParticlePaths.ImpactArmor;
-			p.OnHit ??= ParticlePaths.ImpactArmor;
-		}
-		if (p.Tier >= FxTier.Legendary)
-		{
-			// 爆头特效 / 爆头标记默认用"爆头血花"，比 theme 更能表达"爆头"这一事件。
-			p.OnKillHeadshot ??= ParticlePaths.BloodHeadshot;
-			p.OnHitHeadshot ??= ParticlePaths.BloodHeadshot;
-			p.RoundEnd ??= theme;
+			p.OnKill ??= p.Theme;
 		}
 		return p;
 	}
