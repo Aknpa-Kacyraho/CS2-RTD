@@ -101,6 +101,7 @@ public class Awakener : DiceBlueprint
 		}
 		_players.Clear();
 		_killCount.Clear();
+		_originalMaxHealth.Clear();
 	}
 
 	private void Revert(CCSPlayerController player)
@@ -121,6 +122,7 @@ public class Awakener : DiceBlueprint
 			((CBaseEntity)player.PlayerPawn.Value).Health = Math.Min(((CBaseEntity)player.PlayerPawn.Value).Health, value);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CBaseEntity", "m_iMaxHealth", 0);
 		}
+		_originalMaxHealth.Remove(player);
 	}
 
 	private void ApplyStats(CCSPlayerController player, int kills)

@@ -23,6 +23,8 @@ public class Titanfall : DiceBlueprint
 
 	private readonly Dictionary<CCSPlayerController, int> _initialHP = new Dictionary<CCSPlayerController, int>();
 
+	private readonly Dictionary<CCSPlayerController, int> _initialMaxHP = new Dictionary<CCSPlayerController, int>();
+
 	private readonly Dictionary<CCSPlayerController, int> _initialArmor = new Dictionary<CCSPlayerController, int>();
 
 	public override string ClassName => "Titanfall";
@@ -64,6 +66,7 @@ public class Titanfall : DiceBlueprint
 			_released[player] = false;
 			CCSPlayerPawn value = player.PlayerPawn.Value;
 			_initialHP[player] = ((CBaseEntity)value).Health;
+			_initialMaxHP[player] = ((CBaseEntity)value).MaxHealth;
 			_initialArmor[player] = Math.Max(value.ArmorValue, 100);
 			value.ArmorValue = Math.Max(value.ArmorValue, 100);
 			Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_ArmorValue", 0);
@@ -83,6 +86,7 @@ public class Titanfall : DiceBlueprint
 		MoveLockManager.Unlock(player, "Titanfall");
 		DamageBonusManager.Unregister(player, "Titanfall");
 		SpeedBonusManager.Unregister(player, "Titanfall");
+		RestoreVitals(player);
 		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
 			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
@@ -93,6 +97,7 @@ public class Titanfall : DiceBlueprint
 		_released.Remove(player);
 		_lockdownStart.Remove(player);
 		_initialHP.Remove(player);
+		_initialMaxHP.Remove(player);
 		_initialArmor.Remove(player);
 	}
 
@@ -102,6 +107,7 @@ public class Titanfall : DiceBlueprint
 		{
 			MoveLockManager.Unlock(item, "Titanfall");
 			SpeedBonusManager.Unregister(item, "Titanfall");
+			RestoreVitals(item);
 			if ((CEntityInstance)(object)((item == null) ? null : item.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)item.PlayerPawn.Value).IsValid)
 			{
 				item.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item, 100f);
@@ -113,12 +119,37 @@ public class Titanfall : DiceBlueprint
 		_released.Clear();
 		_lockdownStart.Clear();
 		_initialHP.Clear();
+		_initialMaxHP.Clear();
 		_initialArmor.Clear();
 	}
 
 	public override void Destroy()
 	{
 		Reset();
+	}
+
+	/// <summary>还原泰坦化前的 HP/护甲（否则 dice 移除后玩家会永久保持泰坦数值）。</summary>
+	private void RestoreVitals(CCSPlayerController player)
+	{
+		if (!_initialMaxHP.TryGetValue(player, out int maxHp) || !_initialArmor.TryGetValue(player, out int armor))
+		{
+			return;
+		}
+		CCSPlayerPawn pawn = ((player == null) ? null : player.PlayerPawn?.Value);
+		if (pawn == null || !((CEntityInstance)pawn).IsValid)
+		{
+			return;
+		}
+		int max = Math.Max(1, maxHp);
+		((CBaseEntity)pawn).MaxHealth = max;
+		if (((CBaseEntity)pawn).Health > max)
+		{
+			((CBaseEntity)pawn).Health = max;
+		}
+		pawn.ArmorValue = Math.Min(pawn.ArmorValue, armor);
+		Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CBaseEntity", "m_iMaxHealth", 0);
+		Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CBaseEntity", "m_iHealth", 0);
+		Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CCSPlayerPawn", "m_ArmorValue", 0);
 	}
 
 	public void OnTick()

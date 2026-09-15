@@ -14,7 +14,6 @@ public static class DiceSynergy
 	public static HashSet<string> ResolveComboNames(HashSet<string> activeDice)
 	{
 		HashSet<string> hashSet = new HashSet<string>(activeDice);
-		HashSet<string> hashSet2 = new HashSet<string>();
 		foreach (var (item, item2, item3) in _combos)
 		{
 			if (hashSet.Contains(item) && hashSet.Contains(item2))
@@ -22,8 +21,6 @@ public static class DiceSynergy
 				hashSet.Remove(item);
 				hashSet.Remove(item2);
 				hashSet.Add(item3);
-				hashSet2.Add(item);
-				hashSet2.Add(item2);
 			}
 		}
 		return hashSet;

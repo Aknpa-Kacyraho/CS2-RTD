@@ -176,16 +176,9 @@ public class DivineResurrection : DiceBlueprint
 								CCSPlayerPawn revivedPawn = capturedDead.PlayerPawn?.Value;
 								if (revivedPawn != null && ((CEntityInstance)revivedPawn).IsValid)
 								{
-									((CBaseEntity)revivedPawn).TakesDamage = false;
-									capturedDead.PrintToCenterAlert("\ud83e\udd1d \u751f\u6b7b\u4e0e\u5171\uff1a\u590d\u6d3b\u83b7\u5f97 2s \u65e0\u654c\uff01");
-									new Timer(2f, (Action)delegate
-									{
-										CCSPlayerPawn after = capturedDead.PlayerPawn?.Value;
-										if (after != null && ((CEntityInstance)after).IsValid)
-										{
-											((CBaseEntity)after).TakesDamage = true;
-										}
-									}, (TimerFlags?)null);
+									float kinshipInvuln = _config.Dices.DivineResurrection.ReviveInvulnSeconds * 2f;
+									Invulnerability.Grant(capturedDead, kinshipInvuln);
+									capturedDead.PrintToCenterAlert($"\ud83e\udd1d \u751f\u6b7b\u4e0e\u5171\uff1a\u590d\u6d3b\u83b7\u5f97 {kinshipInvuln:F0}s \u65e0\u654c\uff01");
 								}
 							}
 						}

@@ -24,6 +24,22 @@ public static class StackingBonusManager
 
 	private static readonly Dictionary<ulong, Dictionary<string, Entry>> _bonuses = new Dictionary<ulong, Dictionary<string, Entry>>();
 
+	private static float _lastPrune;
+
+	private const float PruneInterval = 5f;
+
+	/// <summary>带 TTL 的条目到期后只被"忽略"而不会释放，未定期清理会在一整局里残留。这里按 5s 节流清理。</summary>
+	private static void PruneIfDue()
+	{
+		float now = Server.CurrentTime;
+		if (now - _lastPrune < PruneInterval)
+		{
+			return;
+		}
+		_lastPrune = now;
+		PruneExpired();
+	}
+
 	public static void Set(ulong steamId, string domain, string source, float amount, float? cap = null, float? durationSeconds = null)
 	{
 		Dictionary<string, Entry> map = GetMap(steamId);
@@ -83,6 +99,7 @@ public static class StackingBonusManager
 
 	public static float GetTotal(ulong steamId, string domain, float? cap = null)
 	{
+		PruneIfDue();
 		if (!_bonuses.TryGetValue(steamId, out Dictionary<string, Entry> map) || map.Count == 0)
 		{
 			return 0f;
@@ -133,6 +150,7 @@ public static class StackingBonusManager
 	public static void ClearAll()
 	{
 		_bonuses.Clear();
+		_lastPrune = 0f;
 	}
 
 	public static void PruneExpired()

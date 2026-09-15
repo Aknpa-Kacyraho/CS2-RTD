@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Memory;
@@ -77,6 +78,15 @@ public static class MoveLockManager
 
 	public static void ClearAll()
 	{
+		// 仅清字典会留下 MoveType=0 的玩家（被冻住/定身后再也没人解锁）。清之前先恢复所有被锁玩家的移动。
+		foreach (ulong steamId in _locks.Keys.ToList())
+		{
+			CCSPlayerController player = Utilities.GetPlayers().FirstOrDefault((CCSPlayerController p) => p != null && ((CEntityInstance)p).IsValid && ((CBasePlayerController)p).SteamID == steamId);
+			if (player != null)
+			{
+				RestoreMovement(player);
+			}
+		}
 		_locks.Clear();
 	}
 }

@@ -160,10 +160,11 @@ public static class DynamicHandlers
 		MethodInfo method = plugin.GetType().GetMethod("Command" + command.First().ToString().ToUpper(CultureInfo.CurrentCulture) + command.Substring(1, command.Length - 1));
 		if (!(method == null))
 		{
-			MethodInfo methodInfo = typeof(BasePlugin).GetMethods(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault((MethodInfo m) => m.Name == "RemoveCommand" && m.GetParameters().Length == 3);
+			// RemoveCommand 只有 2 个参数 (name, CommandCallback)，之前按 3 参查找永远查不到 → 反注册静默失效。
+			MethodInfo methodInfo = typeof(BasePlugin).GetMethods(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault((MethodInfo m) => m.Name == "RemoveCommand" && m.GetParameters().Length == 2);
 			if (!(methodInfo == null))
 			{
-				Type parameterType = methodInfo.GetParameters()[2].ParameterType;
+				Type parameterType = methodInfo.GetParameters()[1].ParameterType;
 				Delegate obj = Delegate.CreateDelegate(parameterType, plugin, method);
 				methodInfo.Invoke(basePlugin, new object[2] { command, obj });
 			}

@@ -362,7 +362,7 @@
   "dice_PistolMaster_player": "手枪伤害 +100%；手枪击杀 +$300",
   "dice_Phoenix_name": "菲尼克斯",
   "dice_Phoenix_other": "{purple}[RollTheDice] {green}{playerName} {default}获得了涅槃重生之力！涅槃+守卫天使！",
-  "dice_Phoenix_player": "致命伤害触发涅槃：10s无敌+漂浮+发光，结束爆炸+444HP/444甲+AK",
+  "dice_Phoenix_player": "致命伤害触发涅槃：10s无敌+漂浮+发光，结束爆炸+444HP/444甲+AK；触发后60s冷却",
   "dice_Plague_infected": "{red}🦠 你被瘟疫传染了！每秒-1HP！",
   "dice_Plague_name": "瘟疫",
   "dice_Plague_other": "{purple}[RollTheDice] {green}{playerName} {default}携带了瘟疫！",

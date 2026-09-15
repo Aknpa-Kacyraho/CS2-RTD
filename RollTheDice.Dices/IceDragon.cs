@@ -112,6 +112,23 @@ public class IceDragon : DiceBlueprint
 		{
 			Remove(item);
 		}
+		// 解冻所有被冻结的敌人：清 _frozenUntil 后 OnTick 不会再解锁它们，必须在此主动恢复。
+		foreach (ulong steamId in _frozenSteamIDs)
+		{
+			CCSPlayerController victim = Utilities.GetPlayers().FirstOrDefault((CCSPlayerController x) => x != null && ((CEntityInstance)x).IsValid && ((CBasePlayerController)x).SteamID == steamId);
+			if (victim == null)
+			{
+				MoveLockManager.Clear(steamId);
+				continue;
+			}
+			MoveLockManager.Unlock(victim, "IceDragon");
+			CCSPlayerPawn pawn = victim.PlayerPawn?.Value;
+			if (pawn != null && ((CEntityInstance)pawn).IsValid)
+			{
+				((CBaseModelEntity)pawn).Render = Color.FromArgb(255, 255, 255, 255);
+				Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CBaseModelEntity", "m_clrRender", 0);
+			}
+		}
 		_players.Clear();
 		_originalMaxHealth.Clear();
 		_originalArmor.Clear();

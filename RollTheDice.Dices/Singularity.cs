@@ -8,6 +8,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -156,7 +157,7 @@ public class Singularity : DiceBlueprint
 		_particle = Utilities.CreateEntityByName<CParticleSystem>("info_particle_system");
 		if ((CEntityInstance)(object)_particle != (CEntityInstance)null)
 		{
-			_particle.EffectName = "particles/ui/status_effects/speed_boost.vpcf";
+			_particle.EffectName = ParticlePaths.AmbientEmbersBlack;
 			_particle.StartActive = true;
 			((CBaseEntity)_particle).Teleport(pos, new QAngle((float?)null, (float?)null, (float?)null), new Vector((float?)null, (float?)null, (float?)null));
 			((CBaseEntity)_particle).DispatchSpawn();

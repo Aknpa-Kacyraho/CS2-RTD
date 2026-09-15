@@ -12,6 +12,8 @@ public static class GlowUtil
 		CDynamicProp val2 = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic");
 		if ((CEntityInstance)(object)val == (CEntityInstance)null || (CEntityInstance)(object)val2 == (CEntityInstance)null)
 		{
+			Entities.RemoveEntity((CBaseEntity)val);
+			Entities.RemoveEntity((CBaseEntity)val2);
 			return (null, null);
 		}
 		CBodyComponent cBodyComponent = entity.CBodyComponent;
@@ -28,11 +30,15 @@ public static class GlowUtil
 		CSkeletonInstance val3 = (CSkeletonInstance)obj;
 		if (val3 == null)
 		{
+			Entities.RemoveEntity((CBaseEntity)val);
+			Entities.RemoveEntity((CBaseEntity)val2);
 			return (null, null);
 		}
 		string modelName = val3.ModelState.ModelName;
 		if (string.IsNullOrEmpty(modelName))
 		{
+			Entities.RemoveEntity((CBaseEntity)val);
+			Entities.RemoveEntity((CBaseEntity)val2);
 			return (null, null);
 		}
 		((CBaseEntity)val).Spawnflags = 256u;

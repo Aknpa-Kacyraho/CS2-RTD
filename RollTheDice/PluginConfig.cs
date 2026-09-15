@@ -31,9 +31,6 @@ public class PluginConfig : BasePluginConfig
 	[JsonPropertyName("allow_dice_after_respawn")]
 	public bool AllowDiceAfterRespawn { get; set; } = false;
 
-	[JsonPropertyName("notify_other_players_about_dices_rolled")]
-	public bool NotifyOtherPlayers { get; set; } = true;
-
 	[JsonPropertyName("notify_player_via_chatmsg")]
 	public bool NotifyPlayerViaChatMsg { get; set; } = true;
 
@@ -48,6 +45,9 @@ public class PluginConfig : BasePluginConfig
 
 	[JsonPropertyName("sounds")]
 	public SoundConfig Sounds { get; set; } = new SoundConfig();
+
+	[JsonPropertyName("effects")]
+	public EffectsConfig Effects { get; set; } = new EffectsConfig();
 
 	[JsonPropertyName("precache")]
 	public PrecacheConfig Precache { get; set; } = new PrecacheConfig();

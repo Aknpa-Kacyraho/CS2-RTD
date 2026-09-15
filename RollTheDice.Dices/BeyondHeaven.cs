@@ -45,7 +45,6 @@ public class BeyondHeaven : DiceBlueprint
 		_holders.Add(player.SteamID);
 		_used.Remove(player.SteamID);
 		_cooldownEnd[player.SteamID] = 0f;
-		RollTheDice.LogDebug($"[BeyondHeaven] Add: steamid={player.SteamID} holders={_holders.Count}\n");
 		NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 		{
 			"playerName",
@@ -89,7 +88,6 @@ public class BeyondHeaven : DiceBlueprint
 		{
 			return;
 		}
-		RollTheDice.LogDebug($"[BeyondHeaven] E press: steamid={player.SteamID} holders={_holders.Count} isHolder={_holders.Contains(player.SteamID)} used={_used.Contains(player.SteamID)} stopped={_timeStopped}\n");
 		if (!_holders.Contains(player.SteamID) && !_players.Contains(player))
 		{
 			return;
@@ -113,7 +111,6 @@ public class BeyondHeaven : DiceBlueprint
 		_used.Add(player.SteamID);
 		_timeStopped = true;
 		LockOthers(player);
-		RollTheDice.LogDebug($"[BeyondHeaven] activated (steamid={player.SteamID})\n");
 		player.PrintToCenterAlert("🌌 超越天堂！时间暂停9s！");
 		Server.PrintToChatAll($" {_localizer["command.prefix"].Value}🌌 {player.PlayerName} 超越了天堂！时间暂停9秒！");
 	}

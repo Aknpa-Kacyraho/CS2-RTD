@@ -17,6 +17,8 @@ public class Paladin : DiceBlueprint
 
 	private readonly Dictionary<CCSPlayerController, int> _paladinHpBonus = new Dictionary<CCSPlayerController, int>();
 
+	private readonly Dictionary<CCSPlayerController, int> _originalMaxHealth = new Dictionary<CCSPlayerController, int>();
+
 	public override string ClassName => "Paladin";
 
 	public override List<string> Listeners
@@ -49,6 +51,7 @@ public class Paladin : DiceBlueprint
 			_paladinSpeedBonus[player] = 0f;
 			_paladinHpBonus[player] = 0;
 			CCSPlayerPawn value = player.PlayerPawn.Value;
+			_originalMaxHealth[player] = ((CBaseEntity)value).MaxHealth;
 			int bonusArmor = _config.Dices.Paladin.BonusArmor;
 			value.ArmorValue = Math.Max(value.ArmorValue, bonusArmor);
 			Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_ArmorValue", 0);
@@ -78,6 +81,7 @@ public class Paladin : DiceBlueprint
 		_players.Clear();
 		_paladinSpeedBonus.Clear();
 		_paladinHpBonus.Clear();
+		_originalMaxHealth.Clear();
 	}
 
 	private void Revert(CCSPlayerController player)
@@ -87,7 +91,21 @@ public class Paladin : DiceBlueprint
 		{
 			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+			// 绝对值还原 HP 上限，避免 dice 移除后永久多出上限。
+			if (_originalMaxHealth.TryGetValue(player, out int origMax))
+			{
+				CCSPlayerPawn pawn = player.PlayerPawn.Value;
+				int newMax = Math.Max(1, origMax);
+				((CBaseEntity)pawn).MaxHealth = newMax;
+				if (((CBaseEntity)pawn).Health > newMax)
+				{
+					((CBaseEntity)pawn).Health = newMax;
+				}
+				Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CBaseEntity", "m_iMaxHealth", 0);
+				Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CBaseEntity", "m_iHealth", 0);
+			}
 		}
+		_originalMaxHealth.Remove(player);
 	}
 
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)

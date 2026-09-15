@@ -172,6 +172,7 @@ public class Nirvana : DiceBlueprint
 		float num = Server.CurrentTime;
 		if (_cooldowns.TryGetValue(victim, out var value2) && num < value2)
 		{
+			RollTheDice.LogDebug($"[Nirvana] cooldown: sid={((CBasePlayerController)victim).SteamID} remain={value2 - num:F1}s -> continue\n");
 			return (HookResult)0;
 		}
 		float minChance = _config.Dices.Nirvana.MinChance;

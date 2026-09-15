@@ -23,6 +23,10 @@ public class Phoenix : DiceBlueprint
 
 	private readonly Dictionary<CCSPlayerController, float> _cooldownEnd = new Dictionary<CCSPlayerController, float>();
 
+	private readonly Dictionary<CCSPlayerController, Vector> _floatAnchor = new Dictionary<CCSPlayerController, Vector>();
+
+	private readonly Dictionary<CCSPlayerController, float> _floatStart = new Dictionary<CCSPlayerController, float>();
+
 	public override string ClassName => "Phoenix";
 
 
@@ -55,7 +59,6 @@ public class Phoenix : DiceBlueprint
 			_players.Add(player);
 			_phoenixExploded[player] = false;
 			_cooldownEnd[player] = 0f;
-			RollTheDice.LogDebug($"[Phoenix] Add: steamid={((CBasePlayerController)player).SteamID} players={_players.Count}\n");
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
 				"playerName",
@@ -72,6 +75,8 @@ public class Phoenix : DiceBlueprint
 		_phoenixGlows.Remove(player);
 		_phoenixExploded.Remove(player);
 		_cooldownEnd.Remove(player);
+		_floatAnchor.Remove(player);
+		_floatStart.Remove(player);
 	}
 
 	public override void Reset()
@@ -85,6 +90,8 @@ public class Phoenix : DiceBlueprint
 		_phoenixGlows.Clear();
 		_phoenixExploded.Clear();
 		_cooldownEnd.Clear();
+		_floatAnchor.Clear();
+		_floatStart.Clear();
 	}
 
 	public override void Destroy()
@@ -115,20 +122,53 @@ public class Phoenix : DiceBlueprint
 	public void TriggerPhoenixRevive(CCSPlayerController player)
 	{
 		CCSPlayerPawn val = ((player == null) ? null : player.PlayerPawn?.Value);
-		RollTheDice.LogDebug($"[Phoenix] TriggerPhoenixRevive: pawnValid={(val != null && ((CEntityInstance)val).IsValid)}\n");
-		if (val != null && ((CEntityInstance)val).IsValid)
+		if (val == null || !((CEntityInstance)val).IsValid)
 		{
-			float num = Server.CurrentTime;
-			float invulDuration = _config.Dices.Phoenix.InvulDuration;
-			_phoenixEndTime[player] = num + invulDuration;
-			_cooldownEnd[player] = num + 60f;
-			((CBaseEntity)val).MoveType = (MoveType_t)0;
-			Schema.SetSchemaValue<int>(((NativeEntity)val).Handle, "CBaseEntity", "m_nActualMoveType", 0);
-			((CBaseEntity)val).ActualGravityScale = 0.1f;
-			_phoenixGlows[player] = GlowUtil.CreateGlow((CBaseEntity)(object)val, Color.Gold);
-			player.PrintToCenterAlert($"\ud83d\udd25 菲尼克斯涅槃！{invulDuration}s无敌！");
-			Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83d\udd25 {((CBasePlayerController)player).PlayerName} 触发菲尼克斯！涅槃重生！");
+			return;
 		}
+		if (((CBaseEntity)val).LifeState != 0)
+		{
+			return;
+		}
+		float num = Server.CurrentTime;
+		float invulDuration = _config.Dices.Phoenix.InvulDuration;
+		_phoenixEndTime[player] = num + invulDuration;
+		_cooldownEnd[player] = num + 60f;
+		((CBaseEntity)val).MoveType = (MoveType_t)0;
+		Schema.SetSchemaValue<int>(((NativeEntity)val).Handle, "CBaseEntity", "m_nActualMoveType", 0);
+		Utilities.SetStateChanged((CBaseEntity)(object)val, "CBaseEntity", "m_MoveType", 0);
+		((CBaseEntity)val).ActualGravityScale = 0.1f;
+		Vector? absOrigin = ((CBaseEntity)val).AbsOrigin;
+		if (absOrigin != null)
+		{
+			_floatAnchor[player] = new Vector(absOrigin.X, absOrigin.Y, absOrigin.Z);
+			_floatStart[player] = num;
+		}
+		CCSPlayerController captured = player;
+		Server.NextFrame((Action)delegate
+		{
+			AttachPhoenixVisual(captured);
+		});
+		player.PrintToCenterAlert($"\ud83d\udd25 菲尼克斯涅槃！{invulDuration}s无敌！");
+		Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83d\udd25 {((CBasePlayerController)player).PlayerName} 触发菲尼克斯！涅槃重生！");
+	}
+
+	private void AttachPhoenixVisual(CCSPlayerController player)
+	{
+		if (player == null || !_phoenixEndTime.ContainsKey(player))
+		{
+			return;
+		}
+		CCSPlayerPawn val = player.PlayerPawn?.Value;
+		if (val == null || !((CEntityInstance)val).IsValid || ((CBaseEntity)val).LifeState != 0)
+		{
+			return;
+		}
+		if (_phoenixGlows.ContainsKey(player))
+		{
+			return;
+		}
+		_phoenixGlows[player] = GlowUtil.CreateGlow((CBaseEntity)(object)val, Color.Gold);
 	}
 
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
@@ -164,13 +204,6 @@ public class Phoenix : DiceBlueprint
 			}
 		}
 		CCSPlayerController val = (CCSPlayerController)obj2;
-		if (_players.Count > 0)
-		{
-			bool valOk = val != null && ((CEntityInstance)val).IsValid;
-			bool contains = valOk && _players.Contains(val);
-			string cool = (valOk && _cooldownEnd.TryGetValue(val, out var _c)) ? _c.ToString("F2") : "?";
-			RollTheDice.LogDebug($"[Phoenix] dmg: players={_players.Count} valid={valOk} contains={contains} hp={(valOk ? entity.Health : -1)} dmg={info.Damage} coolEnd={cool}\n");
-		}
 		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
 		{
 			return (HookResult)0;
@@ -183,15 +216,17 @@ public class Phoenix : DiceBlueprint
 		}
 		if (_cooldownEnd.TryGetValue(val, out var value3) && num < value3)
 		{
+			if (entity.Health - (int)float.Round(info.Damage) <= 0)
+			{
+				val.PrintToCenterAlert($"\ud83d\udd25 \u6d85\u69c3\u51b7\u5374\u4e2d\uff08\u5269 {value3 - num:F0}s\uff09\uff0c\u672c\u6b21\u81f4\u547d\u4f24\u65e0\u6cd5\u963b\u6b62");
+			}
 			return (HookResult)0;
 		}
 		int num2 = entity.Health - (int)float.Round(info.Damage);
 		if (num2 > 0)
 		{
-			RollTheDice.LogDebug($"[Phoenix] notLethal: hp={entity.Health} dmg={info.Damage} -> continue\n");
 			return (HookResult)0;
 		}
-		RollTheDice.LogDebug($"[Phoenix] LETHAL -> revive: hp={entity.Health} dmg={info.Damage}\n");
 		info.Damage = 0f;
 		_phoenixExploded[val] = false;
 		CCSPlayerPawn val2 = ((NativeObject)entity).As<CCSPlayerPawn>();
@@ -200,11 +235,7 @@ public class Phoenix : DiceBlueprint
 			((CBaseEntity)val2).Health = Math.Max(((CBaseEntity)val2).Health, 1);
 			Utilities.SetStateChanged((CBaseEntity)(object)val2, "CBaseEntity", "m_iHealth", 0);
 		}
-		CCSPlayerController capturedVictim = val;
-		Server.NextFrame((Action)delegate
-		{
-			TriggerPhoenixRevive(capturedVictim);
-		});
+		TriggerPhoenixRevive(val);
 		return (HookResult)1;
 	}
 
@@ -303,16 +334,19 @@ public class Phoenix : DiceBlueprint
 				{
 					((CBaseEntity)val4).MoveType = (MoveType_t)0;
 					Schema.SetSchemaValue<int>(((NativeEntity)val4).Handle, "CBaseEntity", "m_nActualMoveType", 0);
+					Utilities.SetStateChanged((CBaseEntity)(object)val4, "CBaseEntity", "m_MoveType", 0);
 				}
 				if (((CBaseEntity)val4).ActualGravityScale > 0.15f)
 				{
 					((CBaseEntity)val4).ActualGravityScale = 0.1f;
 				}
-				if (((CBaseEntity)val4).AbsOrigin != null)
+				if (_floatAnchor.TryGetValue(player, out Vector anchor))
 				{
-					float num4 = _config.Dices.Phoenix.FloatSpeed * Server.TickInterval;
-					Vector val5 = new Vector((float?)((CBaseEntity)val4).AbsOrigin.X, (float?)((CBaseEntity)val4).AbsOrigin.Y, (float?)(((CBaseEntity)val4).AbsOrigin.Z + num4));
-					((CBaseEntity)val4).Teleport(val5, ((CBaseEntity)val4).AbsRotation, new Vector((float?)0f, (float?)0f, (float?)(num4 / Server.TickInterval)));
+					float floatSpeed = _config.Dices.Phoenix.FloatSpeed;
+					float num4 = _floatStart.TryGetValue(player, out float floatStartTime) ? (num - floatStartTime) : 0f;
+					Vector val5 = new Vector(anchor.X, anchor.Y, anchor.Z + floatSpeed * num4);
+					((CBaseEntity)val4).Teleport(val5, ((CBaseEntity)val4).AbsRotation, new Vector(0f, 0f, 0f));
+					((CBaseEntity)val4).BaseVelocity.Z = floatSpeed;
 				}
 			}
 		}

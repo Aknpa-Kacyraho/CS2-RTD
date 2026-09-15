@@ -23,6 +23,32 @@ public class DeathKnightComplete : DiceBlueprint
 
 	public static readonly HashSet<ulong> DeniedNextRound = new HashSet<ulong>();
 
+	// 上一回合被斩杀而"下回合禁骰"的名单：在回合开始时从 DeniedNextRound 提升为生效，
+	// 本回合滚骰用它判定，回合结束时清空。之前唯一的一份名单在回合开始/结束被提前清掉，导致禁骰从未生效。
+	private static readonly HashSet<ulong> _deniedThisRound = new HashSet<ulong>();
+
+	public static bool IsDeniedThisRound(ulong steamId)
+	{
+		return _deniedThisRound.Contains(steamId);
+	}
+
+	/// <summary>回合开始时调用：把上一回合记录的禁骰名单提升为本回合生效。</summary>
+	public static void PromoteDenied()
+	{
+		_deniedThisRound.Clear();
+		foreach (ulong id in DeniedNextRound)
+		{
+			_deniedThisRound.Add(id);
+		}
+		DeniedNextRound.Clear();
+	}
+
+	/// <summary>回合结束时调用：本回合的禁骰失效。</summary>
+	public static void ClearDeniedThisRound()
+	{
+		_deniedThisRound.Clear();
+	}
+
 	public override string ClassName => "DeathKnightComplete";
 
 
@@ -122,12 +148,15 @@ public class DeathKnightComplete : DiceBlueprint
 		_originalArmor.Clear();
 		_lastHealTime.Clear();
 		_startMaxHP.Clear();
-		DeniedNextRound.Clear();
+		// 注意：这里不能清 DeniedNextRound。它在回合 N 记录、要在回合 N+1 开始时才提升生效，
+		// 而 Reset 在回合 N 结束就会被调用——提前清掉会让禁骰永远不生效。只在 Destroy 里清。
 	}
 
 	public override void Destroy()
 	{
 		Reset();
+		DeniedNextRound.Clear();
+		_deniedThisRound.Clear();
 	}
 
 	public void OnTick()

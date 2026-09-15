@@ -43,8 +43,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private readonly List<DiceBlueprint> _dices;
 
-	private readonly Dictionary<DiceBlueprint, int> _diceUsageCount;
-
 	private readonly Dictionary<CCSPlayerController, string> _originalPlayerNames;
 
 	private bool _isDuringRound;
@@ -52,12 +50,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	private readonly Random _random;
 
 	private const int DefaultMaxDicePerPlayer = 1;
-
-	private static int _heartbeatCount;
-
-	public static int DiceTickCounter;
-
-	private static int _tickTest;
 
 	public required PluginConfig Config { get; set; }
 
@@ -113,11 +105,47 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 	}
 
+	[ConsoleCommand("rtdeffect", "Play a particle effect (debug)")]
+	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
+	[CommandHelper(1, "<particles/....vpcf> [self|crosshair|near] [seconds]")]
+	public void CommandEffect(CCSPlayerController player, CommandInfo command)
+	{
+		if (player == null || !player.IsValid)
+		{
+			return;
+		}
+		string path = command.GetArg(1);
+		if (string.IsNullOrWhiteSpace(path))
+		{
+			command.ReplyToCommand("rtdeffect <particles/....vpcf> [self|crosshair|near] [seconds]");
+			return;
+		}
+		float seconds = 3f;
+		if (float.TryParse(command.GetArg(3), NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed) && parsed > 0f)
+		{
+			seconds = parsed;
+		}
+		string mode = command.GetArg(2).ToLowerInvariant();
+		CParticleSystem system = mode switch
+		{
+			"self" => Effects.PlayOnPlayer(player, path, seconds),
+			"near" => Effects.Play(player.PlayerPawn?.Value?.AbsOrigin, path, seconds),
+			_ => Effects.PlayAtCrosshair(player, path, 300f, seconds)
+		};
+		string normalized = Effects.Normalize(path);
+		command.ReplyToCommand(system != null ? $"OK {normalized}" : $"FAILED {normalized}");
+	}
+
 	[ConsoleCommand("rtd", "Roll the Dice")]
 	[ConsoleCommand("dice", "Roll the Dice")]
 	[CommandHelper(0, "")]
 	public void CommandRollTheDice(CCSPlayerController player, CommandInfo command)
 	{
+		if (player == null || !((CEntityInstance)player).IsValid)
+		{
+			command.ReplyToCommand("This command must be run by a player.");
+			return;
+		}
 		if (!Config.Enabled || !_currentMapConfig.Enabled || _dices.Count == 0)
 		{
 			command.ReplyToCommand((string?)((BasePlugin)this).Localizer["core.disabled"]);
@@ -134,7 +162,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			command.ReplyToCommand((string?)((BasePlugin)this).Localizer[value.RtdOnSpawn ? "command.rollthedice.rtdonspawn.enabled" : "command.rollthedice.rtdonspawn.disabled"]);
 			return;
 		}
-		if (!Config.AllowRtdDuringWarmup && GameRules.Get("WarmupPeriod") is int num && num != 0)
+		if (!Config.AllowRtdDuringWarmup && GameRules.Get("WarmupPeriod") is bool warmup && warmup)
 		{
 			command.ReplyToCommand((string?)((BasePlugin)this).Localizer["command.rollthedice.iswarmup"]);
 			return;
@@ -164,16 +192,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				return;
 			}
 		}
-		if (Config.PriceToDice > 0)
-		{
-			if (player.InGameMoneyServices.Account < Config.PriceToDice)
-			{
-				command.ReplyToCommand(((BasePlugin)this).Localizer["command.rollthedice.notenoughmoney"].Value.Replace("{money}", Config.PriceToDice.ToString()));
-				return;
-			}
-			player.InGameMoneyServices.Account -= Config.PriceToDice;
-			Utilities.SetStateChanged((CBaseEntity)(object)player, "CCSPlayerController", "m_pInGameMoneyServices", 0);
-		}
 		CHandle<CCSPlayerPawn> playerPawn = player.PlayerPawn;
 		byte? obj;
 		if (playerPawn == null)
@@ -189,6 +207,16 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			command.ReplyToCommand((string?)((BasePlugin)this).Localizer["command.rollthedice.notalive"]);
 			return;
+		}
+		if (Config.PriceToDice > 0)
+		{
+			if (player.InGameMoneyServices == null || player.InGameMoneyServices.Account < Config.PriceToDice)
+			{
+				command.ReplyToCommand(((BasePlugin)this).Localizer["command.rollthedice.notenoughmoney"].Value.Replace("{money}", Config.PriceToDice.ToString()));
+				return;
+			}
+			player.InGameMoneyServices.Account -= Config.PriceToDice;
+			Utilities.SetStateChanged((CBaseEntity)(object)player, "CCSPlayerController", "m_pInGameMoneyServices", 0);
 		}
 		var (text2, text3) = RollTheDiceForPlayer(player);
 		if (string.IsNullOrEmpty(text2))
@@ -276,6 +304,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	public void OnConfigParsed(PluginConfig config)
 	{
 		Config = config;
+		DiceEffects.Enabled = config.Effects?.Enabled ?? true;
+		DiceEffects.TrailsEnabled = config.Effects?.Trails ?? true;
 		Console.WriteLine(((BasePlugin)this).Localizer["core.config"]);
 	}
 
@@ -332,6 +362,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			manifest.AddResource(Config.Precache.SoundEventFile);
 		}
 		manifest.AddResource("models/props/de_dust/hr_dust/dust_soccerball/dust_soccer_ball001.vmdl");
+		Effects.PrecacheAll(manifest);
 		foreach (string precacheModel in _precacheModels)
 		{
 			manifest.AddResource(precacheModel);
@@ -366,6 +397,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		((BasePlugin)this).RegisterListener<Listeners.OnServerPrecacheResources>(new Listeners.OnServerPrecacheResources(OnServerPrecacheResources));
 		((BasePlugin)this).RegisterListener<Listeners.OnPlayerButtonsChanged>(new Listeners.OnPlayerButtonsChanged(OnPlayerButtonsChanged));
 		((BasePlugin)this).RegisterListener<Listeners.OnPlayerTakeDamagePre>(new Listeners.OnPlayerTakeDamagePre(OnPlayerTakeDamagePreCentral));
+		((BasePlugin)this).RegisterListener<Listeners.OnTick>(new Listeners.OnTick(DiceEffects.OnTick));
 		RegisterCheatGuard();
 		if (hotReload)
 		{
@@ -392,13 +424,53 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		((BasePlugin)this).DeregisterEventHandler<EventRoundFreezeEnd>((GameEventHandler<EventRoundFreezeEnd>)OnRoundFreezeEnd, (HookMode)1);
 		((BasePlugin)this).DeregisterEventHandler<EventRoundEnd>((GameEventHandler<EventRoundEnd>)OnRoundEnd, (HookMode)1);
 		((BasePlugin)this).DeregisterEventHandler<EventPlayerDeath>((GameEventHandler<EventPlayerDeath>)OnPlayerDeath, (HookMode)1);
+		((BasePlugin)this).DeregisterEventHandler<EventPlayerHurt>((GameEventHandler<EventPlayerHurt>)OnPlayerHurtReveal, (HookMode)1);
 		((BasePlugin)this).DeregisterEventHandler<EventPlayerDisconnect>((GameEventHandler<EventPlayerDisconnect>)OnPlayerDisconnect, (HookMode)1);
 		((BasePlugin)this).RemoveListener<Listeners.OnMapStart>(new Listeners.OnMapStart(OnMapStart));
 		((BasePlugin)this).RemoveListener<Listeners.OnMapEnd>(new Listeners.OnMapEnd(OnMapEnd));
 		((BasePlugin)this).RemoveListener<Listeners.OnServerPrecacheResources>(new Listeners.OnServerPrecacheResources(OnServerPrecacheResources));
+		((BasePlugin)this).RemoveListener<Listeners.OnPlayerButtonsChanged>(new Listeners.OnPlayerButtonsChanged(OnPlayerButtonsChanged));
 		((BasePlugin)this).RemoveListener<Listeners.OnPlayerTakeDamagePre>(new Listeners.OnPlayerTakeDamagePre(OnPlayerTakeDamagePreCentral));
+		((BasePlugin)this).RemoveListener<Listeners.OnTick>(new Listeners.OnTick(DiceEffects.OnTick));
+		Effects.ClearAll();
+		DiceEffects.ClearAll();
+		// 卸载时彻底清掉静态/实例状态，避免 css_reload 后残留（旧实例的 Instance、玩家键集合、buff 域）。
+		Instance = null;
+		_playersThatRolledTheDice.Clear();
+		_PlayerCooldown.Clear();
+		_originalPlayerNames.Clear();
+		Invulnerability.ClearAll();
+		MoveLockManager.ClearAll();
+		StackingHealth.ClearAll();
+		DamageBonusManager.ClearAll();
+		DamageReductionManager.ClearAll();
+		SpeedBonusManager.ClearAll();
 		Console.WriteLine(((BasePlugin)this).Localizer["core.unload"]);
 	}
+
+	/// <summary>
+	/// CheatGuard 的每条被拦指令需要<em>各自独立</em>的委托实例。
+	/// 原因：<c>BasePlugin.AddCommandListener</c> 内部用 <c>Dictionary&lt;Delegate,...&gt;</c> 以委托为键，
+	/// 若 22 条指令共用同一个 <c>OnCheatGuardCommand</c> 方法组委托，键会互相覆盖 →
+	/// <c>RemoveCommandListener</c> 只能摘掉最后一个，其余 21 个原生钩子在卸载/热重载后泄漏并叠加。
+	/// 每条指令包一个 <see cref="CheatGuardHook"/> 实例（Target 不同 → 委托不等）即可对称摘除。
+	/// </summary>
+	private sealed class CheatGuardHook
+	{
+		private readonly RollTheDice _plugin;
+
+		public CheatGuardHook(RollTheDice plugin)
+		{
+			_plugin = plugin;
+		}
+
+		public HookResult Handle(CCSPlayerController? player, CommandInfo info)
+		{
+			return _plugin.OnCheatGuardCommand(player, info);
+		}
+	}
+
+	private readonly List<(string Command, CommandInfo.CommandListenerCallback Handler)> _cheatGuardHooks = new List<(string, CommandInfo.CommandListenerCallback)>();
 
 	private void RegisterCheatGuard()
 	{
@@ -411,7 +483,10 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			if (!string.IsNullOrWhiteSpace(command))
 			{
-				((BasePlugin)this).AddCommandListener(command, OnCheatGuardCommand);
+				string name = command.Trim().ToLowerInvariant();
+				CommandInfo.CommandListenerCallback handler = new CheatGuardHook(this).Handle;
+				_cheatGuardHooks.Add((name, handler));
+				((BasePlugin)this).AddCommandListener(name, handler, HookMode.Pre);
 			}
 		}
 		LogDebug($"{DateTime.Now:HH:mm:ss} CheatGuard: blocked {guard.BlockedCommands.Count} commands (bypass={guard.BypassPermission})\n");
@@ -419,18 +494,11 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private void DeregisterCheatGuard()
 	{
-		CheatGuardConfig guard = Config?.CheatGuard;
-		if (guard == null || guard.BlockedCommands == null)
+		foreach ((string command, CommandInfo.CommandListenerCallback handler) in _cheatGuardHooks)
 		{
-			return;
+			((BasePlugin)this).RemoveCommandListener(command, handler, HookMode.Pre);
 		}
-		foreach (string command in guard.BlockedCommands)
-		{
-			if (!string.IsNullOrWhiteSpace(command))
-			{
-				((BasePlugin)this).RemoveCommandListener(command, OnCheatGuardCommand, (HookMode)0);
-			}
-		}
+		_cheatGuardHooks.Clear();
 	}
 
 	private HookResult OnCheatGuardCommand(CCSPlayerController? player, CommandInfo info)
@@ -483,7 +551,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		Karma.BuffedPlayers.Clear();
 		Plague.InfectedPlayers.Clear();
 		GravityWell.ActiveWells.Clear();
-		DeathKnightComplete.DeniedNextRound.Clear();
+		DeathKnightComplete.PromoteDenied();
 		StackingHealth.ClearAll();
 		MoveLockManager.ClearAll();
 		_isDuringRound = true;
@@ -498,6 +566,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		DamageBonusManager.ClearAll();
 		DamageReductionManager.ClearAll();
 		SpeedBonusManager.ClearAll();
+		Effects.ClearAll();
+		DiceEffects.ClearAll();
 		GameRules.Refresh();
 		object obj = GameRules.Get("WarmupPeriod");
 		bool flag = default(bool);
@@ -947,6 +1017,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			Console.WriteLine("[RollTheDice] OnRoundEnd RemoveDicesForPlayers error: " + ex.Message);
 		}
+		// 本回合的"禁骰"已随本回合滚骰生效，回合结束即失效。
+		DeathKnightComplete.ClearDeniedThisRound();
 		if (Config.CooldownRounds > 0)
 		{
 			foreach (KeyValuePair<CCSPlayerController, int> item in _PlayerCooldown)
@@ -977,6 +1049,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				}
 			}
 		}
+		DiceEffects.OnPlayerDeath(userid);
+		DiceEffects.OnPlayerKill(attacker, userid);
 		RemoveDiceForPlayer(userid, DiceRemoveReason.Death);
 		return (HookResult)0;
 	}
@@ -985,8 +1059,16 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	{
 		//IL_0022: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0025: Unknown result type (might be due to invalid IL or missing references)
-		RemoveDiceForPlayer(@event.Userid, DiceRemoveReason.Disconnect);
-		_originalPlayerNames.Remove(@event.Userid);
+		CCSPlayerController disconnected = @event.Userid;
+		RemoveDiceForPlayer(disconnected, DiceRemoveReason.Disconnect);
+		if (disconnected != null)
+		{
+			// 控制器句柄可能被新加入的玩家复用，必须清掉所有以 controller 为键的状态，否则新玩家会继承
+			// "已掷骰 / 冷却中" 的旧记录。
+			_originalPlayerNames.Remove(disconnected);
+			_playersThatRolledTheDice.Remove(disconnected);
+			_PlayerCooldown.Remove(disconnected);
+		}
 		return (HookResult)0;
 	}
 
@@ -1088,6 +1170,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				changed = true;
 			}
 		}
+		DiceEffects.OnPlayerDamaged(victim, attacker);
 		return changed ? HookResult.Changed : HookResult.Continue;
 	}
 
@@ -1102,10 +1185,19 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	private void OnMapEnd()
 	{
 		DestroyModules();
+		Effects.ClearAll();
+		DiceEffects.ClearAll();
 		_isDuringRound = false;
 		_playersThatRolledTheDice.Clear();
 		_PlayerCooldown.Clear();
-		_diceUsageCount.Clear();
+		_originalPlayerNames.Clear();
+		// 地图结束做一次完整清理，避免状态带到下一张图。
+		Invulnerability.ClearAll();
+		MoveLockManager.ClearAll();
+		StackingHealth.ClearAll();
+		DamageBonusManager.ClearAll();
+		DamageReductionManager.ClearAll();
+		SpeedBonusManager.ClearAll();
 	}
 
 	private (string?, string?) RollTheDiceForPlayer(CCSPlayerController? player, string? diceName = null)
@@ -1131,13 +1223,9 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 						diceBlueprint.Remove(player, DiceRemoveReason.NewDice);
 					}
 					diceBlueprint.Add(player);
+					DiceEffects.OnDiceAdded(player, diceBlueprint.ClassName);
 					RefreshPlayerDiceName(player);
 					LogDebug($"{DateTime.Now:HH:mm:ss} ✓ {((CBasePlayerController)player).PlayerName} ← {diceBlueprint.ClassName}\n");
-					if (!_diceUsageCount.ContainsKey(diceBlueprint))
-					{
-						_diceUsageCount[diceBlueprint] = 0;
-					}
-					_diceUsageCount[diceBlueprint]++;
 					RefreshCombos(player);
 					AnnounceDiceRarity(player, diceBlueprint);
 					return (diceBlueprint.ClassName, diceBlueprint.Description);
@@ -1160,13 +1248,9 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 						diceBlueprint2.Remove(player, DiceRemoveReason.NewDice);
 					}
 					diceBlueprint2.Add(player);
+					DiceEffects.OnDiceAdded(player, diceBlueprint2.ClassName);
 					RefreshPlayerDiceName(player);
 					LogDebug($"{DateTime.Now:HH:mm:ss} ✓ {((CBasePlayerController)player).PlayerName} ← {diceName}\n");
-					if (!_diceUsageCount.ContainsKey(diceBlueprint2))
-					{
-						_diceUsageCount[diceBlueprint2] = 0;
-					}
-					_diceUsageCount[diceBlueprint2]++;
 					RefreshCombos(player);
 					AnnounceDiceRarity(player, diceBlueprint2);
 					return (diceBlueprint2.ClassName, diceBlueprint2.Description);
@@ -1187,7 +1271,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			return null;
 		}
-		RarityConfig rarity = Config?.Dices?.Rarity;
+		RarityConfig? rarity = CurrentRarity;
 		if (rarity != null && rarity.TierWeights != null && rarity.TierWeights.Count > 0)
 		{
 			Dictionary<string, List<DiceBlueprint>> byTier = new Dictionary<string, List<DiceBlueprint>>();
@@ -1249,9 +1333,16 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		return pool[pool.Count - 1];
 	}
 
+	/// <summary>
+	/// 当前生效的稀有度配置：地图配置（若命中）优先，否则回退全局。
+	/// 注意 <c>LoadMapConfig</c> 在无匹配地图时会把 <c>Dices</c> 直接指向全局 <c>Config.Dices</c>，
+	/// 所以"无地图配置"时这里就是全局值。
+	/// </summary>
+	private RarityConfig? CurrentRarity => _currentMapConfig?.Dices?.Rarity ?? Config?.Dices?.Rarity;
+
 	private string GetDiceTier(DiceBlueprint dice)
 	{
-		RarityConfig rarity = Config?.Dices?.Rarity;
+		RarityConfig? rarity = CurrentRarity;
 		if (rarity != null && rarity.DiceTier != null && rarity.DiceTier.TryGetValue(dice.ClassName, out string tier) && !string.IsNullOrEmpty(tier))
 		{
 			return tier;
@@ -1297,7 +1388,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			}
 			string prefix = ((BasePlugin)this).Localizer["command.prefix"].Value;
 			player.PrintToChat($" {prefix}{color}🎲 你抽到了 [{label}] {localized}");
-			if ((tier == "legendary" || tier == "combo") && (Config?.Dices?.Rarity?.BroadcastLegendary ?? true))
+			if ((tier == "legendary" || tier == "combo") && (CurrentRarity?.BroadcastLegendary ?? true))
 			{
 				Server.PrintToChatAll($" {prefix}{color}🌟 传说骰子降临！{((CBasePlayerController)player).PlayerName} 抽到了【{localized}】！");
 			}
@@ -1335,6 +1426,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				catch
 				{
 				}
+				DiceEffects.OnDiceRemoved(player, dix.ClassName);
 				flag = true;
 			}
 		}
@@ -1404,6 +1496,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 		_originalPlayerNames.Clear();
 		Invulnerability.ClearAll();
+		Effects.ClearAll();
+		DiceEffects.ClearAll();
 		RefreshCombos(null);
 	}
 
@@ -1524,10 +1618,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				DiceBlueprint item = (DiceBlueprint)Activator.CreateInstance(value, Config, _currentMapConfig, ((BasePlugin)this).Localizer);
 				_dices.Add(item);
 			}
-		}
-		foreach (DiceBlueprint dix in _dices)
-		{
-			_diceUsageCount.Add(dix, 0);
 		}
 		RegisterListeners();
 		RegisterEventHandlers();
@@ -1654,7 +1744,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			RecipientFilter val = new RecipientFilter();
 			val.Add(player);
 			RecipientFilter val2 = val;
-			((CBaseEntity)player).EmitSound(text, val2, 1f, 0f);
+			((CBaseEntity)player).EmitSound(text, val2, Math.Clamp(Config.Sounds.Volume, 0f, 1f), 0f);
 		}
 	}
 
@@ -1771,6 +1861,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			return false;
 		}
 		diceBlueprint.Remove(player);
+		DiceEffects.OnDiceRemoved(player, diceClassName);
 		_playersThatRolledTheDice.Remove(player);
 		RefreshPlayerDiceName(player);
 		RefreshCombos(player);
@@ -1796,7 +1887,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private int GetMaxDiceCount(CCSPlayerController player)
 	{
-		if (DeathKnightComplete.DeniedNextRound.Contains(((CBasePlayerController)player).SteamID))
+		if (DeathKnightComplete.IsDeniedThisRound(((CBasePlayerController)player).SteamID))
 		{
 			return 0;
 		}
@@ -1855,73 +1946,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			Console.WriteLine("[RollTheDice] Failed to create round backup: " + ex.Message);
 		}
-	}
-
-	public void OnHeartbeat()
-	{
-		_heartbeatCount++;
-		if (_heartbeatCount % 128 == 1)
-		{
-			try
-			{
-				int num = 0;
-				int num2 = 0;
-				foreach (DiceBlueprint dix in _dices)
-				{
-					if (dix.Listeners.Contains("OnTick"))
-					{
-						num++;
-					}
-					if (dix._players.Count > 0)
-					{
-						num2++;
-					}
-				}
-				StringBuilder stringBuilder = new StringBuilder();
-				StringBuilder stringBuilder2 = stringBuilder;
-				StringBuilder stringBuilder3 = stringBuilder2;
-				StringBuilder.AppendInterpolatedStringHandler handler = new StringBuilder.AppendInterpolatedStringHandler(13, 2, stringBuilder2);
-				handler.AppendFormatted(DateTime.Now, "HH:mm:ss");
-				handler.AppendLiteral(" <3 #");
-				handler.AppendFormatted(_heartbeatCount);
-				handler.AppendLiteral(" alive=[");
-				stringBuilder3.Append(ref handler);
-				foreach (CCSPlayerController item in from p in Utilities.GetPlayers()
-					where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV
-					select p)
-				{
-					stringBuilder2 = stringBuilder;
-					StringBuilder stringBuilder4 = stringBuilder2;
-					handler = new StringBuilder.AppendInterpolatedStringHandler(3, 2, stringBuilder2);
-					handler.AppendFormatted(((CBasePlayerController)item).PlayerName);
-					handler.AppendLiteral("(");
-					handler.AppendFormatted(((CBaseEntity)item).TeamNum);
-					handler.AppendLiteral(") ");
-					stringBuilder4.Append(ref handler);
-				}
-				stringBuilder2 = stringBuilder;
-				StringBuilder stringBuilder5 = stringBuilder2;
-				handler = new StringBuilder.AppendInterpolatedStringHandler(32, 3, stringBuilder2);
-				handler.AppendLiteral("] dices=");
-				handler.AppendFormatted(_dices.Count);
-				handler.AppendLiteral(" onTickDice=");
-				handler.AppendFormatted(num);
-				handler.AppendLiteral(" activeDice=");
-				handler.AppendFormatted(num2);
-				stringBuilder5.Append(ref handler);
-				stringBuilder2 = stringBuilder;
-				StringBuilder stringBuilder6 = stringBuilder2;
-				handler = new StringBuilder.AppendInterpolatedStringHandler(12, 1, stringBuilder2);
-				handler.AppendLiteral(" | tickTest=");
-				handler.AppendFormatted(_tickTest);
-				stringBuilder6.Append(ref handler);
-				LogDebug(stringBuilder?.ToString() + "\n");
-			}
-			catch
-			{
-			}
-		}
-		_tickTest++;
 	}
 
 	private void OnPlayerButtonsChanged(CCSPlayerController player, PlayerButtons pressed, PlayerButtons released)
@@ -2000,7 +2024,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		_playersThatRolledTheDice = new Dictionary<CCSPlayerController, int>();
 		_PlayerCooldown = new Dictionary<CCSPlayerController, int>();
 		_dices = new List<DiceBlueprint>();
-		_diceUsageCount = new Dictionary<DiceBlueprint, int>();
 		_originalPlayerNames = new Dictionary<CCSPlayerController, string>();
 		_random = new Random(Guid.NewGuid().GetHashCode());
 	}

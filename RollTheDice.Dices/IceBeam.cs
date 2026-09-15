@@ -98,6 +98,33 @@ public class IceBeam : DiceBlueprint
 				value.Kill();
 			}
 		}
+		// 解冻所有被冻结的敌方玩家：只 Kill 定时器会跳过它们的 Unlock，导致 MoveType=0 残留。
+		foreach (ulong steamId in _frozenSteamIDs)
+		{
+			CCSPlayerController victim = null;
+			foreach (CCSPlayerController candidate in Utilities.GetPlayers())
+			{
+				if (candidate != null && ((CEntityInstance)candidate).IsValid && ((CBasePlayerController)candidate).SteamID == steamId)
+				{
+					victim = candidate;
+					break;
+				}
+			}
+			if (victim == null)
+			{
+				MoveLockManager.Clear(steamId);
+				continue;
+			}
+			MoveLockManager.Unlock(victim, "IceBeam");
+			CCSPlayerPawn pawn = victim.PlayerPawn?.Value;
+			if (pawn != null && ((CEntityInstance)pawn).IsValid)
+			{
+				pawn.VelocityModifier = 1f;
+				((CBaseModelEntity)pawn).Render = Color.FromArgb(255, 255, 255, 255);
+				Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+				Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CBaseModelEntity", "m_clrRender", 0);
+			}
+		}
 		_frozenPlayers.Clear();
 		_frozenSteamIDs.Clear();
 	}

@@ -216,6 +216,7 @@ public class Fate : DiceBlueprint
 		_darktideFreezeUntil.Clear();
 		_dawnRespawnTime.Clear();
 		_dawnActivated.Clear();
+		_dawnOriginalMaxHealth.Clear();
 		_assignedThisRound = false;
 	}
 
@@ -410,7 +411,6 @@ public class Fate : DiceBlueprint
 						Schema.SetSchemaValue<int>(((NativeEntity)val5).Handle, "CBaseEntity", "m_nActualMoveType", 2);
 						((CBaseModelEntity)val5).Render = Color.FromArgb(255, 255, 255, 255);
 						Utilities.SetStateChanged((CBaseEntity)(object)val5, "CBaseModelEntity", "m_clrRender", 0);
-						((CBaseEntity)val5).TakesDamage = true;
 						player.PrintToCenterAlert("\ud83c\udf05 黎明降临！你已重生！");
 						Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83c\udf05 {((CBasePlayerController)player).PlayerName} 的命运·黎明降临！浴火重生！");
 					}
@@ -550,7 +550,6 @@ public class Fate : DiceBlueprint
 			{
 				continue;
 			}
-			((CBaseEntity)val2).TakesDamage = true;
 			MoveLockManager.Unlock(val, "FateWeb");
 			if (!val.IsBot && !((CBasePlayerController)val).IsHLTV)
 			{
@@ -615,6 +614,19 @@ public class Fate : DiceBlueprint
 			}
 		}
 		CCSPlayerController victim = (CCSPlayerController)obj2;
+		if ((CEntityInstance)(object)victim != (CEntityInstance)null && ((CEntityInstance)victim).IsValid)
+		{
+			ulong invSid = ((CBasePlayerController)victim).SteamID;
+			float invNow = Server.CurrentTime;
+			bool webInvuln = _webDeathTime.TryGetValue(invSid, out var webUntil) && invNow < webUntil;
+			bool darkInvuln = _darktideFreezeUntil.TryGetValue(invSid, out var darkUntil) && invNow < darkUntil;
+			bool dawnInvuln = _dawnRespawnTime.TryGetValue(invSid, out var dawnUntil) && invNow < dawnUntil;
+			if (webInvuln || darkInvuln || dawnInvuln)
+			{
+				info.Damage = 0f;
+				return (HookResult)1;
+			}
+		}
 		if ((CEntityInstance)(object)victim != (CEntityInstance)null && ((CEntityInstance)victim).IsValid && _assignments.TryGetValue(((CBasePlayerController)victim).SteamID, out string value5) && value5 == "web" && !_webTriggered.GetValueOrDefault(((CBasePlayerController)victim).SteamID))
 		{
 			int num = (int)((float)entity.Health - info.Damage);
@@ -685,7 +697,6 @@ public class Fate : DiceBlueprint
 							float webInvulDuration = _config.Dices.Fate.WebInvulDuration;
 							_webDeathTime[vSid] = Server.CurrentTime + webInvulDuration;
 							MoveLockManager.Lock(capV, "FateWeb");
-							((CBaseEntity)val4).TakesDamage = false;
 							capV.PrintToCenterAlert($"\ud83d\udd78 织网触发！与 {((CBasePlayerController)capE).PlayerName} 换位，无敌{webInvulDuration:F0}s...");
 							Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83d\udd78 {((CBasePlayerController)capV).PlayerName} 的命运·织网触发！与 {((CBasePlayerController)capE).PlayerName} 换位！");
 						}
@@ -746,7 +757,6 @@ public class Fate : DiceBlueprint
 							Schema.SetSchemaValue<int>(((NativeEntity)val).Handle, "CBaseEntity", "m_nActualMoveType", 0);
 							((CBaseModelEntity)val).Render = Color.FromArgb(255, 255, 215, 0);
 							Utilities.SetStateChanged((CBaseEntity)(object)val, "CBaseModelEntity", "m_clrRender", 0);
-							((CBaseEntity)val).TakesDamage = false;
 							capV.PrintToCenterAlert($"\ud83c\udf05 黎明将至...{freezeDur:F0}s后重生！");
 							Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83c\udf05 {((CBasePlayerController)capV).PlayerName} 的命运·黎明触发！{freezeDur:F0}s后重生！");
 						}

@@ -17,6 +17,8 @@ public class GuardianAngel : DiceBlueprint
 
 	private readonly HashSet<nint> _processingSave = new HashSet<nint>();
 
+	private readonly Dictionary<ulong, float> _invulnUntil = new Dictionary<ulong, float>();
+
 	public override string ClassName => "GuardianAngel";
 
 	public override List<string> Listeners
@@ -65,6 +67,7 @@ public class GuardianAngel : DiceBlueprint
 	{
 		_players.Remove(player);
 		_hasAngel.Remove(((CBasePlayerController)player).SteamID);
+		_invulnUntil.Remove(((CBasePlayerController)player).SteamID);
 	}
 
 	public override void Reset()
@@ -72,6 +75,7 @@ public class GuardianAngel : DiceBlueprint
 		_players.Clear();
 		_hasAngel.Clear();
 		_processingSave.Clear();
+		_invulnUntil.Clear();
 	}
 
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
@@ -106,7 +110,20 @@ public class GuardianAngel : DiceBlueprint
 			}
 		}
 		CCSPlayerController player = (CCSPlayerController)obj2;
-		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid || !_hasAngel.Contains(((CBasePlayerController)player).SteamID))
+		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid)
+		{
+			return (HookResult)0;
+		}
+		if (_invulnUntil.TryGetValue(((CBasePlayerController)player).SteamID, out var invulnUntil))
+		{
+			if (Server.CurrentTime < invulnUntil)
+			{
+				info.Damage = 0f;
+				return (HookResult)1;
+			}
+			_invulnUntil.Remove(((CBasePlayerController)player).SteamID);
+		}
+		if (!_hasAngel.Contains(((CBasePlayerController)player).SteamID))
 		{
 			return (HookResult)0;
 		}
@@ -122,7 +139,7 @@ public class GuardianAngel : DiceBlueprint
 		_processingSave.Add(((NativeEntity)entity).Handle);
 		info.Damage = 0f;
 		_hasAngel.Remove(((CBasePlayerController)player).SteamID);
-		entity.TakesDamage = false;
+		_invulnUntil[((CBasePlayerController)player).SteamID] = Server.CurrentTime + _config.Dices.GuardianAngel.InvincibilitySeconds;
 		Server.NextFrame((Action)delegate
 		{
 			//IL_0137: Unknown result type (might be due to invalid IL or missing references)
@@ -134,13 +151,6 @@ public class GuardianAngel : DiceBlueprint
 				entity.MaxHealth = Math.Max(num2, entity.MaxHealth);
 				Utilities.SetStateChanged(entity, "CBaseEntity", "m_iHealth", 0);
 				Utilities.SetStateChanged(entity, "CBaseEntity", "m_iMaxHealth", 0);
-				new Timer(_config.Dices.GuardianAngel.InvincibilitySeconds, (Action)delegate
-				{
-					if ((CEntityInstance)(object)entity != (CEntityInstance)null && ((CEntityInstance)entity).IsValid)
-					{
-						entity.TakesDamage = true;
-					}
-				}, (TimerFlags?)null);
 				if ((CEntityInstance)(object)player != (CEntityInstance)null && ((CEntityInstance)player).IsValid)
 				{
 					string text = _localizer["dice_GuardianAngel_saved"].Value.Replace("{hp}", num2.ToString());

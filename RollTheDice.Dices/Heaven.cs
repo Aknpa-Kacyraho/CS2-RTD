@@ -52,7 +52,6 @@ public class Heaven : DiceBlueprint
 		}
 		_players.Add(player);
 		_comboActive = DiceSynergy.HasPartner(player, "World") || DiceSynergy.HasPartner(player, "Izayoi");
-		RollTheDice.LogDebug($"[Heaven] Add: combo={_comboActive} selfWorld={(RollTheDice.Instance?.HasDiceActive(player, "World") ?? false)} selfIzayoi={(RollTheDice.Instance?.HasDiceActive(player, "Izayoi") ?? false)}\n");
 		if (_comboActive)
 		{
 			RollTheDice instance = RollTheDice.Instance;
@@ -75,7 +74,7 @@ public class Heaven : DiceBlueprint
 							instance.RemoveDiceFromPlayer(captured, "Izayoi");
 						}
 						instance.RemoveDiceFromPlayer(captured, "Heaven");
-						RollTheDice.LogDebug($"[Heaven] combo -> GrantComboDice(BeyondHeaven)={instance.GrantComboDice(captured, "BeyondHeaven")}\n");
+						instance.GrantComboDice(captured, "BeyondHeaven");
 					}
 				});
 				return;
@@ -117,14 +116,12 @@ public class Heaven : DiceBlueprint
 	public void OnPlayerButtonsChanged(CCSPlayerController player, PlayerButtons pressed, PlayerButtons released)
 	{
 		//IL_004c: Unknown result type (might be due to invalid IL or missing references)
-		RollTheDice.LogDebug($"[Heaven] E press: players={_players.Count} active={_active} contains={_players.Contains(player)} use={((Enum)pressed).HasFlag((Enum)(object)(PlayerButtons)32)}\n");
 		if (_players.Count != 0 && !_active && !((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && _players.Contains(player) && ((Enum)pressed).HasFlag((Enum)(object)(PlayerButtons)32) && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
 			_active = true;
 			_timescale = _config.Dices.Heaven.MinTimescale;
 			_nextStepTime = Server.CurrentTime + _config.Dices.Heaven.StepInterval;
 			Server.ExecuteCommand($"host_timescale {_timescale:F1}");
-			RollTheDice.LogDebug($"[Heaven] activated -> host_timescale {_timescale:F1}\n");
 			player.PrintToCenterAlert("\ud83c\udf0c 天堂之门开启！");
 			Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83c\udf0c {((CBasePlayerController)player).PlayerName} 打开了天堂之门！时间从{_config.Dices.Heaven.MinTimescale:F1}x加速！");
 		}

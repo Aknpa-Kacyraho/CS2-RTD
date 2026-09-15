@@ -37,6 +37,7 @@
 | **统一 buff 系统** | 伤害 / 减伤 / 移速经 `StackingBonusManager` 统一结算，支持叠层与限时 |
 | **统一无敌** | `Invulnerability` 由主插件伤害钩子统一拦截，复活类骰子共用 |
 | **作弊指令守卫 (CheatGuard)** | `sv_cheats 1` 环境下，仅 ≥2 真人时拦截非管理员的动作类作弊指令 |
+| **语义化粒子特效** | 169 个骰子逐一配粒子：抽到瞬间的爆发、击杀/受击/命中的事件特效，以及约 30 个「散发型」骰子在脚底留下的周期痕迹（火魔余烬 / 毒刃孢子 / 幽灵雾气…）。**不挂常驻光环**，不挡视线 |
 | **全中文界面** | 所有提示、骰子名、描述均已汉化 |
 | **高度可配置** | 每个骰子的参数均通过 JSON 配置，支持地图级覆盖 |
 
@@ -313,8 +314,10 @@ bind o rtd
 | `!givedice PlayerName` | 给指定玩家随机掷骰 |
 | `!givedice * DiceName` | 给所有玩家发指定骰子 |
 | `!givedice PlayerName DiceName` | 给指定玩家发指定骰子 |
+| `!rtdeffect <particles/....vpcf> [self\|crosshair\|near] [秒]` | 播放指定粒子（排查 / 预览特效用） |
 
 > 骰子名大小写不敏感，对应 `src/dices/` 目录中的类名（如 `Glow`、`IncreaseSpeed`）。
+> `rtdeffect` 的粒子路径可带 `.vpcf` 或 `.vpcf_c`（会自动归一化）。
 
 ### 服务器控制台命令
 
@@ -410,13 +413,41 @@ bind o rtd
 {
   "sounds": {
     "dice_sound": "sounds/ui/coin_pickup_01.vsnd",  // 掷骰音效（空字符串 = 禁用）
-    "play_on_command_only": false  // true = 仅手动 !rtd 播放音效
+    "play_on_command_only": false,  // true = 仅手动 !rtd 播放音效
+    "volume": 0.5  // 掷骰音效音量（0.0 ~ 1.0）
   },
   "precache": {
     "soundevent_file": "soundevents/soundevents_rollthedice.vsndevts"
   }
 }
 ```
+
+### 特效配置 (Particles / Effects)
+
+```jsonc
+{
+  "effects": {
+    "enabled": true,  // 总开关：false = 关闭全部粒子（性能/排查用）
+    "trails": true    // false = 只关「脚底周期痕迹」，保留抽到/击杀等触发特效
+  }
+}
+```
+
+每个骰子用哪种粒子写在源码 `src/RollTheDice.Utils/DiceEffects.cs` 的设计表里（一行一个骰子），
+不需要、也不要改各个骰子文件。粒子的触发方式分四类：
+
+| 触发 | 时机 | 例子 |
+|------|------|------|
+| `burst` | 抽到 / 施加该骰子的瞬间，在玩家身上放一次 | 火球 → 燃烧瓶爆炸 |
+| `trail` | 周期性在**脚底**留下一个小粒子（约 30 个「散发型」骰子才有） | 火魔 → 小火余烬；毒刃 → 孢子；幽灵 → 雾气 |
+| `onKill` / `onKillSelf` / `onDeath` | 击杀敌人 / 击杀时自己 / 自己阵亡 | 狙击精英 → 尸体爆头血 + 自己弹壳 |
+| `onHurt` / `onHit` | 自己受击 / 命中敌人（各 0.25s 节流） | 铁头功 → 头盔跳弹；圣骑士 → 护甲跳弹 |
+
+> **不再使用「常驻光环」**：旧版几乎每个骰子都往玩家身上挂一个常驻粒子（火系全是 `env_fire_large`），
+> 看起来就是一团火挂在身上、又丑又挡视线，现已全部移除，改为「脚底痕迹 + 事件触发」。
+
+**主机（listen server 本地客户端）看不到粒子？** 粒子资源通过 `OnServerPrecacheResources` 预缓存，
+该回调**只在载入地图时触发** → 必须换图或重启服务器才会生效，`css_reload` 不够。
 
 ### 稀有度配置
 
@@ -633,6 +664,12 @@ A: 检查：
 1. `configs/plugins/RollTheDice/RollTheDice.json` 中 `"enabled": true`
 2. CSS 控制台日志中是否有报错
 3. `css_plugins list` 确认插件已加载
+
+### Q: 主机（本地开房）看不到骰子粒子特效，队友却能看到？
+
+A: 这是 CS2 资源加载机制：粒子必须在地图载入时通过 `OnServerPrecacheResources` 预缓存，
+而该回调**只在载图时触发**。执行 `css_reload RollTheDice` 或重载配置**不足以**让主机看到特效，
+需要**换图或重启服务器**。联网队友一般不受影响。
 
 ---
 

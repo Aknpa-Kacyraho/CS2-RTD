@@ -25,6 +25,8 @@ public class Evolution : DiceBlueprint
 
 	private readonly Dictionary<CCSPlayerController, int> _hpStacks = new Dictionary<CCSPlayerController, int>();
 
+	private readonly Dictionary<CCSPlayerController, int> _originalMaxHealth = new Dictionary<CCSPlayerController, int>();
+
 	public override string ClassName => "Evolution";
 
 	public override List<string> Listeners
@@ -62,6 +64,7 @@ public class Evolution : DiceBlueprint
 			_damageStacks[player] = 0;
 			_speedStacks[player] = 0;
 			_hpStacks[player] = 0;
+			_originalMaxHealth[player] = ((CBaseEntity)player.PlayerPawn.Value).MaxHealth;
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
 				"playerName",
@@ -92,6 +95,7 @@ public class Evolution : DiceBlueprint
 		_damageStacks.Clear();
 		_speedStacks.Clear();
 		_hpStacks.Clear();
+		_originalMaxHealth.Clear();
 	}
 
 	public override void Destroy()
@@ -108,6 +112,22 @@ public class Evolution : DiceBlueprint
 			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
 			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
+		// 绝对值还原 HP 上限（避免与其它改 MaxHealth 的 dice 叠加时算错）。
+		if (_originalMaxHealth.TryGetValue(player, out int origMax)
+			&& (CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null
+			&& ((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		{
+			CCSPlayerPawn pawn = player.PlayerPawn.Value;
+			int newMax = Math.Max(1, origMax);
+			((CBaseEntity)pawn).MaxHealth = newMax;
+			if (((CBaseEntity)pawn).Health > newMax)
+			{
+				((CBaseEntity)pawn).Health = newMax;
+			}
+			Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CBaseEntity", "m_iMaxHealth", 0);
+			Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CBaseEntity", "m_iHealth", 0);
+		}
+		_originalMaxHealth.Remove(player);
 	}
 
 	public void OnTick()
