@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-GPLv3-blue)](LICENSE)
 
-**基于 [Kandru/cs2-roll-the-dice](https://github.com/Kandru/cs2-roll-the-dice) 的深度修改版**，新增 120+ 骰子、组合技系统（Combo Synergy）、多骰子叠加、两轮加权分布等大量新机制。
+**基于 [Kandru/cs2-roll-the-dice](https://github.com/Kandru/cs2-roll-the-dice) 的深度修改版**，扩展至 169 个骰子、65 对组合技（Combo Synergy）、四档稀有度抽取、多骰子叠加、统一无敌/buff 系统与作弊指令守卫等大量新机制。
 
 > **原项目**：[Kandru/cs2-roll-the-dice](https://github.com/Kandru/cs2-roll-the-dice) by [@Kandru](https://github.com/Kandru) & [@derkalle4](https://github.com/derkalle4)  
 > 本项目遵循 GPLv3 协议，保留原作者全部版权。
@@ -29,11 +29,14 @@
 
 | 特性 | 说明 |
 |------|------|
-| **157 个骰子** | 涵盖战斗、生存、团队、经济、全局等各类效果 |
-| **5 个合成骰子 (Combodice)** | 无法直接掷出，需特定骰子组合触发合成 |
-| **42 对组合技 (Combo Synergy)** | 两名玩家持有特定骰子对时双方效果翻倍 |
+| **169 个骰子** | 涵盖战斗、生存、团队、经济、全局等各类效果 |
+| **6 个合成 / 进化骰** | 冰巨龙、火巨龙、死亡骑士完全体、超越天堂、菲尼克斯、雷达站（稀有度 combo 档，仍可极低概率抽到） |
+| **65 对组合技 (Combo Synergy)** | 两名玩家持有特定骰子对时双方效果增强，按持有者同队实时判定 |
+| **四档稀有度抽取** | 普通 / 稀有 / 史诗 / 传说 + combo 档，权重与逐骰定档均可配置；抽到传说/combo 全服播报 |
 | **多骰子叠加** | 玩家可同时持有多个不同类型的骰子 |
-| **两轮加权分布** | 特殊骰子独立概率系统，普通骰子均匀分布 |
+| **统一 buff 系统** | 伤害 / 减伤 / 移速经 `StackingBonusManager` 统一结算，支持叠层与限时 |
+| **统一无敌** | `Invulnerability` 由主插件伤害钩子统一拦截，复活类骰子共用 |
+| **作弊指令守卫 (CheatGuard)** | `sv_cheats 1` 环境下，仅 ≥2 真人时拦截非管理员的动作类作弊指令 |
 | **全中文界面** | 所有提示、骰子名、描述均已汉化 |
 | **高度可配置** | 每个骰子的参数均通过 JSON 配置，支持地图级覆盖 |
 
@@ -77,6 +80,12 @@
 | `ReverseCausality` | 因果倒置 | 受伤延迟 5s，期间伤害翻倍 |
 | `Vampire` | 吸血鬼 | 造成伤害回复自身 HP |
 | `ReturnToSender` | 遣返 | 射击概率将敌人送回出生点 |
+| `Combo` | 连击 | 连续命中叠层：每层 +10% 伤害（上限 10 层），≥5 层每次命中回 5HP，满层 +15% 移速并标记敌人 5s |
+| `PainConverter` | 痛觉转化 | 受敌伤按掉血比例蓄痛（上限 100），按 E 释放 5s 爆发：伤害 / 移速 / 回血 |
+| `Anatomist` | 解剖学家 | 爆头伤害 ×1.6，非爆头伤害 ×0.8 |
+| `IronHead` | 铁头功 | 受到爆头伤害减少 99% |
+| `Guillotine` | 斩首 | 对 HP < 35% 的敌人造成致死伤害 |
+| `LastStand` | 最后一发 | 弹匣只剩最后一发时，该发伤害 ×3 |
 
 ### 🛡️ 生命与护甲
 
@@ -101,7 +110,9 @@
 | `Respawn` | 涅槃 | 死亡后复活 |
 | `InfiniteProliferation` | 无限增殖 | 复活 4 次，每次 HP 减半 |
 | `Emperor` | 皇帝 | 队友首次死亡后复活 |
-| `Phoenix` | 菲尼克斯 | 🔒 受致命伤触发涅槃，10s 无敌后爆炸回血 |
+| `Phoenix` | 菲尼克斯 | 受致命伤触发涅槃，10s 无敌后爆炸回血（combo 档） |
+| `Crouch` | 蹲伏 | 蹲下时减伤 30% 并每秒回复 5HP |
+| `Kinship` | 羁绊 | 队友阵亡时自己 1s 无敌；自己阵亡时存活队友 1s 无敌 |
 
 ### ⚡ 速度与移动
 
@@ -132,6 +143,7 @@
 | `SlyFox` | 狡猾狐狸 | 投掷物爆炸时间随机 |
 | `NoExplosives` | 哑火 | 随机 2 名敌人禁用爆炸物 |
 | `DecoyDummy` | 假人诱饵 | 获得真诱饵弹，定时补给 |
+| `ReloadGap` | 换弹窗口 | 换弹过程中减伤 80%，换完 3s 内伤害 +40% |
 
 ### 🌍 全局效果（影响全图）
 
@@ -175,7 +187,7 @@
 | `Paladin` | 圣骑士 | 200 额外护甲，受击叠加速度/HP |
 | `Necromancer` | 死灵法师 | 消耗 50HP 复活阵亡队友 |
 | `DivineResurrection` | 神迹 | 击杀概率复活队友 |
-| `Prophet` | 先知 | 直接看到对面所有骰子 |
+| `Prophet` | 先知 | 每 5s +1 层预知（上限 10），每层抵挡一次敌人伤害 |
 | `ImposterSyndrome` | 第六感 | 被雷达发现时通知 + 诱饵弹高亮敌人 |
 
 ### 🌀 特殊机制
@@ -192,8 +204,6 @@
 | `Evolution` | 进化 | 每 25s 随机进化，最多 5 次 |
 | `Corona` | 日冕 | 45s 后烧死 → 复活为太阳神 |
 | `Countdown` | 倒计时 | 时间到回溯出生点满状态 |
-| `Rewind` | 回溯求源 | 按 E 全员时间回溯 |
-| `Universe` | 宇宙 | 死亡自动时间回溯（上限 2 次） |
 | `Izayoi` | 十六夜 | 时间之力躁动 |
 | `Heaven` | 天堂 | 按 E 打开天堂之门，时间加速 |
 | `Afterimage` | 残影 | 留下空间残影，按 E 时空回溯 |
@@ -217,7 +227,7 @@
 | `Tactician` | 军师 | 每 15s 暴露敌人位置 1s |
 | `InfoHole` | 信息黑洞 | 敌方雷达屏蔽 |
 | `RadarJammer` | 雷达干扰 | 击杀后黑敌人雷达 20s |
-| `RadarStation` | 雷达站 | 🔒 所有敌人发光，移速 ×0.6 |
+| `RadarStation` | 雷达站 | 所有敌人发光，移速 ×0.6（combo 档） |
 | `ShadowWarrior` | 影子武士 | 按 E 召唤分身 |
 | `Hermit` | 隐者 | 脚步无声，几乎完全隐身 |
 | `LaserCage` | 激光牢笼 | 旋转激光牢笼环绕 |
@@ -233,27 +243,31 @@
 | `Molt` | 蜕皮 | 死亡复活，体型缩小 |
 | `DeathKnight` | 死亡骑士 | 每失 1HP 获得 1% 减伤，持刀回血 |
 | `Frostmourne` | 霜之哀伤 | 持刀 60% 减伤 + 回血 |
-| `God` | 上帝 | 666HP + 666 甲 + 2 倍速 + 1.5 倍伤害 |
+| `God` | 上帝 | 90s 试炼：3× 移速 / 3× 伤害、+500 护甲、60% 减伤；击杀回 150HP 并短暂无敌 |
 | `Knight` | 骑士 | 300HP，队友定期吸取 50HP |
 | `Prayer` | 祈愿 | 每 20s 祈祷，成功 3 次全灭敌方 |
 | `Wolf` | 狼 | 每只狼给所有狼 +30HP +30 甲 +10% 伤害 +10% 速度 |
 | `WolfKing` | 狼王 | 300HP +40% 伤害 +40% 速度，队友必定得狼 |
 | `Fibonacci` | 斐波那契 | 受到斐波那契数列伤害时免疫 + 回复 |
 | `Deaf` | 失聪 | 失聪 + 按 E 透视敌人 |
+| `Rally` | 集结 | 400~500 码内每名存活队友为自己与附近队友提供光环伤害 / 减伤（上限 5 层） |
+| `Echo` | 回音 | 命中敌人 0.8s 后对同一目标追加一次回音伤害 |
+| `Curse` | 怨念 | 自身阵亡后标记击杀者受伤增加，存活队友获得短时伤害加成 |
+| `Yagorou` | 亚戈鲁 | 击杀后短时无敌；每回合一次致命伤免疫 |
+| `Teneril` | 忒尼尔 | 队友阵亡时随机诅咒一名敌人（减速 + 削减当前血量） |
 
-### 🔒 合成骰子 (Combodice)
+### 🧬 合成 / 进化骰（稀有度 combo 档）
 
-> 无法通过 `!rtd` 随机抽取，必须满足条件后触发合成。
+> 平时主要通过特定骰子组合合成触发；同时也以 combo 档（权重 2）参与随机抽取，极难直接抽到。`DragonSoul`（巨龙之魂）与 `WolfKing`（狼王）为独立特殊池。
 
 | 类名 | 骰子名 | 合成条件 |
 |------|--------|---------|
 | `IceDragon` | 冰巨龙 | 双龙魂触发：222HP + 333 甲，攻击附冰冻 |
 | `FireDragon` | 火巨龙 | 双龙魂触发：333HP + 222 甲，攻击附灼烧 |
 | `DeathKnightComplete` | 死亡骑士完全体 | 死亡骑士 + 霜之哀伤：333HP/333 甲，99% 减伤 |
-| `BeyondHeaven` | 超越天堂 | 世界/十六夜 + 天堂：按 E 暂停时间 9s |
+| `BeyondHeaven` | 超越天堂 | 世界/十六夜 + 天堂：按 E 暂停时间 9s，其他玩家无法移动/开火 |
 | `Phoenix` | 菲尼克斯 | 彼岸 + 守护天使：受致命伤触发涅槃 |
-
-> 标记 🔒 的骰子 `CanBeDrawn = false`，不可通过 `!rtd` 随机获取。
+| `RadarStation` | 雷达站 | 所有敌人发光，自身移速 ×0.6 |
 
 ---
 
@@ -404,6 +418,56 @@ bind o rtd
 }
 ```
 
+### 稀有度配置
+
+```jsonc
+{
+  "dices": {
+    "rarity": {
+      "tier_weights": { "common": 70, "rare": 20, "epic": 6, "legendary": 2, "combo": 2 },
+      "broadcast_legendary": true,
+      "dice_tier": {
+        "Fate": "legendary",
+        "God": "legendary",
+        "Shield": "rare",
+        "GunGod": "rare",
+        "Anatomist": "common"
+        // ... 未列出的默认 common
+      }
+    }
+  }
+}
+```
+
+- `tier_weights`：各档位抽取权重（会按当前池中实际出现的档位归一化，所以档位概率即配置值）。
+- `dice_tier`：逐骰定档；完整清单见仓库 `docs/dice-cn-tier.txt` 与 `docs/dice-rarity-list.md`。
+- `broadcast_legendary`：抽到传说 / combo 时是否全服播报（默认 `true`）。
+
+### 作弊指令守卫 (CheatGuard)
+
+dice 的「无扩散」「时间」类效果需要服务器 `sv_cheats 1`，为防止加入的玩家借此开挂，插件内置守卫：
+
+```jsonc
+{
+  "cheat_guard": {
+    "enabled": true,
+    "bypass_permission": "@css/root",
+    "blocked_commands": [
+      "noclip", "god", "buddha", "notarget", "hurtme",
+      "give", "impulse",
+      "setpos", "setang", "setpos_exact", "setang_exact", "getpos",
+      "ent_create", "ent_remove", "ent_remove_all", "ent_fire", "ent_dump", "ent_info", "ent_text", "ent_teleport", "ent_bbox",
+      "thirdperson"
+    ]
+  }
+}
+```
+
+- 只拦「玩家动作类」作弊，**不拦** `sv_*` / `mp_*` / `bot_*` / `map` / `changelevel`（避免误伤引擎与开局流程）；也不拦普通玩家的 `drop`（丢枪指令）。
+- **只在 ≥2 个真人（非 bot/HLTV）时启用**：单机 / 本地人机完全不受影响。
+- `bypass_permission` 指定的管理员始终放行。
+- 客户端本地 cvar（透视 `r_drawothermodels`、线框 `mat_wireframe`）服务器收不到，无法拦截 —— 引擎层限制。
+
 ---
 
 ## 平衡性调整指南
@@ -460,13 +524,14 @@ bind o rtd
 
 ### 进阶：理解骰子分发机制
 
-本版使用**两轮加权分布**系统：
+本版使用**四档稀有度两段式抽取**：
 
-1. **第一轮**：每位玩家从普通骰子池（150 个，Weight = 1.0）均匀随机抽取
-2. **特殊骰子**：`DragonSoul`（巨龙之魂）、`WolfKing`（狼王）有独立触发概率
-   - 持有特殊骰子的玩家锁定，不参与第二轮
-   - 第二轮中，剩余玩家独立计算是否获得特殊骰子的奖励
-3. **组合骰子**：`IceDragon`、`FireDragon`、`DeathKnightComplete`、`BeyondHeaven`、`Phoenix` 不可随机抽取，只能通过 combo 合成
+1. **定档**：每个骰子在 `dices.rarity.dice_tier` 中有一个档位（`common` / `rare` / `epic` / `legendary` / `combo`），未列出的默认 `common`。
+2. **选档**：在「当前可抽取池中实际出现的档位」之间按 `dices.rarity.tier_weights` 归一化抽取 —— 因此档位概率就等于配置值，不随各档骰子数量偏移。默认权重：普通 70 / 稀有 20 / 史诗 6 / 传说 2 / combo 2。
+3. **选骰**：在该档位内均匀随机选一个骰子。
+4. **特殊池**：`DragonSoul`、`WolfKing` 为 `IsSpecial`，走独立概率池，不参与上述档位抽取。
+
+抽到 `legendary` 或 `combo` 时默认全服播报（`broadcast_legendary`），每个骰子都会按档位颜色给玩家发一条「🎲 你抽到了 [档位] 名字」。
 
 ### 调整特殊骰子概率
 
@@ -544,11 +609,11 @@ dotnet publish
 
 ### Q: 为什么有些骰子从没见过？
 
-A: 157 个骰子均匀分布，特定骰子出现概率约为 1/157 ≈ 0.64%。此外，5 个组合骰子（冰巨龙、火巨龙、死亡骑士完全体、超越天堂、菲尼克斯）完全无法随机抽取，必须满足 combo 条件。
+A: 骰子按稀有度两段式抽取：先按 `tier_weights`（普通 70 / 稀有 20 / 史诗 6 / 传说 2 / combo 2）选档，再在该档内均匀抽一个。传说档总概率仅 2%，单个传说骰概率更低；combo 档（冰巨龙、火巨龙、死亡骑士完全体、超越天堂、菲尼克斯、雷达站）平时主要靠合成触发。
 
 ### Q: 组合技为什么很少触发？
 
-A: 两个特定骰子同时出现在两人的概率 ≈ 1/22500。这是数学事实，不是 bug。想体验 combo 可以用 `!givedice` 命令手动测试。
+A: 骰子池有 169 个，两人同时抽到特定一对骰子的概率极低。这是数学事实，不是 bug。想体验 combo 可以用 `!givedice` 命令手动测试。
 
 ### Q: 如何测试某个骰子？
 
