@@ -147,6 +147,7 @@ public class BeyondHeaven : DiceBlueprint
 					continue;
 				}
 				MoveLockManager.Lock(other, "BeyondHeaven");
+				FreezeFiring(other);
 			}
 			CCSPlayerController holder = FindBySteamId(kv.Key);
 			if (holder != null)
@@ -170,6 +171,7 @@ public class BeyondHeaven : DiceBlueprint
 				continue;
 			}
 			MoveLockManager.Lock(other, "BeyondHeaven");
+			FreezeFiring(other);
 		}
 	}
 
@@ -185,8 +187,45 @@ public class BeyondHeaven : DiceBlueprint
 			if (player != null && player.IsValid)
 			{
 				MoveLockManager.Unlock(player, "BeyondHeaven");
+				RestoreFiring(player);
 			}
 		}
+	}
+
+	/// <summary>
+	/// 时间暂停期间压制被冻结者的开火：把当前武器的下次允许攻击 tick 推到 2 tick 之后（每 tick 刷新）。
+	/// 仅靠 MoveType=0 只能冻结移动，不能阻止开枪。
+	/// </summary>
+	private static void FreezeFiring(CCSPlayerController player)
+	{
+		CBasePlayerWeapon weapon = GetActiveWeapon(player);
+		if (weapon != null && weapon.IsValid)
+		{
+			int until = Server.TickCount + 2;
+			weapon.NextPrimaryAttackTick = until;
+			weapon.NextSecondaryAttackTick = until;
+		}
+	}
+
+	private static void RestoreFiring(CCSPlayerController player)
+	{
+		CBasePlayerWeapon weapon = GetActiveWeapon(player);
+		if (weapon != null && weapon.IsValid)
+		{
+			weapon.NextPrimaryAttackTick = Server.TickCount;
+			weapon.NextSecondaryAttackTick = Server.TickCount;
+		}
+	}
+
+	private static CBasePlayerWeapon? GetActiveWeapon(CCSPlayerController player)
+	{
+		CCSPlayerPawn pawn = player?.PlayerPawn?.Value;
+		if (pawn == null || !pawn.IsValid)
+		{
+			return null;
+		}
+		CPlayer_WeaponServices services = ((CBasePlayerPawn)pawn).WeaponServices;
+		return services?.ActiveWeapon?.Value;
 	}
 
 	private static CCSPlayerController? FindBySteamId(ulong steamId)

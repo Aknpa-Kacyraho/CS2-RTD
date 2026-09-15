@@ -572,7 +572,7 @@
   "dice_Cthulhu_player": "召唤克苏恩！1HP锁死+无法移动，每秒敌人-1%移速-1HP，100s后全灭",
   "dice_BeyondHeaven_name": "超越天堂",
   "dice_BeyondHeaven_other": "{purple}[RollTheDice] {green}{playerName} {default}超越了天堂！世界/十六夜+天堂！",
-  "dice_BeyondHeaven_player": "按E暂停时间9s，可移动攻击杀人，仅一次",
+  "dice_BeyondHeaven_player": "按E暂停时间9s：其他玩家无法移动/开火，自己可自由行动，仅一次",
   "dice_Combo_name": "连击",
   "dice_Combo_other": "{purple}[RollTheDice] {green}{playerName} {default}进入了连击状态！",
   "dice_Combo_player": "连续命中敌人叠层：每层+10%伤害(上限10层)，≥5层每次命中回5HP，满层+15%移速并标记敌人5s；3秒未命中清零",

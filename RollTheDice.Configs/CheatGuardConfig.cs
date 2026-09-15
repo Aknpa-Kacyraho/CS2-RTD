@@ -32,8 +32,8 @@ public class CheatGuardConfig
 	{
 		// 移动/生存类作弊
 		"noclip", "god", "buddha", "notarget", "hurtme",
-		// 物品/武器
-		"give", "impulse", "drop",
+		// 物品/武器（注意：不要加 "drop"——它是普通玩家的丢枪指令，不是作弊，会误伤）
+		"give", "impulse",
 		// 传送/位置
 		"setpos", "setang", "setpos_exact", "setang_exact", "getpos",
 		// 实体刷取/编辑

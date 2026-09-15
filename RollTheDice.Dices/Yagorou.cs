@@ -84,6 +84,7 @@ public class Yagorou : DiceBlueprint
 		{
 			_invulnUntil[steamID] = until;
 		}
+		RollTheDice.LogDebug($"[Yagorou] kill: killer={steamID} invulnUntil={until:F2} now={Server.CurrentTime:F2}\n");
 		killer.PrintToCenterAlert($"亚戈鲁：击杀无敌 {_config.Dices.Yagorou.KillInvulnSeconds:F1}s");
 		return (HookResult)0;
 	}
@@ -120,6 +121,10 @@ public class Yagorou : DiceBlueprint
 			return (HookResult)0;
 		}
 		ulong steamID = ((CBasePlayerController)player).SteamID;
+		if (_invulnUntil.Count > 0 || _lethalSaves.Count > 0)
+		{
+			RollTheDice.LogDebug($"[Yagorou] dmg: sid={steamID} hp={((CBaseEntity)pawn).Health} dmg={info.Damage} invuln={_invulnUntil.ContainsKey(steamID)} saves={(_lethalSaves.TryGetValue(steamID, out var _s) ? _s : -1)} now={Server.CurrentTime:F2}\n");
+		}
 		if (_invulnUntil.TryGetValue(steamID, out float until))
 		{
 			if (Server.CurrentTime < until)

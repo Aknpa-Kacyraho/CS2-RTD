@@ -55,6 +55,7 @@ public class Phoenix : DiceBlueprint
 			_players.Add(player);
 			_phoenixExploded[player] = false;
 			_cooldownEnd[player] = 0f;
+			RollTheDice.LogDebug($"[Phoenix] Add: steamid={((CBasePlayerController)player).SteamID} players={_players.Count}\n");
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
 				"playerName",
@@ -114,6 +115,7 @@ public class Phoenix : DiceBlueprint
 	public void TriggerPhoenixRevive(CCSPlayerController player)
 	{
 		CCSPlayerPawn val = ((player == null) ? null : player.PlayerPawn?.Value);
+		RollTheDice.LogDebug($"[Phoenix] TriggerPhoenixRevive: pawnValid={(val != null && ((CEntityInstance)val).IsValid)}\n");
 		if (val != null && ((CEntityInstance)val).IsValid)
 		{
 			float num = Server.CurrentTime;
@@ -162,6 +164,13 @@ public class Phoenix : DiceBlueprint
 			}
 		}
 		CCSPlayerController val = (CCSPlayerController)obj2;
+		if (_players.Count > 0)
+		{
+			bool valOk = val != null && ((CEntityInstance)val).IsValid;
+			bool contains = valOk && _players.Contains(val);
+			string cool = (valOk && _cooldownEnd.TryGetValue(val, out var _c)) ? _c.ToString("F2") : "?";
+			RollTheDice.LogDebug($"[Phoenix] dmg: players={_players.Count} valid={valOk} contains={contains} hp={(valOk ? entity.Health : -1)} dmg={info.Damage} coolEnd={cool}\n");
+		}
 		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid || !_players.Contains(val))
 		{
 			return (HookResult)0;
@@ -179,8 +188,10 @@ public class Phoenix : DiceBlueprint
 		int num2 = entity.Health - (int)float.Round(info.Damage);
 		if (num2 > 0)
 		{
+			RollTheDice.LogDebug($"[Phoenix] notLethal: hp={entity.Health} dmg={info.Damage} -> continue\n");
 			return (HookResult)0;
 		}
+		RollTheDice.LogDebug($"[Phoenix] LETHAL -> revive: hp={entity.Health} dmg={info.Damage}\n");
 		info.Damage = 0f;
 		_phoenixExploded[val] = false;
 		CCSPlayerPawn val2 = ((NativeObject)entity).As<CCSPlayerPawn>();
