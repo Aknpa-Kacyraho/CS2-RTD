@@ -184,7 +184,11 @@ public class Titanfall : DiceBlueprint
 					int valueOrDefault2 = _initialHP.GetValueOrDefault(item, 100);
 					int valueOrDefault3 = _initialArmor.GetValueOrDefault(item, 0);
 					((CBaseEntity)value).MaxHealth = (int)float.Round((float)valueOrDefault2 + (float)(titanHP - valueOrDefault2) * num4);
-					((CBaseEntity)value).Health = ((CBaseEntity)value).MaxHealth;
+					// 只插值上限，不每 tick 回满血（否则锁定期几乎免死）。
+					if (((CBaseEntity)value).Health > ((CBaseEntity)value).MaxHealth)
+					{
+						((CBaseEntity)value).Health = ((CBaseEntity)value).MaxHealth;
+					}
 					value.ArmorValue = (int)float.Round((float)valueOrDefault3 + (float)(titanArmor - valueOrDefault3) * num4);
 					Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iMaxHealth", 0);
 					Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iHealth", 0);

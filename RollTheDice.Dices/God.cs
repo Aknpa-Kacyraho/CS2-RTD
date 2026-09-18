@@ -11,25 +11,21 @@ using RollTheDice.Utils;
 namespace RollTheDice.Dices;
 
 /// <summary>
-/// 神王 God：神之试炼——获得高额移速/伤害/护甲，但限时内未击杀则失去全部；每次击杀刷新时限。
-/// 与 Goddess 组合（神之共鸣）。
+/// 神王 God：整个回合保持 666 生命 / 666 护甲、伤害翻倍并附带减伤；击杀敌人回少量血并获得短暂无敌。
+/// （2026-09-18 重做：删除限时试炼，改为稳定形态，避免"不杀人即全损"的净负面体验。）
 /// </summary>
 public class God : DiceBlueprint
 {
-	private sealed class TrialState
+	private sealed class GodState
 	{
 		public int OriginalArmor;
 
-		public float Deadline;
-
-		public bool Active;
+		public int OriginalMaxHealth;
 	}
 
-	private readonly Dictionary<CCSPlayerController, TrialState> _states = new Dictionary<CCSPlayerController, TrialState>();
+	private readonly Dictionary<CCSPlayerController, GodState> _states = new Dictionary<CCSPlayerController, GodState>();
 
 	public override string ClassName => "God";
-
-	public override List<string> Listeners => new List<string> { "OnTick" };
 
 	public override List<string> Events => new List<string> { "EventPlayerDeath" };
 
@@ -45,15 +41,20 @@ public class God : DiceBlueprint
 		{
 			return;
 		}
+		CCSPlayerPawn pawn = player.PlayerPawn.Value;
 		_players.Add(player);
-		_states[player] = new TrialState
+		_states[player] = new GodState
 		{
-			OriginalArmor = player.PlayerPawn.Value.ArmorValue
+			OriginalArmor = pawn.ArmorValue,
+			OriginalMaxHealth = pawn.MaxHealth
 		};
-		Activate(player);
+		ApplyGodform(player, fullHeal: true);
+		DamageBonusManager.Register(player, ClassName, _config.Dices.God.DamageMultiplier - 1f);
+		DamageReductionManager.Register(player, ClassName, _config.Dices.God.DamageReduction);
+		Invulnerability.Grant(player, _config.Dices.God.InvulnSeconds);
 		if (DiceSynergy.HasPartner(player, "Goddess"))
 		{
-			DiceSynergy.AnnounceCombo(player, "神之共鸣", "神之力时限延长！");
+			DiceSynergy.AnnounceCombo(player, "神之共鸣", "神之力回血翻倍！");
 		}
 		NotifyPlayers(player, ClassName, new Dictionary<string, string>
 		{
@@ -66,7 +67,7 @@ public class God : DiceBlueprint
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
-		Expire(player);
+		Restore(player);
 		_states.Remove(player);
 		_players.Remove(player);
 	}
@@ -75,7 +76,7 @@ public class God : DiceBlueprint
 	{
 		foreach (CCSPlayerController player in _players.ToList())
 		{
-			Expire(player);
+			Restore(player);
 		}
 		_states.Clear();
 		_players.Clear();
@@ -84,27 +85,6 @@ public class God : DiceBlueprint
 	public override void Destroy()
 	{
 		Reset();
-	}
-
-	public void OnTick()
-	{
-		if (_players.Count == 0)
-		{
-			return;
-		}
-		float now = Server.CurrentTime;
-		foreach (CCSPlayerController player in _players.ToList())
-		{
-			if (!_states.TryGetValue(player, out TrialState state) || !state.Active)
-			{
-				continue;
-			}
-			if (now >= state.Deadline)
-			{
-				Expire(player);
-				player?.PrintToCenterAlert("神之试炼失败！失去全部神力");
-			}
-		}
 	}
 
 	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
@@ -123,74 +103,69 @@ public class God : DiceBlueprint
 		{
 			return HookResult.Continue;
 		}
-		Activate(attacker);
 		HealOnKill(attacker);
+		Invulnerability.Grant(attacker, _config.Dices.God.InvulnSeconds);
+		ApplyGodform(attacker, fullHeal: false);
 		return HookResult.Continue;
 	}
 
 	private void HealOnKill(CCSPlayerController player)
 	{
-		if (player == null || !player.IsValid)
-		{
-			return;
-		}
-		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
+		CCSPlayerPawn pawn = player?.PlayerPawn?.Value;
 		if (pawn == null || !pawn.IsValid)
 		{
 			return;
 		}
-		int heal = _config.Dices.God.HealOnKill;
-		if (heal > 0)
+		GodConfig cfg = _config.Dices.God;
+		if (cfg.HealOnKill <= 0)
 		{
-			pawn.Health = Math.Min(pawn.Health + heal, pawn.MaxHealth);
-			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
+			return;
 		}
+		int heal = cfg.HealOnKill * (DiceSynergy.HasPartner(player, "Goddess") ? 2 : 1);
+		pawn.Health = Math.Min(pawn.Health + heal, pawn.MaxHealth);
+		Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
 	}
 
-	private void Activate(CCSPlayerController player)
+	/// <param name="fullHeal">首次获得时灌满 666；击杀刷新只维持上限/护甲，不回满。</param>
+	private void ApplyGodform(CCSPlayerController player, bool fullHeal)
 	{
-		if (player == null || !player.IsValid || !_states.TryGetValue(player, out TrialState state))
+		CCSPlayerPawn pawn = player?.PlayerPawn?.Value;
+		if (pawn == null || !pawn.IsValid)
 		{
 			return;
 		}
 		GodConfig cfg = _config.Dices.God;
-		float duration = DiceSynergy.HasPartner(player, "Goddess") ? cfg.Duration * 1.5f : cfg.Duration;
-		state.Deadline = Server.CurrentTime + duration;
-		state.Active = true;
-		SpeedBonusManager.Register(player, ClassName, cfg.SpeedMultiplier - 1f);
-		DamageBonusManager.Register(player, ClassName, cfg.DamageMultiplier - 1f);
-		DamageReductionManager.Register(player, ClassName, cfg.DamageReduction);
-		Invulnerability.Grant(player, cfg.InvulnSeconds);
-		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
-		if (pawn != null && pawn.IsValid)
+		pawn.MaxHealth = cfg.MaxHealth;
+		Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iMaxHealth", 0);
+		if (fullHeal)
 		{
-			pawn.ArmorValue = state.OriginalArmor + cfg.ArmorBonus;
-			Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_ArmorValue", 0);
-			pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
-			Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+			pawn.Health = cfg.MaxHealth;
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
 		}
+		pawn.ArmorValue = cfg.ArmorValue;
+		Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_ArmorValue", 0);
 	}
 
-	private void Expire(CCSPlayerController player)
+	private void Restore(CCSPlayerController player)
 	{
-		if (player == null || !player.IsValid || !_states.TryGetValue(player, out TrialState state))
+		if (player == null || !player.IsValid || !_states.TryGetValue(player, out GodState state))
 		{
 			return;
 		}
-		state.Active = false;
-		SpeedBonusManager.Unregister(player, ClassName);
 		DamageBonusManager.Unregister(player, ClassName);
 		DamageReductionManager.Unregister(player, ClassName);
 		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
 		if (pawn != null && pawn.IsValid)
 		{
-			if (pawn.ArmorValue > state.OriginalArmor)
+			pawn.MaxHealth = state.OriginalMaxHealth;
+			if (pawn.Health > state.OriginalMaxHealth)
 			{
-				pawn.ArmorValue = state.OriginalArmor;
-				Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_ArmorValue", 0);
+				pawn.Health = state.OriginalMaxHealth;
 			}
-			pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
-			Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iMaxHealth", 0);
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
+			pawn.ArmorValue = state.OriginalArmor;
+			Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_ArmorValue", 0);
 		}
 	}
 }

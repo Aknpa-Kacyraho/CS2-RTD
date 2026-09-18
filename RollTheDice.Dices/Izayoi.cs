@@ -1,17 +1,19 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Timers;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 十六夜 Izayoi：周期性进入时间加速，自身获得大幅移速加成。
+/// （2026-09-18 重做：原实现用全局 host_timescale 随机加减速，敌我一视同仁、会坑自己；现改为个人时间加速。）
+/// </summary>
 public class Izayoi : DiceBlueprint
 {
 	private bool _comboActive;
@@ -20,11 +22,7 @@ public class Izayoi : DiceBlueprint
 
 	private readonly Dictionary<CCSPlayerController, float> _nextTriggerTime = new Dictionary<CCSPlayerController, float>();
 
-	private static readonly float[] Timescales = new float[11]
-	{
-		0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1f, 1.1f, 1.2f, 1.3f, 1.4f,
-		1.5f
-	};
+	private readonly Dictionary<CCSPlayerController, float> _speedEndTime = new Dictionary<CCSPlayerController, float>();
 
 	public override string ClassName => "Izayoi";
 
@@ -82,44 +80,79 @@ public class Izayoi : DiceBlueprint
 			"playerName",
 			((CBasePlayerController)player).PlayerName
 		} });
+		player.PrintToCenterAlert("⏳ 十六夜！时间加速将周期降临！");
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
+		if (player != null && player.IsValid)
+		{
+			SpeedBonusManager.Unregister(player, "IzayoiTime");
+		}
 		_players.Remove(player);
 		_nextTriggerTime.Remove(player);
+		_speedEndTime.Remove(player);
 	}
 
 	public override void Reset()
 	{
+		foreach (CCSPlayerController item in _players.ToList())
+		{
+			if (item != null && item.IsValid)
+			{
+				SpeedBonusManager.Unregister(item, "IzayoiTime");
+			}
+		}
 		_players.Clear();
 		_nextTriggerTime.Clear();
+		_speedEndTime.Clear();
+	}
+
+	public override void Destroy()
+	{
+		Reset();
 	}
 
 	public void OnTick()
 	{
-		//IL_01b2: Unknown result type (might be due to invalid IL or missing references)
 		if (_players.Count == 0)
 		{
 			return;
 		}
 		float num = Server.CurrentTime;
+		float duration = _config.Dices.Izayoi.DurationSeconds;
 		foreach (CCSPlayerController item in _players.ToList())
 		{
 			try
 			{
-				if (!((CEntityInstance)(object)item == (CEntityInstance)null) && ((CEntityInstance)item).IsValid && _nextTriggerTime.TryGetValue(item, out var value) && !(num < value))
+				if (item == null || !item.IsValid || item.PlayerPawn?.Value == null || !item.PlayerPawn.Value.IsValid)
 				{
-					float num2 = Timescales[_random.Next(Timescales.Length)];
-					float durationSeconds = _config.Dices.Izayoi.DurationSeconds;
-					string text = ((num2 < 1f) ? $"减速 ({num2}x)" : ((num2 > 1f) ? $"加速 ({num2}x)" : $"正常 ({num2}x)"));
-					Server.ExecuteCommand("host_timescale " + num2.ToString(CultureInfo.InvariantCulture));
-					Server.PrintToChatAll("⏳ 时间被扰动了！" + text);
-					new Timer(durationSeconds, (Action)delegate
+					continue;
+				}
+				if (_speedEndTime.TryGetValue(item, out float endTime))
+				{
+					if (num >= endTime)
 					{
-						Server.ExecuteCommand("host_timescale 1.0");
-					}, (TimerFlags?)null);
+						_speedEndTime.Remove(item);
+						SpeedBonusManager.Unregister(item, "IzayoiTime");
+						item.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item, 100f);
+						Utilities.SetStateChanged(item.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+					}
+					else
+					{
+						item.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item, 100f);
+						Utilities.SetStateChanged(item.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+					}
+				}
+				if (_nextTriggerTime.TryGetValue(item, out float next) && num >= next)
+				{
 					_nextTriggerTime[item] = num + _config.Dices.Izayoi.IntervalSeconds;
+					float mult = 1.5f + (float)_random.NextDouble() * 0.7f;
+					SpeedBonusManager.Register(item, "IzayoiTime", mult - 1f);
+					_speedEndTime[item] = num + duration;
+					item.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item, 100f);
+					Utilities.SetStateChanged(item.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+					item.PrintToCenterAlert($"⏳ 时间加速！移速 ×{mult:F1}，{duration:F0}s");
 				}
 			}
 			catch

@@ -11,5 +11,5 @@ public class TacticianConfig
 	public float RevealInterval { get; set; } = 15f;
 
 	[JsonPropertyName("reveal_duration")]
-	public float RevealDuration { get; set; } = 1f;
+	public float RevealDuration { get; set; } = 4f;
 }

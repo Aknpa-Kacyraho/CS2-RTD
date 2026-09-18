@@ -51,6 +51,12 @@ public class Reincarnation : DiceBlueprint
 			{
 				player.PrintToCenterAlert($"\ud83d\udd04 轮回！下回合获得{num}个额外骰子！");
 			}
+			// 本回合立即获得 1 个额外骰子，不再是纯延迟收益。
+			RollTheDice instance = RollTheDice.Instance;
+			if (instance != null && instance.ForceExtraDiceForPlayer(player))
+			{
+				player.PrintToCenterAlert("\u267b 轮回：立即获得 1 个额外骰子！");
+			}
 		}
 	}
 

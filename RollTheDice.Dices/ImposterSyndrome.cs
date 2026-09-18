@@ -39,6 +39,44 @@ public class ImposterSyndrome : DiceBlueprint
 		}
 	}
 
+	public override List<string> Events => new List<string> { "EventPlayerDeath" };
+
+	/// <summary>击杀敌人后暴露所有敌人 3s（第六感的情报价值）。</summary>
+	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
+	{
+		CCSPlayerController attacker = @event.Attacker;
+		CCSPlayerController victim = @event.Userid;
+		if (attacker == null || !attacker.IsValid || victim == null || !victim.IsValid || attacker == victim || !_players.Contains(attacker))
+		{
+			return HookResult.Continue;
+		}
+		if (((CBaseEntity)attacker).TeamNum == ((CBaseEntity)victim).TeamNum)
+		{
+			return HookResult.Continue;
+		}
+		List<(CDynamicProp, CDynamicProp)> list = new List<(CDynamicProp, CDynamicProp)>();
+		foreach (CCSPlayerController enemy in Utilities.GetPlayers())
+		{
+			if (!((CEntityInstance)enemy).IsValid || ((CBaseEntity)enemy).TeamNum == ((CBaseEntity)attacker).TeamNum || ((CBasePlayerController)enemy).IsHLTV || enemy.PlayerPawn?.Value == null || !((CEntityInstance)enemy.PlayerPawn.Value).IsValid || ((CBaseEntity)enemy.PlayerPawn.Value).LifeState != 0)
+			{
+				continue;
+			}
+			list.Add(GlowUtil.CreateGlow((CBaseEntity)enemy.PlayerPawn.Value, Color.Orange));
+		}
+		if (list.Count > 0)
+		{
+			CleanupDecoyGlows(attacker);
+			_decoyGlows[attacker] = list;
+			attacker.PrintToCenterAlert("\ud83d\udc41 击杀揭露！敌人位置已暴露 3s！");
+			CCSPlayerController captured = attacker;
+			new Timer(3f, (Action)delegate
+			{
+				CleanupDecoyGlows(captured);
+			}, (TimerFlags?)null);
+		}
+		return HookResult.Continue;
+	}
+
 	public ImposterSyndrome(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
 	{

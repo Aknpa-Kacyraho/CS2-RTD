@@ -48,13 +48,9 @@ public class Cthulhu : DiceBlueprint
 	{
 		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
-			CCSPlayerPawn value = player.PlayerPawn.Value;
-			((CBaseEntity)value).MaxHealth = 1;
-			((CBaseEntity)value).Health = 1;
-			Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iMaxHealth", 0);
-			Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iHealth", 0);
-			MoveLockManager.Lock(player, "Cthulhu");
 			_players.Add(player);
+			// 祭坛化：持有者不再 1HP 定身，改为获得高额减伤，靠站场施压而不是自杀。
+			DamageReductionManager.Register(player, ClassName, _config.Dices.Cthulhu.DamageReduction);
 			if (_roundStartTime == 0f)
 			{
 				_roundStartTime = Server.CurrentTime;
@@ -79,6 +75,10 @@ public class Cthulhu : DiceBlueprint
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		MoveLockManager.Unlock(player, "Cthulhu");
+		if (player != null && player.IsValid)
+		{
+			DamageReductionManager.Unregister(player, ClassName);
+		}
 		_players.Remove(player);
 	}
 
@@ -87,6 +87,10 @@ public class Cthulhu : DiceBlueprint
 		foreach (CCSPlayerController item in _players.ToList())
 		{
 			MoveLockManager.Unlock(item, "Cthulhu");
+			if (item != null && item.IsValid)
+			{
+				DamageReductionManager.Unregister(item, ClassName);
+			}
 		}
 		_players.Clear();
 		_roundStartTime = 0f;
@@ -111,10 +115,6 @@ public class Cthulhu : DiceBlueprint
 		float killTime = _config.Dices.Cthulhu.KillTime;
 		foreach (CCSPlayerController item in _players.ToList())
 		{
-			if ((CEntityInstance)(object)((item == null) ? null : item.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)item.PlayerPawn.Value).IsValid)
-			{
-				MoveLockManager.Lock(item, "Cthulhu");
-			}
 			if (DiceSynergy.HasPartner(item, "DuskDawn") && Server.TickCount % 64 == 0 && (CEntityInstance)(object)((item == null) ? null : item.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)item.PlayerPawn.Value).IsValid)
 			{
 				CCSPlayerPawn value = item.PlayerPawn.Value;

@@ -89,6 +89,11 @@ public class RadarStation : DiceBlueprint
 	{
 		foreach (CCSPlayerController item in _players.ToList())
 		{
+			if (item != null && item.IsValid && item.PlayerPawn?.Value != null && item.PlayerPawn.Value.IsValid)
+			{
+				item.PlayerPawn.Value.VelocityModifier = 1f;
+				Utilities.SetStateChanged(item.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+			}
 			if (_enemyGlows.TryGetValue(item, out Dictionary<CCSPlayerController, (CDynamicProp, CDynamicProp)> value))
 			{
 				foreach (KeyValuePair<CCSPlayerController, (CDynamicProp, CDynamicProp)> item2 in value)
@@ -123,6 +128,7 @@ public class RadarStation : DiceBlueprint
 			{
 				if ((CEntityInstance)(object)diceOwner == (CEntityInstance)null || !((CEntityInstance)diceOwner).IsValid || (CEntityInstance)(object)diceOwner.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)diceOwner.PlayerPawn.Value).IsValid || ((CBaseEntity)diceOwner.PlayerPawn.Value).LifeState != 0)
 				{
+					ClearOwnerGlows(diceOwner);
 					continue;
 				}
 				diceOwner.PlayerPawn.Value.VelocityModifier = 0.6f;
@@ -156,6 +162,19 @@ public class RadarStation : DiceBlueprint
 			catch
 			{
 			}
+		}
+	}
+
+	/// <summary>持有者死亡/失效时清掉仍在敌人身上的发光实体，避免残留到回合末。</summary>
+	private void ClearOwnerGlows(CCSPlayerController diceOwner)
+	{
+		if (_enemyGlows.TryGetValue(diceOwner, out Dictionary<CCSPlayerController, (CDynamicProp, CDynamicProp)> value))
+		{
+			foreach (KeyValuePair<CCSPlayerController, (CDynamicProp, CDynamicProp)> item in value)
+			{
+				GlowUtil.RemoveGlow(item.Value.Item1, item.Value.Item2);
+			}
+			value.Clear();
 		}
 	}
 

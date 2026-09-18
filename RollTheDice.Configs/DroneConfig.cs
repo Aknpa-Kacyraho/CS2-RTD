@@ -20,11 +20,11 @@ public class DroneConfig
 	public float AttackRange { get; set; } = 800f;
 
 	[JsonPropertyName("fire_rate")]
-	public float FireRate { get; set; } = 1.2f;
+	public float FireRate { get; set; } = 1.6f;
 
 	[JsonPropertyName("damage_min")]
-	public int DamageMin { get; set; } = 20;
+	public int DamageMin { get; set; } = 14;
 
 	[JsonPropertyName("damage_max")]
-	public int DamageMax { get; set; } = 35;
+	public int DamageMax { get; set; } = 24;
 }

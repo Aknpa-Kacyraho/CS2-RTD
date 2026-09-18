@@ -18,7 +18,9 @@ public class Singularity : DiceBlueprint
 
 	private float _singularityEndTime;
 
-	private float _nextUseTime;
+	private readonly Dictionary<CCSPlayerController, float> _nextUseTime = new Dictionary<CCSPlayerController, float>();
+
+	private int _ownerTeam;
 
 	private CParticleSystem? _particle;
 
@@ -50,7 +52,7 @@ public class Singularity : DiceBlueprint
 
 	public override float GetCooldownRemaining(CCSPlayerController player)
 	{
-		return _players.Contains(player) ? Math.Max(0f, _nextUseTime - Server.CurrentTime) : 0f;
+		return _players.Contains(player) && _nextUseTime.TryGetValue(player, out float next) ? Math.Max(0f, next - Server.CurrentTime) : 0f;
 	}
 
 	public Singularity(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
@@ -76,6 +78,7 @@ public class Singularity : DiceBlueprint
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		_players.Remove(player);
+		_nextUseTime.Remove(player);
 		CleanupSingularity();
 	}
 
@@ -85,7 +88,7 @@ public class Singularity : DiceBlueprint
 		CleanupSingularity();
 		_singularityPos = null;
 		_singularityEndTime = 0f;
-		_nextUseTime = 0f;
+		_nextUseTime.Clear();
 		_countdown10Shown = false;
 		_countdown5Shown = false;
 	}
@@ -121,9 +124,10 @@ public class Singularity : DiceBlueprint
 			return;
 		}
 		float num = Server.CurrentTime;
-		if (!(num < _nextUseTime))
+		if (!_nextUseTime.TryGetValue(player, out float nextUse) || !(num < nextUse))
 		{
-			_nextUseTime = num + _config.Dices.Singularity.Cooldown;
+			_nextUseTime[player] = num + _config.Dices.Singularity.Cooldown;
+			_ownerTeam = ((CBaseEntity)player).TeamNum;
 			CCSPlayerPawn value = player.PlayerPawn.Value;
 			if (((CBaseEntity)value).AbsOrigin != null)
 			{
@@ -217,7 +221,7 @@ public class Singularity : DiceBlueprint
 		Vector singularityPos = _singularityPos;
 		float pullStrength = _config.Dices.Singularity.PullStrength;
 		foreach (CCSPlayerController item3 in from p in Utilities.GetPlayers()
-			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0 && ((CBaseEntity)p.PlayerPawn.Value).AbsOrigin != null
+			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && ((CBaseEntity)p).TeamNum != _ownerTeam && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0 && ((CBaseEntity)p.PlayerPawn.Value).AbsOrigin != null
 			select p)
 		{
 			CCSPlayerPawn value = item3.PlayerPawn.Value;

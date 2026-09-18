@@ -1,10 +1,12 @@
 中文名（ClassName） - 当前稀有度
 
+觉醒者（Awakener） - 传说
 克苏恩（Cthulhu） - 传说
 命运（Fate） - 传说
 四骑士（FourHorsemen） - 传说
 神王（God） - 传说
 终焉（Ragnarok） - 传说
+剑仙（SwordSaint） - 传说
 命运之轮（WheelOfFate） - 传说
 狼王（WolfKing） - 传说
 世界（World） - 传说
@@ -14,7 +16,6 @@
 冰巨龙（IceDragon） - combo
 菲尼克斯（Phoenix） - combo
 雷达站（RadarStation） - combo
-觉醒者（Awakener） - 史诗
 死亡骑士（DeathKnight） - 史诗
 神迹（DivineResurrection） - 史诗
 龙裔（Dragonborn） - 史诗
@@ -28,17 +29,18 @@ Forsaken（Forsaken） - 史诗
 十六夜（Izayoi） - 史诗
 羁绊（Kinship） - 史诗
 蚊子（Mosquito） - 史诗
+彼岸（Nirvana） - 史诗
 核弹泄露（NukeLeak） - 史诗
 教皇（Pope） - 史诗
 先知（Prophet） - 史诗
 轮回（Reincarnation） - 史诗
 皇家壁垒（RoyalBarrier） - 史诗
 奇点（Singularity） - 史诗
-剑仙（SwordSaint） - 史诗
 军师（Tactician） - 史诗
 饕餮（Taotie） - 史诗
 泰坦陨落（Titanfall） - 史诗
 虚无（Void） - 史诗
+亚戈鲁（Yagorou） - 史诗
 残影（Afterimage） - 稀有
 狂战士（Berserker） - 稀有
 小型黑洞（BlackHole） - 稀有
@@ -48,6 +50,7 @@ C4专家（C4Expert） - 稀有
 连击（Combo） - 稀有
 倒计时（Countdown） - 稀有
 沙漠之鹰（DeagleKing） - 稀有
+缴械（Disarm） - 稀有
 天罚（DivinePunishment） - 稀有
 巨龙之魂（DragonSoul） - 稀有
 暮光（DuskDawn） - 稀有
@@ -74,7 +77,6 @@ C4专家（C4Expert） - 稀有
 模仿大师（Mimic） - 稀有
 死灵法师（Necromancer） - 稀有
 夜光（Nightglow） - 稀有
-彼岸（Nirvana） - 稀有
 痛觉转化（PainConverter） - 稀有
 寄生（Parasite） - 稀有
 鸡神（PlayAsChicken） - 稀有
@@ -90,16 +92,15 @@ C4专家（C4Expert） - 稀有
 卫星（Satellite） - 稀有
 坚盾（Shield） - 稀有
 天际（Skyline） - 稀有
-迷雾逃生（SmokeBomb） - 稀有
 烟雾克星（SmokeVision） - 稀有
 狙击精英（SniperElite） - 稀有
 噬魂者（SoulEater） - 稀有
 猎杀快感（SpeedOnKill） - 稀有
+心有灵犀（Synced） - 稀有
 黄昏之时（Twilight） - 稀有
 吸血鬼（Vampire） - 稀有
 方向错乱（WASDChaos） - 稀有
 白洞（WhiteHole） - 稀有
-亚戈鲁（Yagorou） - 稀有
 肾上腺素（Adrenaline） - 普通
 琥珀（Amber） - 普通
 解剖学家（Anatomist） - 普通
@@ -116,7 +117,6 @@ C4专家（C4Expert） - 稀有
 死手（DeadHand） - 普通
 失聪（Deaf） - 普通
 假人诱饵（DecoyDummy） - 普通
-缴械（Disarm） - 普通
 回音（Echo） - 普通
 月蚀（Eclipse） - 普通
 进化（Evolution） - 普通
@@ -160,7 +160,7 @@ C4专家（C4Expert） - 稀有
 牺牲（SacrificeSelf） - 普通
 影子武士（ShadowWarrior） - 普通
 狡猾狐狸（SlyFox） - 普通
-心有灵犀（Synced） - 普通
+迷雾逃生（SmokeBomb） - 普通
 忒尼尔（Teneril） - 普通
 魔镜（Thorns） - 普通
 雷劫（ThunderChain） - 普通

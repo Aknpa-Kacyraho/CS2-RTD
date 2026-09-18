@@ -276,11 +276,10 @@ public class DeathKnightComplete : DiceBlueprint
 				}
 			}
 		}
-		string text = (string)obj;
-		if (text != null && text.Contains("knife"))
+		if (((CBaseEntity)attacker).TeamNum != ((CBaseEntity)userid).TeamNum)
 		{
 			DeniedNextRound.Add(((CBasePlayerController)userid).SteamID);
-			userid.PrintToCenterAlert("☠ 被死亡骑士的霜之哀伤斩杀！下回合无法获得骰子！");
+			userid.PrintToCenterAlert("☠ 被死亡骑士斩杀！下回合无法获得骰子！");
 		}
 		return (HookResult)0;
 	}

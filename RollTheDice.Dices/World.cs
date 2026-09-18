@@ -14,6 +14,8 @@ public class World : DiceBlueprint
 
 	public static Dictionary<ulong, int> PendingExtraRolls = new Dictionary<ulong, int>();
 
+	private static bool _granting;
+
 	public override string ClassName => "World";
 
 	public World(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
@@ -30,6 +32,7 @@ public class World : DiceBlueprint
 		}
 		_players.Add(player);
 		PendingExtraRolls[((CBasePlayerController)player).SteamID] = _config.Dices.World.ExtraDiceCount;
+		GrantExtraDice(player);
 		_comboActive = DiceSynergy.HasPartner(player, "Heaven");
 		if (_comboActive)
 		{
@@ -67,6 +70,36 @@ public class World : DiceBlueprint
 				_config.Dices.World.ExtraDiceCount.ToString()
 			}
 		});
+	}
+
+	/// <summary>抽到世界立即补发额外骰子；不再依赖回合开始的补骰窗口（在窗口内抽到会被清 pending 而丢失）。</summary>
+	private void GrantExtraDice(CCSPlayerController player)
+	{
+		if (_granting)
+		{
+			return;
+		}
+		RollTheDice instance = RollTheDice.Instance;
+		if (instance == null)
+		{
+			return;
+		}
+		_granting = true;
+		try
+		{
+			int count = _config.Dices.World.ExtraDiceCount;
+			for (int i = 0; i < count; i++)
+			{
+				if (!instance.ForceExtraDiceForPlayer(player))
+				{
+					break;
+				}
+			}
+		}
+		finally
+		{
+			_granting = false;
+		}
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)

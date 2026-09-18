@@ -8,5 +8,5 @@ public class KinshipConfig
 	public bool Enabled { get; set; } = true;
 
 	[JsonPropertyName("invuln_seconds")]
-	public float InvulnSeconds { get; set; } = 1f;
+	public float InvulnSeconds { get; set; } = 3f;
 }

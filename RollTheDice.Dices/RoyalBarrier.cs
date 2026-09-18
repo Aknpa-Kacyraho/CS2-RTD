@@ -15,6 +15,10 @@ public class RoyalBarrier : DiceBlueprint
 {
 	private bool _comboActive;
 
+	private readonly Dictionary<CCSPlayerController, int> _originalMaxHealth = new Dictionary<CCSPlayerController, int>();
+
+	private readonly Dictionary<CCSPlayerController, int> _originalArmor = new Dictionary<CCSPlayerController, int>();
+
 	public override string ClassName => "RoyalBarrier";
 
 	public override List<string> Listeners
@@ -42,6 +46,8 @@ public class RoyalBarrier : DiceBlueprint
 		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
 			CCSPlayerPawn value = player.PlayerPawn.Value;
+			_originalMaxHealth[player] = ((CBaseEntity)value).MaxHealth;
+			_originalArmor[player] = value.ArmorValue;
 			((CBaseEntity)value).MaxHealth = _config.Dices.RoyalBarrier.MaxHealth;
 			((CBaseEntity)value).Health = _config.Dices.RoyalBarrier.MaxHealth;
 			value.ArmorValue = _config.Dices.RoyalBarrier.MaxArmor;
@@ -78,9 +84,27 @@ public class RoyalBarrier : DiceBlueprint
 	{
 		if ((CEntityInstance)(object)player.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
-			player.PlayerPawn.Value.VelocityModifier = 1f;
-			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+			CCSPlayerPawn pawn = player.PlayerPawn.Value;
+			pawn.VelocityModifier = 1f;
+			Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+			if (_originalMaxHealth.TryGetValue(player, out int max))
+			{
+				((CBaseEntity)pawn).MaxHealth = max;
+				if (((CBaseEntity)pawn).Health > max)
+				{
+					((CBaseEntity)pawn).Health = max;
+				}
+				Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CBaseEntity", "m_iMaxHealth", 0);
+				Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CBaseEntity", "m_iHealth", 0);
+			}
+			if (_originalArmor.TryGetValue(player, out int armor))
+			{
+				pawn.ArmorValue = Math.Min(pawn.ArmorValue, armor);
+				Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CCSPlayerPawn", "m_ArmorValue", 0);
+			}
 		}
+		_originalMaxHealth.Remove(player);
+		_originalArmor.Remove(player);
 		_players.Remove(player);
 	}
 
@@ -116,7 +140,6 @@ public class RoyalBarrier : DiceBlueprint
 					CCSPlayerPawn value = item.PlayerPawn.Value;
 					bool comboActive = DiceSynergy.HasPartner(item, "Giant");
 					float num = (comboActive ? 0.65f : _config.Dices.RoyalBarrier.SpeedMultiplier);
-					bool flag = !comboActive;
 					if (((CBaseEntity)value).MaxHealth != maxHealth)
 					{
 						((CBaseEntity)value).MaxHealth = maxHealth;
@@ -126,10 +149,6 @@ public class RoyalBarrier : DiceBlueprint
 					{
 						value.VelocityModifier = num;
 						Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
-					}
-					if (flag && ((CBaseEntity)value).AbsVelocity.Z > 50f)
-					{
-						((CBaseEntity)value).Teleport(((CBaseEntity)value).AbsOrigin, ((CBaseEntity)value).AbsRotation, new Vector((float?)((CBaseEntity)value).AbsVelocity.X, (float?)((CBaseEntity)value).AbsVelocity.Y, (float?)0f));
 					}
 				}
 			}

@@ -1,53 +1,30 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
+using RollTheDice.Configs;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 觉醒者 Awakener：每次击杀/助攻成长——+160 生命（抬高上限，可突破原有上限）、+1 倍伤害、+40% 减伤（叠加上限 99%）。
+/// 与 Evolution 组合（超进化）：开局即视为已获得 1 次击杀。
+/// </summary>
 public class Awakener : DiceBlueprint
 {
-	private bool _comboActive;
-
 	private readonly Dictionary<CCSPlayerController, int> _killCount = new Dictionary<CCSPlayerController, int>();
 
 	private readonly Dictionary<CCSPlayerController, int> _originalMaxHealth = new Dictionary<CCSPlayerController, int>();
 
 	public override string ClassName => "Awakener";
 
-	public override List<string> Events
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "EventPlayerDeath";
-			return list;
-		}
-	}
+	public override List<string> Events => new List<string> { "EventPlayerDeath" };
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnTick";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnTick" };
 
 	public Awakener(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
@@ -57,33 +34,29 @@ public class Awakener : DiceBlueprint
 
 	public override void Add(CCSPlayerController player)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
-			_players.Add(player);
-			_comboActive = DiceSynergy.HasPartner(player, "Evolution");
-			_killCount[player] = (_comboActive ? 1 : 0);
-			if (_comboActive)
-			{
-				DiceSynergy.AnnounceCombo(player, "超进化", "超进化联动生效！初始+1击杀！");
-			}
-			CCSPlayerPawn value = player.PlayerPawn.Value;
-			_originalMaxHealth[player] = ((CBaseEntity)value).MaxHealth;
-			if (_comboActive)
-			{
-				((CBaseEntity)value).MaxHealth += 100;
-				((CBaseEntity)value).Health += 100;
-				Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iMaxHealth", 0);
-				Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_iHealth", 0);
-			}
-			ApplyStats(player, _killCount[player]);
-			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
+			return;
+		}
+		_players.Add(player);
+		_originalMaxHealth[player] = player.PlayerPawn.Value.MaxHealth;
+		bool combo = DiceSynergy.HasPartner(player, "Evolution");
+		int startKills = combo ? 1 : 0;
+		_killCount[player] = startKills;
+		ApplyStats(player, startKills);
+		if (startKills > 0)
+		{
+			GrantHealth(player, startKills);
+			DiceSynergy.AnnounceCombo(player, "超进化", "超进化联动生效！初始+1击杀！");
+		}
+		NotifyPlayers(player, ClassName, new Dictionary<string, string>
+		{
 			{
 				"playerName",
 				((CBasePlayerController)player).PlayerName
-			} });
-			int killsToMax = _config.Dices.Awakener.KillsToMax;
-			player.PrintToCenterAlert($"⚡ 觉醒者！击杀或助攻{killsToMax}人以觉醒全部力量...");
-		}
+			}
+		});
+		player.PrintToCenterAlert("⚡ 觉醒者！每次击杀/助攻：+160HP、伤害+100%、减伤+40%");
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
@@ -95,88 +68,103 @@ public class Awakener : DiceBlueprint
 
 	public override void Reset()
 	{
-		foreach (CCSPlayerController item in _players.ToList())
+		foreach (CCSPlayerController player in _players.ToList())
 		{
-			Revert(item);
+			Revert(player);
 		}
 		_players.Clear();
 		_killCount.Clear();
 		_originalMaxHealth.Clear();
 	}
 
+	public override void Destroy()
+	{
+		Reset();
+	}
+
 	private void Revert(CCSPlayerController player)
 	{
-		if ((CEntityInstance)(object)player != (CEntityInstance)null && ((CEntityInstance)player).IsValid)
+		if (player == null || !player.IsValid)
 		{
-			DamageBonusManager.Unregister(player, ClassName);
-			SpeedBonusManager.Unregister(player, ClassName);
+			if (player != null)
+			{
+				_originalMaxHealth.Remove(player);
+			}
+			return;
 		}
-		if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		DamageBonusManager.Unregister(player, ClassName);
+		DamageReductionManager.Unregister(player, ClassName);
+		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
+		if (pawn != null && pawn.IsValid && _originalMaxHealth.TryGetValue(player, out int original))
 		{
-			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
-			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
-		}
-		if (_originalMaxHealth.TryGetValue(player, out var value) && (CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
-		{
-			((CBaseEntity)player.PlayerPawn.Value).MaxHealth = value;
-			((CBaseEntity)player.PlayerPawn.Value).Health = Math.Min(((CBaseEntity)player.PlayerPawn.Value).Health, value);
-			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CBaseEntity", "m_iMaxHealth", 0);
+			pawn.MaxHealth = original;
+			if (pawn.Health > original)
+			{
+				pawn.Health = original;
+			}
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iMaxHealth", 0);
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
 		}
 		_originalMaxHealth.Remove(player);
 	}
 
 	private void ApplyStats(CCSPlayerController player, int kills)
 	{
-		if (!((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid)
 		{
-			int killsToMax = _config.Dices.Awakener.KillsToMax;
-			float num = Math.Min((float)kills / (float)killsToMax, 1f);
-			float num2 = _config.Dices.Awakener.StartSpeedMult + num * (_config.Dices.Awakener.MaxSpeedMult - _config.Dices.Awakener.StartSpeedMult);
-			float num3 = _config.Dices.Awakener.StartDamageMult + num * (_config.Dices.Awakener.MaxDamageMult - _config.Dices.Awakener.StartDamageMult);
-			SpeedBonusManager.Register(player, ClassName, num2 - 1f);
-			DamageBonusManager.Register(player, ClassName, num3 - 1f);
-			player.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
-			Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+			return;
 		}
+		AwakenerConfig cfg = _config.Dices.Awakener;
+		float damageBonus = kills * cfg.DamageBonusPerKill;
+		float reduction = Math.Min(kills * cfg.ReductionPerKill, cfg.ReductionCap);
+		DamageBonusManager.Register(player, ClassName, damageBonus);
+		DamageReductionManager.Register(player, ClassName, reduction, cfg.ReductionCap);
+	}
+
+	private void GrantHealth(CCSPlayerController player, int kills)
+	{
+		CCSPlayerPawn pawn = player?.PlayerPawn?.Value;
+		if (pawn == null || !pawn.IsValid || kills <= 0)
+		{
+			return;
+		}
+		int gain = kills * _config.Dices.Awakener.HpPerKill;
+		pawn.MaxHealth += gain;
+		pawn.Health += gain;
+		Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iMaxHealth", 0);
+		Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
 	}
 
 	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
 	{
-		CheckKill(@event.Attacker);
-		CheckKill(@event.Assister);
-		return (HookResult)0;
+		CCSPlayerController victim = @event.Userid;
+		if (victim == null || !victim.IsValid)
+		{
+			return HookResult.Continue;
+		}
+		CheckKill(@event.Attacker, victim);
+		CheckKill(@event.Assister, victim);
+		return HookResult.Continue;
 	}
 
-	private void CheckKill(CCSPlayerController? player)
+	private void CheckKill(CCSPlayerController? player, CCSPlayerController victim)
 	{
-		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && _players.Contains(player))
+		if (player == null || !player.IsValid || !_players.Contains(player))
 		{
-			int num = (_killCount.TryGetValue(player, out var value) ? value : 0);
-			num++;
-			_killCount[player] = num;
-			ApplyStats(player, num);
-			if ((CEntityInstance)(object)player.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
-			{
-				CCSPlayerPawn value2 = player.PlayerPawn.Value;
-				((CBaseEntity)value2).MaxHealth += 100;
-				((CBaseEntity)value2).Health += 100;
-				Utilities.SetStateChanged((CBaseEntity)(object)value2, "CBaseEntity", "m_iMaxHealth", 0);
-				Utilities.SetStateChanged((CBaseEntity)(object)value2, "CBaseEntity", "m_iHealth", 0);
-			}
-			int killsToMax = _config.Dices.Awakener.KillsToMax;
-			if (num == 1)
-			{
-				player.PrintToCenterAlert($"⚡ 觉醒中... +100HP！({num}/{killsToMax})");
-			}
-			else if (num >= killsToMax)
-			{
-				player.PrintToCenterAlert($"⚡ 觉醒完成！伤害×{_config.Dices.Awakener.MaxDamageMult} 速度×{_config.Dices.Awakener.MaxSpeedMult}！+100HP");
-			}
-			else
-			{
-				player.PrintToCenterAlert($"⚡ 觉醒中... +100HP！({num}/{killsToMax})");
-			}
+			return;
 		}
+		// 只有击杀/助攻敌人（不同队）才计入成长，避免刷队友或自杀。
+		if (((CBaseEntity)player).TeamNum == ((CBaseEntity)victim).TeamNum)
+		{
+			return;
+		}
+		int kills = (_killCount.TryGetValue(player, out int value) ? value : 0) + 1;
+		_killCount[player] = kills;
+		ApplyStats(player, kills);
+		GrantHealth(player, 1);
+		AwakenerConfig cfg = _config.Dices.Awakener;
+		float reduction = Math.Min(kills * cfg.ReductionPerKill, cfg.ReductionCap);
+		player.PrintToCenterAlert($"⚡ 觉醒！+{cfg.HpPerKill}HP，伤害+{kills * cfg.DamageBonusPerKill * 100f:0}%，减伤+{reduction * 100f:0}%");
 	}
 
 	public void OnTick()
@@ -185,18 +173,15 @@ public class Awakener : DiceBlueprint
 		{
 			return;
 		}
-		foreach (CCSPlayerController item in _players.ToList())
+		foreach (CCSPlayerController player in _players.ToList())
 		{
-			try
+			if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 			{
-				if (!((CEntityInstance)(object)((item == null) ? null : item.PlayerPawn?.Value) == (CEntityInstance)null) && ((CEntityInstance)item.PlayerPawn.Value).IsValid && ((CBaseEntity)item.PlayerPawn.Value).LifeState == 0)
-				{
-					int kills = (_killCount.TryGetValue(item, out var value) ? value : 0);
-					ApplyStats(item, kills);
-				}
+				continue;
 			}
-			catch
+			if (player.PlayerPawn.Value.LifeState == 0)
 			{
+				ApplyStats(player, _killCount.TryGetValue(player, out int kills) ? kills : 0);
 			}
 		}
 	}

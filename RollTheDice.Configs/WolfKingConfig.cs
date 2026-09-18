@@ -15,4 +15,8 @@ public class WolfKingConfig
 
 	[JsonPropertyName("speed_bonus")]
 	public float SpeedBonus { get; set; } = 0.4f;
+
+	/// <summary>击杀敌人回复的生命（狼王吞噬）。</summary>
+	[JsonPropertyName("kill_heal")]
+	public int KillHeal { get; set; } = 50;
 }

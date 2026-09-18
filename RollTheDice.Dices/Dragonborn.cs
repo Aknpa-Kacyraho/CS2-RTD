@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
@@ -20,6 +21,8 @@ public class Dragonborn : DiceBlueprint
 	private readonly Dictionary<CCSPlayerController, int> _killCount = new Dictionary<CCSPlayerController, int>();
 
 	private readonly Dictionary<CCSPlayerController, bool> _transformed = new Dictionary<CCSPlayerController, bool>();
+
+	private readonly Dictionary<CCSPlayerController, int> _originalMaxHealth = new Dictionary<CCSPlayerController, int>();
 
 	public override string ClassName => "Dragonborn";
 
@@ -75,6 +78,7 @@ public class Dragonborn : DiceBlueprint
 			}
 			_killCount[player] = 0;
 			_transformed[player] = false;
+			_originalMaxHealth[player] = ((CBaseEntity)player.PlayerPawn.Value).MaxHealth;
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
 				"playerName",
@@ -86,6 +90,7 @@ public class Dragonborn : DiceBlueprint
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
+		RestoreMaxHealth(player);
 		_players.Remove(player);
 		_killCount.Remove(player);
 		_transformed.Remove(player);
@@ -93,9 +98,35 @@ public class Dragonborn : DiceBlueprint
 
 	public override void Reset()
 	{
+		foreach (CCSPlayerController item in _players.ToList())
+		{
+			RestoreMaxHealth(item);
+		}
 		_players.Clear();
 		_killCount.Clear();
 		_transformed.Clear();
+		_originalMaxHealth.Clear();
+	}
+
+	private void RestoreMaxHealth(CCSPlayerController player)
+	{
+		if (player == null || !player.IsValid || !_originalMaxHealth.TryGetValue(player, out int original))
+		{
+			_originalMaxHealth.Remove(player);
+			return;
+		}
+		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
+		if (pawn != null && pawn.IsValid)
+		{
+			((CBaseEntity)pawn).MaxHealth = original;
+			if (((CBaseEntity)pawn).Health > original)
+			{
+				((CBaseEntity)pawn).Health = original;
+			}
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iMaxHealth", 0);
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
+		}
+		_originalMaxHealth.Remove(player);
 	}
 
 	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)

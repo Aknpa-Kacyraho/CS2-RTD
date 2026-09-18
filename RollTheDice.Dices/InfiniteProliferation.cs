@@ -94,46 +94,19 @@ public class InfiniteProliferation : DiceBlueprint
 			return (HookResult)0;
 		}
 		List<string> tmpWeaponList = new List<string>();
-		CCSPlayerController attacker = @event.Attacker;
-		object obj;
-		if (attacker == null)
+		// 保留的是"自己"死亡时的武器，而不是击杀者的武器。
+		if (victim.PlayerPawn?.Value != null && ((CEntityInstance)victim.PlayerPawn.Value).IsValid && ((CBasePlayerPawn)victim.PlayerPawn.Value).WeaponServices != null)
 		{
-			obj = null;
-		}
-		else
-		{
-			CHandle<CCSPlayerPawn> playerPawn = attacker.PlayerPawn;
-			if (playerPawn == null)
+			foreach (CHandle<CBasePlayerWeapon> myWeapon in ((CBasePlayerPawn)victim.PlayerPawn.Value).WeaponServices.MyWeapons)
 			{
-				obj = null;
-			}
-			else
-			{
-				CCSPlayerPawn value2 = playerPawn.Value;
-				obj = ((value2 != null) ? ((CBasePlayerPawn)value2).WeaponServices : null);
-			}
-		}
-		if (obj != null)
-		{
-			foreach (CHandle<CBasePlayerWeapon> myWeapon in ((CBasePlayerPawn)attacker.PlayerPawn.Value).WeaponServices.MyWeapons)
-			{
-				object obj2;
-				if (myWeapon == null)
+				if (myWeapon == null || !myWeapon.IsValid || myWeapon.Value == null || ((CEntityInstance)myWeapon.Value).DesignerName == null)
 				{
-					obj2 = null;
+					continue;
 				}
-				else
+				string designerName = ((CEntityInstance)myWeapon.Value).DesignerName;
+				if (!designerName.Contains("knife") && !designerName.Contains("bayonet") && !designerName.Contains("c4"))
 				{
-					CBasePlayerWeapon value3 = myWeapon.Value;
-					obj2 = ((value3 != null) ? ((CEntityInstance)value3).DesignerName : null);
-				}
-				if (obj2 != null)
-				{
-					string designerName = ((CEntityInstance)myWeapon.Value).DesignerName;
-					if (!designerName.Contains("knife") && !designerName.Contains("bayonet") && !designerName.Contains("c4"))
-					{
-						tmpWeaponList.Add(designerName);
-					}
+					tmpWeaponList.Add(designerName);
 				}
 			}
 		}

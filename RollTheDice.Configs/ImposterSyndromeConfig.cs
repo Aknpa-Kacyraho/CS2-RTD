@@ -8,5 +8,5 @@ public class ImposterSyndromeConfig
 	public bool Enabled { get; set; } = true;
 
 	[JsonPropertyName("decoy_interval")]
-	public float DecoyInterval { get; set; } = 30f;
+	public float DecoyInterval { get; set; } = 15f;
 }

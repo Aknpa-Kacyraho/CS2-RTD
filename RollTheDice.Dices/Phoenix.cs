@@ -27,6 +27,8 @@ public class Phoenix : DiceBlueprint
 
 	private readonly Dictionary<CCSPlayerController, float> _floatStart = new Dictionary<CCSPlayerController, float>();
 
+	private readonly Dictionary<CCSPlayerController, int> _originalMaxHealth = new Dictionary<CCSPlayerController, int>();
+
 	public override string ClassName => "Phoenix";
 
 
@@ -59,6 +61,7 @@ public class Phoenix : DiceBlueprint
 			_players.Add(player);
 			_phoenixExploded[player] = false;
 			_cooldownEnd[player] = 0f;
+			_originalMaxHealth[player] = player.PlayerPawn.Value.MaxHealth;
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
 				"playerName",
@@ -70,6 +73,7 @@ public class Phoenix : DiceBlueprint
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		DeactivatePhoenix(player);
+		RestoreMaxHealth(player);
 		_players.Remove(player);
 		_phoenixEndTime.Remove(player);
 		_phoenixGlows.Remove(player);
@@ -77,6 +81,7 @@ public class Phoenix : DiceBlueprint
 		_cooldownEnd.Remove(player);
 		_floatAnchor.Remove(player);
 		_floatStart.Remove(player);
+		_originalMaxHealth.Remove(player);
 	}
 
 	public override void Reset()
@@ -84,6 +89,7 @@ public class Phoenix : DiceBlueprint
 		foreach (CCSPlayerController item in _players.ToList())
 		{
 			DeactivatePhoenix(item);
+			RestoreMaxHealth(item);
 		}
 		_players.Clear();
 		_phoenixEndTime.Clear();
@@ -92,6 +98,29 @@ public class Phoenix : DiceBlueprint
 		_cooldownEnd.Clear();
 		_floatAnchor.Clear();
 		_floatStart.Clear();
+		_originalMaxHealth.Clear();
+	}
+
+	/// <summary>爆炸后 MaxHealth 被设为 444，移除/回合结束必须还原，否则残留到重生。</summary>
+	private void RestoreMaxHealth(CCSPlayerController player)
+	{
+		if (player == null || !player.IsValid || !_originalMaxHealth.TryGetValue(player, out int original))
+		{
+			_originalMaxHealth.Remove(player);
+			return;
+		}
+		CCSPlayerPawn pawn = player.PlayerPawn?.Value;
+		if (pawn != null && pawn.IsValid)
+		{
+			((CBaseEntity)pawn).MaxHealth = original;
+			if (((CBaseEntity)pawn).Health > original)
+			{
+				((CBaseEntity)pawn).Health = original;
+			}
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iMaxHealth", 0);
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
+		}
+		_originalMaxHealth.Remove(player);
 	}
 
 	public override void Destroy()

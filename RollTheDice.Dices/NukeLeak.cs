@@ -94,6 +94,11 @@ public class NukeLeak : DiceBlueprint
 				{
 					continue;
 				}
+				// 持有者免疫核爆，避免"同归于尽"式的纯自伤。
+				if (_players.Contains(player))
+				{
+					continue;
+				}
 				if (!player.IsBot && !((CBasePlayerController)player).IsHLTV)
 				{
 					((CBasePlayerPawn)player.PlayerPawn.Value).CommitSuicide(false, true);

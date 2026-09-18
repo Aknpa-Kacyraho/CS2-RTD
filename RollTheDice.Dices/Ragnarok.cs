@@ -10,6 +10,10 @@ using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
+/// <summary>
+/// 终焉 Ragnarok：开局 {InvulDuration}s 无敌；{RoundDuration}s 后降下终焉，对所有敌人造成 {FinalDamage} 审判伤害。
+/// （2026-09-18 重做：移除"自爆+随机献祭队友"的净负面设计，改为纯收益的全场处决。）
+/// </summary>
 public class Ragnarok : DiceBlueprint
 {
 	private bool _comboActive;
@@ -88,7 +92,7 @@ public class Ragnarok : DiceBlueprint
 				"playerName",
 				((CBasePlayerController)player).PlayerName
 			} });
-			Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + "⏳ 终焉降临！持有者30s无敌，60s后与一名队友共赴黄昏！");
+			Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + "⏳ 终焉降临！持有者30s无敌，60s后审判所有敌人！");
 		}
 	}
 
@@ -114,17 +118,7 @@ public class Ragnarok : DiceBlueprint
 
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
-		//IL_002a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00f8: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0071: Unknown result type (might be due to invalid IL or missing references)
-		//IL_009e: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00f5: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00f1: Unknown result type (might be due to invalid IL or missing references)
-		if (_players.Count == 0 || _roundEnded || (CEntityInstance)(object)_holder == (CEntityInstance)null)
-		{
-			return (HookResult)0;
-		}
-		if ((CEntityInstance)(object)_holder.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)_holder.PlayerPawn.Value).IsValid)
+		if (!_active() || (CEntityInstance)(object)_holder.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)_holder.PlayerPawn.Value).IsValid)
 		{
 			return (HookResult)0;
 		}
@@ -142,13 +136,13 @@ public class Ragnarok : DiceBlueprint
 		return (HookResult)0;
 	}
 
+	private bool _active()
+	{
+		return _players.Count != 0 && !_roundEnded && (CEntityInstance)(object)_holder != (CEntityInstance)null;
+	}
+
 	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
 	{
-		//IL_0017: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0248: Unknown result type (might be due to invalid IL or missing references)
-		//IL_024c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_004c: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0066: Unknown result type (might be due to invalid IL or missing references)
 		if (_roundEnded || _holderDied)
 		{
 			return (HookResult)0;
@@ -164,39 +158,7 @@ public class Ragnarok : DiceBlueprint
 		}
 		_holderDied = true;
 		_roundEnded = true;
-		List<CCSPlayerController> list = (from p in Utilities.GetPlayers()
-			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && (CEntityInstance)(object)p != (CEntityInstance)(object)_holder && ((CBaseEntity)p).TeamNum == _holderTeam && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0
-			select p).ToList();
-		CCSPlayerController val = null;
-		if (list.Count > 0)
-		{
-			val = list[Random.Shared.Next(list.Count)];
-		}
-		if ((CEntityInstance)(object)val != (CEntityInstance)null)
-		{
-			CCSPlayerController val2 = val;
-			if (!val2.IsBot && !((CBasePlayerController)val2).IsHLTV)
-			{
-				((CBasePlayerPawn)val2.PlayerPawn.Value).CommitSuicide(false, true);
-			}
-			else
-			{
-				try
-				{
-					((CBasePlayerPawn)val2.PlayerPawn.Value).CommitSuicide(false, true);
-				}
-				catch
-				{
-					((CBaseEntity)val2.PlayerPawn.Value).Health = 0;
-					Utilities.SetStateChanged((CBaseEntity)(object)val2.PlayerPawn.Value, "CBaseEntity", "m_iHealth", 0);
-				}
-			}
-			Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83d\udc80 {((CBasePlayerController)userid).PlayerName} 提前陨落！{((CBasePlayerController)val).PlayerName} 被终焉之力吞噬！");
-		}
-		else
-		{
-			Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83d\udc80 {((CBasePlayerController)userid).PlayerName} 提前陨落！终焉消逝...");
-		}
+		Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83d\udc80 {((CBasePlayerController)userid).PlayerName} 提前陨落！终焉消逝...");
 		return (HookResult)0;
 	}
 
@@ -212,91 +174,56 @@ public class Ragnarok : DiceBlueprint
 		if (num2 >= num3 - 30f && num2 < num3 - 29f)
 		{
 			Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + "⏳ 终焉还剩30秒！");
-			CCSPlayerController? holder = _holder;
-			if (holder != null)
-			{
-				holder.PrintToCenterAlert("⏳ 终焉还剩30秒");
-			}
+			_holder?.PrintToCenterAlert("⏳ 终焉还剩30秒");
 		}
 		if (num2 >= num3 - 20f && num2 < num3 - 19f)
 		{
 			Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + "⏳ 终焉还剩20秒！");
-			CCSPlayerController? holder2 = _holder;
-			if (holder2 != null)
-			{
-				holder2.PrintToCenterAlert("⏳ 终焉还剩20秒");
-			}
+			_holder?.PrintToCenterAlert("⏳ 终焉还剩20秒");
 		}
 		if (num2 >= num3 - 10f && num2 < num3 - 9.9f)
 		{
 			Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + "⏰ 终焉还剩10秒！");
-			CCSPlayerController? holder3 = _holder;
-			if (holder3 != null)
-			{
-				holder3.PrintToCenterAlert("⏳ 终焉还剩10秒");
-			}
+			_holder?.PrintToCenterAlert("⏳ 终焉还剩10秒");
 		}
 		if (num2 >= num3 - 5f && num2 < num3 - 4.9f)
 		{
 			Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + "\ud83d\udc80 终焉还剩5秒！");
-			CCSPlayerController? holder4 = _holder;
-			if (holder4 != null)
-			{
-				holder4.PrintToCenterAlert("⏳ 终焉还剩5秒");
-			}
+			_holder?.PrintToCenterAlert("⏳ 终焉还剩5秒");
 		}
 		if (!(num2 >= num3))
 		{
 			return;
 		}
 		_roundEnded = true;
-		CCSPlayerController? holder5 = _holder;
-		if ((CEntityInstance)(object)((holder5 == null) ? null : holder5.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)_holder.PlayerPawn.Value).IsValid && ((CBaseEntity)_holder.PlayerPawn.Value).LifeState == 0)
+		int finalDamage = _config.Dices.Ragnarok.FinalDamage;
+		foreach (CCSPlayerController enemy in from p in Utilities.GetPlayers()
+			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && ((CBaseEntity)p).TeamNum != _holderTeam && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0
+			select p)
 		{
-			if (!_holder.IsBot && !((CBasePlayerController)_holder).IsHLTV)
+			CCSPlayerPawn pawn = enemy.PlayerPawn.Value;
+			((CBaseEntity)pawn).Health -= finalDamage;
+			Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
+			if (((CBaseEntity)pawn).Health > 0)
 			{
-				((CBasePlayerPawn)_holder.PlayerPawn.Value).CommitSuicide(false, true);
+				enemy.PrintToCenterAlert($"\u2696 终焉审判！-{finalDamage}HP");
+				continue;
 			}
-			else
+			if (!enemy.IsBot && !((CBasePlayerController)enemy).IsHLTV)
 			{
-				try
-				{
-					((CBasePlayerPawn)_holder.PlayerPawn.Value).CommitSuicide(false, true);
-				}
-				catch
-				{
-					((CBaseEntity)_holder.PlayerPawn.Value).Health = 0;
-					Utilities.SetStateChanged((CBaseEntity)(object)_holder.PlayerPawn.Value, "CBaseEntity", "m_iHealth", 0);
-				}
+				((CBasePlayerPawn)pawn).CommitSuicide(false, true);
+				continue;
+			}
+			try
+			{
+				((CBasePlayerPawn)pawn).CommitSuicide(false, true);
+			}
+			catch
+			{
+				((CBaseEntity)pawn).Health = 0;
+				Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
 			}
 		}
-		List<CCSPlayerController> list = (from p in Utilities.GetPlayers()
-			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && (CEntityInstance)(object)p != (CEntityInstance)(object)_holder && ((CBaseEntity)p).TeamNum == _holderTeam && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0
-			select p).ToList();
-		if (list.Count > 0)
-		{
-			CCSPlayerController val = list[Random.Shared.Next(list.Count)];
-			if (!val.IsBot && !((CBasePlayerController)val).IsHLTV)
-			{
-				((CBasePlayerPawn)val.PlayerPawn.Value).CommitSuicide(false, true);
-			}
-			else
-			{
-				try
-				{
-					((CBasePlayerPawn)val.PlayerPawn.Value).CommitSuicide(false, true);
-				}
-				catch
-				{
-					((CBaseEntity)val.PlayerPawn.Value).Health = 0;
-					Utilities.SetStateChanged((CBaseEntity)(object)val.PlayerPawn.Value, "CBaseEntity", "m_iHealth", 0);
-				}
-			}
-			Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83d\udc80 终焉！{((CBasePlayerController)val).PlayerName} 被终焉之力吞噬！");
-		}
-		else
-		{
-			Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + "\ud83d\udc80 终焉降临！持有者已陨落...");
-		}
+		Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + "\ud83d\udc80 终焉降临！所有敌人受到审判！");
 	}
 }

@@ -22,12 +22,14 @@ public class RarityConfig
     public Dictionary<string, string> DiceTier { get; set; } = new Dictionary<string, string>
     {
         // -- 传说 legendary --
+        { "Awakener", "legendary" },
         { "Cthulhu", "legendary" },
         { "Fate", "legendary" },
         { "FourHorsemen", "legendary" },
         { "God", "legendary" },
         { "Ragnarok", "legendary" },
         { "WheelOfFate", "legendary" },
+        { "SwordSaint", "legendary" },
         { "WolfKing", "legendary" },
         { "World", "legendary" },
 
@@ -40,7 +42,6 @@ public class RarityConfig
         { "RadarStation", "combo" },
 
         // -- 史诗 epic --
-        { "Awakener", "epic" },
         { "DeathKnight", "epic" },
         { "DivineResurrection", "epic" },
         { "Dragonborn", "epic" },
@@ -54,17 +55,18 @@ public class RarityConfig
         { "Izayoi", "epic" },
         { "Kinship", "epic" },
         { "Mosquito", "epic" },
+        { "Nirvana", "epic" },
         { "NukeLeak", "epic" },
         { "Pope", "epic" },
         { "Prophet", "epic" },
         { "Reincarnation", "epic" },
         { "RoyalBarrier", "epic" },
         { "Singularity", "epic" },
-        { "SwordSaint", "epic" },
         { "Tactician", "epic" },
         { "Taotie", "epic" },
         { "Titanfall", "epic" },
         { "Void", "epic" },
+        { "Yagorou", "epic" },
 
         // -- 稀有 rare --
         { "Afterimage", "rare" },
@@ -76,6 +78,7 @@ public class RarityConfig
         { "Combo", "rare" },
         { "Countdown", "rare" },
         { "DeagleKing", "rare" },
+        { "Disarm", "rare" },
         { "DivinePunishment", "rare" },
         { "DragonSoul", "rare" },
         { "DuskDawn", "rare" },
@@ -102,7 +105,6 @@ public class RarityConfig
         { "Mimic", "rare" },
         { "Necromancer", "rare" },
         { "Nightglow", "rare" },
-        { "Nirvana", "rare" },
         { "PainConverter", "rare" },
         { "Parasite", "rare" },
         { "PlayAsChicken", "rare" },
@@ -118,16 +120,15 @@ public class RarityConfig
         { "Satellite", "rare" },
         { "Shield", "rare" },
         { "Skyline", "rare" },
-        { "SmokeBomb", "rare" },
         { "SmokeVision", "rare" },
         { "SniperElite", "rare" },
         { "SoulEater", "rare" },
         { "SpeedOnKill", "rare" },
+        { "Synced", "rare" },
         { "Twilight", "rare" },
         { "Vampire", "rare" },
         { "WASDChaos", "rare" },
         { "WhiteHole", "rare" },
-        { "Yagorou", "rare" },
 
         // -- 普通 common --
         { "Adrenaline", "common" },
@@ -146,7 +147,6 @@ public class RarityConfig
         { "DeadHand", "common" },
         { "Deaf", "common" },
         { "DecoyDummy", "common" },
-        { "Disarm", "common" },
         { "Echo", "common" },
         { "Eclipse", "common" },
         { "Evolution", "common" },
@@ -190,7 +190,7 @@ public class RarityConfig
         { "SacrificeSelf", "common" },
         { "ShadowWarrior", "common" },
         { "SlyFox", "common" },
-        { "Synced", "common" },
+        { "SmokeBomb", "common" },
         { "Teneril", "common" },
         { "Thorns", "common" },
         { "ThunderChain", "common" },

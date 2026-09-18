@@ -44,7 +44,10 @@ public class Fate : DiceBlueprint
 
 	private static readonly Random _random = new Random(Guid.NewGuid().GetHashCode());
 
-	private static readonly string[] _fatePool = new string[6] { "orbit", "balance", "compass", "web", "darktide", "dawn" };
+	private static readonly string[] _fatePool = new string[7] { "orbit", "balance", "compass", "web", "darktide", "dawn", "dice_luck" };
+
+	// 持有者必得正向命运，避免抽到 Fate 反而害己。
+	private static readonly string[] _positiveFatePool = new string[3] { "balance", "compass", "dawn" };
 
 	public override string ClassName => "Fate";
 
@@ -103,18 +106,24 @@ public class Fate : DiceBlueprint
 			return;
 		}
 		_assignedThisRound = true;
-		foreach (CCSPlayerController item in from p in Utilities.GetPlayers()
+		List<CCSPlayerController> all = (from p in Utilities.GetPlayers()
 			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid && ((CBaseEntity)p.PlayerPawn.Value).LifeState == 0
-			select p)
+			select p).ToList();
+		AssignFate(player, _positiveFatePool);
+		foreach (CCSPlayerController item in all)
 		{
-			AssignFate(item);
+			if ((CEntityInstance)(object)item == (CEntityInstance)(object)player)
+			{
+				continue;
+			}
+			AssignFate(item, _fatePool);
 		}
 	}
 
-	private void AssignFate(CCSPlayerController player)
+	private void AssignFate(CCSPlayerController player, string[] pool)
 	{
 		ulong steamID = ((CBasePlayerController)player).SteamID;
-		string text = _fatePool[_random.Next(_fatePool.Length)];
+		string text = pool[_random.Next(pool.Length)];
 		_assignments[steamID] = text;
 		CCSPlayerPawn value = player.PlayerPawn.Value;
 		switch (text)

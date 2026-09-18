@@ -17,6 +17,8 @@ public class Emperor : DiceBlueprint
 
 	private readonly Dictionary<CCSPlayerController, bool> _usedResurrection = new Dictionary<CCSPlayerController, bool>();
 
+	private int _resurrectionsUsed;
+
 	public override string ClassName => "Emperor";
 
 	public override List<string> Events
@@ -66,6 +68,7 @@ public class Emperor : DiceBlueprint
 	{
 		_players.Clear();
 		_usedResurrection.Clear();
+		_resurrectionsUsed = 0;
 	}
 
 	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
@@ -90,10 +93,14 @@ public class Emperor : DiceBlueprint
 		{
 			return (HookResult)0;
 		}
+		if (_resurrectionsUsed >= _config.Dices.Emperor.MaxResurrections)
+		{
+			return (HookResult)0;
+		}
 		CCSPlayerController val = null;
 		foreach (CCSPlayerController player in _players)
 		{
-			if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid || ((CBaseEntity)player).TeamNum != ((CBaseEntity)victim).TeamNum || (_usedResurrection.TryGetValue(victim, out var value) && value))
+			if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid || ((CBaseEntity)player).TeamNum != ((CBaseEntity)victim).TeamNum)
 			{
 				continue;
 			}
@@ -104,6 +111,7 @@ public class Emperor : DiceBlueprint
 		{
 			return (HookResult)0;
 		}
+		_resurrectionsUsed++;
 		List<string> tmpWeaponList = new List<string>();
 		CHandle<CCSPlayerPawn> playerPawn = victim.PlayerPawn;
 		object obj;
@@ -126,7 +134,7 @@ public class Emperor : DiceBlueprint
 				}
 			}
 		}
-		_usedResurrection[victim] = true;
+		// 全队共享复活次数，已在上方累加。
 		Server.NextFrame((Action)delegate
 		{
 			Server.NextFrame((Action)delegate

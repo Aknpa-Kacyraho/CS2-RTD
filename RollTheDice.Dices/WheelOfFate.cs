@@ -112,33 +112,17 @@ public class WheelOfFate : DiceBlueprint
 					return (HookResult)0;
 				}
 				List<string> tmpWeaponList = new List<string>();
-				CCSPlayerController attacker = @event.Attacker;
-				object obj2;
-				if (attacker == null)
+				// 保留的是"自己"死亡时的武器，而不是击杀者的武器。
+				foreach (CHandle<CBasePlayerWeapon> myWeapon in ((CBasePlayerPawn)victim.PlayerPawn.Value).WeaponServices.MyWeapons)
 				{
-					obj2 = null;
-				}
-				else
-				{
-					CHandle<CCSPlayerPawn> playerPawn2 = attacker.PlayerPawn;
-					if (playerPawn2 == null)
+					if (myWeapon == null || !myWeapon.IsValid || myWeapon.Value == null || ((CEntityInstance)myWeapon.Value).DesignerName == null)
 					{
-						obj2 = null;
+						continue;
 					}
-					else
+					string designerName = ((CEntityInstance)myWeapon.Value).DesignerName;
+					if (!designerName.Contains("knife") && !designerName.Contains("bayonet") && !designerName.Contains("c4") && !designerName.Contains("taser") && !designerName.Contains("hegrenade") && !designerName.Contains("flashbang") && !designerName.Contains("smokegrenade") && !designerName.Contains("molotov") && !designerName.Contains("decoy"))
 					{
-						CCSPlayerPawn value3 = playerPawn2.Value;
-						obj2 = ((value3 != null) ? ((CBasePlayerPawn)value3).WeaponServices : null);
-					}
-				}
-				if (obj2 != null)
-				{
-					foreach (CHandle<CBasePlayerWeapon> myWeapon in ((CBasePlayerPawn)attacker.PlayerPawn.Value).WeaponServices.MyWeapons)
-					{
-						if (myWeapon != null && myWeapon.IsValid && !((CEntityInstance)(object)myWeapon.Value == (CEntityInstance)null) && ((CEntityInstance)myWeapon.Value).DesignerName != null && !(((CEntityInstance)myWeapon.Value).DesignerName == "weapon_" + ((object)(CsItem)5/*cast due to constrained. prefix*/).ToString().ToLower()) && !(((CEntityInstance)myWeapon.Value).DesignerName == "weapon_knife") && !(((CEntityInstance)myWeapon.Value).DesignerName == "weapon_" + ((object)(CsItem)501/*cast due to constrained. prefix*/).ToString().ToLower()) && !(((CEntityInstance)myWeapon.Value).DesignerName == "weapon_" + ((object)(CsItem)501/*cast due to constrained. prefix*/).ToString().ToLower()) && !(((CEntityInstance)myWeapon.Value).DesignerName == "weapon_" + ((object)(CsItem)500/*cast due to constrained. prefix*/).ToString().ToLower()) && !(((CEntityInstance)myWeapon.Value).DesignerName == "weapon_" + ((object)(CsItem)501/*cast due to constrained. prefix*/).ToString().ToLower()) && !(((CEntityInstance)myWeapon.Value).DesignerName == "weapon_" + ((object)(CsItem)500/*cast due to constrained. prefix*/).ToString().ToLower()))
-						{
-							tmpWeaponList.Add(((CEntityInstance)myWeapon.Value).DesignerName);
-						}
+						tmpWeaponList.Add(designerName);
 					}
 				}
 				Server.NextFrame((Action)delegate

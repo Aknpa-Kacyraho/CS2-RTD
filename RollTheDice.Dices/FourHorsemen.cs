@@ -85,9 +85,13 @@ public class FourHorsemen : DiceBlueprint
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		_players.Remove(player);
+		if (_players.Count == 0)
+		{
+			CleanupAssignments();
+		}
 	}
 
-	public override void Reset()
+	private void CleanupAssignments()
 	{
 		foreach (KeyValuePair<ulong, string> assignment in _assignments)
 		{
@@ -96,11 +100,16 @@ public class FourHorsemen : DiceBlueprint
 				DamageBonusManager.UnregisterBySteamId(assignment.Key, "FourHorsemenWar");
 			}
 		}
-		_players.Clear();
 		_assignments.Clear();
 		_plagueInfected.Clear();
 		_active = false;
 		_lastPlagueTick = 0f;
+	}
+
+	public override void Reset()
+	{
+		CleanupAssignments();
+		_players.Clear();
 	}
 
 	public override void Destroy()

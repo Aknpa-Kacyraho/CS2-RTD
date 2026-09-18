@@ -955,8 +955,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			}))
 			{
 				int diceRollCount = GetDiceRollCount(item11);
-				int num7 = ((!dictionary3.TryGetValue(item11, out var value2)) ? 1 : value2);
-				for (int num8 = diceRollCount; num8 < num7; num8++)
+				// 每次迭代重算上限：若补骰过程中抽到 World（+3），本轮会顺带把额外骰一起发出。
+				for (int num8 = diceRollCount; num8 < GetMaxDiceCount(item11); num8++)
 				{
 					string item = RollTheDiceForPlayer(item11).Item1;
 					if (item != null && !(item == ""))
@@ -1208,9 +1208,9 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			float reduction = DamageReductionManager.GetTotal(victim);
 			if (reduction > 0f)
 			{
-				if (reduction > 0.95f)
+				if (reduction > 0.99f)
 				{
-					reduction = 0.95f;
+					reduction = 0.99f;
 				}
 				info.Damage *= 1f - reduction;
 				changed = true;

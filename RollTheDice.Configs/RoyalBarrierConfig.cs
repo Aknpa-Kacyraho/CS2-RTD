@@ -14,5 +14,5 @@ public class RoyalBarrierConfig
 	public int MaxArmor { get; set; } = 444;
 
 	[JsonPropertyName("speed_multiplier")]
-	public float SpeedMultiplier { get; set; } = 0.3f;
+	public float SpeedMultiplier { get; set; } = 0.55f;
 }
