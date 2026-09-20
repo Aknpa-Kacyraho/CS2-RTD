@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
@@ -88,30 +89,63 @@ public class NukeLeak : DiceBlueprint
 		if (num2 <= 0f)
 		{
 			_detonated = true;
+			float radius = _config.Dices.NukeLeak.DamageRadius;
+			int damage = _config.Dices.NukeLeak.Damage;
+			// 爆心 = 持有者所在位置；离开半径即可躲过。
+			Vector? origin = null;
+			foreach (CCSPlayerController holder in _players)
+			{
+				if (holder != null && holder.IsValid && holder.PlayerPawn?.Value != null && holder.PlayerPawn.Value.IsValid)
+				{
+					origin = holder.PlayerPawn.Value.AbsOrigin;
+					if (origin != null)
+					{
+						break;
+					}
+				}
+			}
+			if (origin == null)
+			{
+				Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + "☢ 核弹泄露哑火：持有者已不在场。");
+				return;
+			}
 			foreach (CCSPlayerController player in Utilities.GetPlayers())
 			{
-				if ((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) == (CEntityInstance)null || !((CEntityInstance)player.PlayerPawn.Value).IsValid || ((CBaseEntity)player.PlayerPawn.Value).LifeState != 0)
+				if (player == null || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid || player.PlayerPawn.Value.LifeState != 0)
 				{
 					continue;
 				}
-				// 持有者免疫核爆，避免"同归于尽"式的纯自伤。
-				if (_players.Contains(player))
+				// 持有者免疫；无敌窗口内也不受直扣血伤害。
+				if (_players.Contains(player) || Invulnerability.IsInvulnerable(player))
 				{
 					continue;
 				}
-				if (!player.IsBot && !((CBasePlayerController)player).IsHLTV)
+				CCSPlayerPawn pawn = player.PlayerPawn.Value;
+				Vector? pos = pawn.AbsOrigin;
+				if (pos == null || Vectors.GetDistance(origin, pos) > radius)
 				{
-					((CBasePlayerPawn)player.PlayerPawn.Value).CommitSuicide(false, true);
+					continue;
+				}
+				int newHp = pawn.Health - damage;
+				if (newHp > 0)
+				{
+					pawn.Health = newHp;
+					Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
+					continue;
+				}
+				if (!player.IsBot && !player.IsHLTV)
+				{
+					pawn.CommitSuicide(false, true);
 					continue;
 				}
 				try
 				{
-					((CBasePlayerPawn)player.PlayerPawn.Value).CommitSuicide(false, true);
+					pawn.CommitSuicide(false, true);
 				}
 				catch
 				{
-					((CBaseEntity)player.PlayerPawn.Value).Health = 0;
-					Utilities.SetStateChanged((CBaseEntity)(object)player.PlayerPawn.Value, "CBaseEntity", "m_iHealth", 0);
+					pawn.Health = 0;
+					Utilities.SetStateChanged(pawn, "CBaseEntity", "m_iHealth", 0);
 				}
 			}
 			Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + _localizer["dice_NukeLeak_detonated"].Value);

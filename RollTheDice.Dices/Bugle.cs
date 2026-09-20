@@ -122,12 +122,18 @@ public class Bugle : DiceBlueprint
 
 	private void ClearAllBuffs()
 	{
-		foreach (CCSPlayerController item in from p in Utilities.GetPlayers()
-			where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && (CEntityInstance)(object)p.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)p.PlayerPawn.Value).IsValid
-			select p)
+		foreach (CCSPlayerController item in Utilities.GetPlayers())
 		{
+			if (item == null || !((CEntityInstance)item).IsValid || ((CBasePlayerController)item).IsHLTV || item.PlayerPawn?.Value == null || !((CEntityInstance)item.PlayerPawn.Value).IsValid)
+			{
+				continue;
+			}
 			SpeedBonusManager.Unregister(item, "Bugle");
 			DamageBonusManager.Unregister(item, "Bugle");
+			// 移速写在 pawn 的 VelocityModifier 字段上，注销后必须显式回写，否则队友会永久残留加速。
+			CCSPlayerPawn pawn = item.PlayerPawn.Value;
+			pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item);
+			Utilities.SetStateChanged((CBaseEntity)pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
 	}
 

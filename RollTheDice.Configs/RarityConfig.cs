@@ -30,6 +30,9 @@ public class RarityConfig
         { "Ragnarok", "legendary" },
         { "WheelOfFate", "legendary" },
         { "SwordSaint", "legendary" },
+        { "SkyVerdict", "legendary" },
+        { "DivineDescent", "legendary" },
+        { "FinalJudgment", "legendary" },
         { "WolfKing", "legendary" },
         { "World", "legendary" },
 
@@ -62,6 +65,7 @@ public class RarityConfig
         { "Reincarnation", "epic" },
         { "RoyalBarrier", "epic" },
         { "Singularity", "epic" },
+        { "Supernova", "epic" },
         { "Tactician", "epic" },
         { "Taotie", "epic" },
         { "Titanfall", "epic" },

@@ -39,6 +39,98 @@ public static class Effects
 		return Init(system, particle, position, angles, null, lifeSeconds) ? system : null;
 	}
 
+	/// <summary>
+	/// 播放一个按 <paramref name="radiusScale"/> 放大的粒子。
+	/// 用 <c>env_particle_glow</c> 的 <see cref="CEnvParticleGlow.RadiusScale"/> 缩放（这是 CS2 里真正能放大粒子的方式；
+	/// <c>info_particle_system</c> 没有 <c>CBodyComponent</c>，设 <c>SceneNode.Scale</c> 会静默失败）。
+	/// <paramref name="radiusScale"/> 是倍率，1=原始大小，几十~几百=巨大。
+	/// </summary>
+	[Obsolete("RadiusScale 不是通用倍率（见 docs/research/2026-09-20-cs2-particle-system.md）。改用 CBeam 原语或自制 vpcf+CP。")]
+	public static CEnvParticleGlow? PlayScaled(Vector? position, string particle, float radiusScale, float? lifeSeconds = null, QAngle? angles = null)
+	{
+		if (position == null)
+		{
+			return null;
+		}
+		CEnvParticleGlow glow = Utilities.CreateEntityByName<CEnvParticleGlow>("env_particle_glow");
+		if (!Init(glow, particle, position, angles, null, lifeSeconds))
+		{
+			return null;
+		}
+		ApplyGlowScale(glow, radiusScale);
+		return glow;
+	}
+
+	/// <summary>在目标身上附着放大的粒子（用于光翼等跟随效果）。返回的实体可用 <see cref="SetScale"/> 再改大小。</summary>
+	[Obsolete("RadiusScale 不是通用倍率（见 docs/research/2026-09-20-cs2-particle-system.md）。改用 CBeam 原语或自制 vpcf+CP。")]
+	public static CEnvParticleGlow? AttachScaled(CBaseEntity? target, string particle, float radiusScale, float? lifeSeconds = null, float zOffset = 0f)
+	{
+		if (target == null || !target.IsValid)
+		{
+			return null;
+		}
+		Vector? origin = target.AbsOrigin;
+		if (origin == null)
+		{
+			return null;
+		}
+		Vector position = new Vector(origin.X, origin.Y, origin.Z + zOffset);
+		CEnvParticleGlow glow = Utilities.CreateEntityByName<CEnvParticleGlow>("env_particle_glow");
+		if (!Init(glow, particle, position, null, target, lifeSeconds))
+		{
+			return null;
+		}
+		ApplyGlowScale(glow, radiusScale);
+		return glow;
+	}
+
+	/// <summary>改已存在放大粒子的倍率（实验性参照 <see cref="PlayScaled"/>）。</summary>
+	[Obsolete("RadiusScale 不是通用倍率（见 docs/research/2026-09-20-cs2-particle-system.md）。改用 CBeam 原语或自制 vpcf+CP。")]
+	public static void SetScale(CEnvParticleGlow? glow, float radiusScale)
+	{
+		ApplyGlowScale(glow, radiusScale);
+	}
+
+	[Obsolete("RadiusScale 不是通用倍率（见 docs/research/2026-09-20-cs2-particle-system.md）。")]
+	private static void ApplyGlowScale(CEnvParticleGlow? glow, float radiusScale)
+	{
+		if (glow == null || !glow.IsValid)
+		{
+			return;
+		}
+		try
+		{
+			glow.RadiusScale = MathF.Max(radiusScale, 0.01f);
+			glow.AlphaScale = 1f;
+			glow.ColorTint = Color.FromArgb(255, 255, 255, 255);
+			Utilities.SetStateChanged((CBaseEntity)glow, "CEnvParticleGlow", "m_flRadiusScale", 0);
+			Utilities.SetStateChanged((CBaseEntity)glow, "CEnvParticleGlow", "m_flAlphaScale", 0);
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>给单个玩家叠加白色闪光遮罩（用于"越近越白"的震撼表现）。alpha 0~255，越大越白。</summary>
+	public static void Whiteout(CCSPlayerController? player, float seconds, float alpha = 255f)
+	{
+		CCSPlayerPawn? pawn = player?.PlayerPawn?.Value;
+		if (pawn == null || !pawn.IsValid || seconds <= 0f)
+		{
+			return;
+		}
+		try
+		{
+			pawn.FlashDuration = seconds;
+			pawn.FlashMaxAlpha = Math.Clamp(alpha, 0f, 255f);
+			Utilities.SetStateChanged((CBaseEntity)pawn, "CCSPlayerPawnBase", "m_flFlashDuration", 0);
+			Utilities.SetStateChanged((CBaseEntity)pawn, "CCSPlayerPawnBase", "m_flFlashMaxAlpha", 0);
+		}
+		catch
+		{
+		}
+	}
+
 	public static CParticleSystem? Attach(CBaseEntity? target, string particle, float? lifeSeconds = null, float zOffset = 0f)
 	{
 		if (target == null || !target.IsValid)
@@ -115,6 +207,7 @@ public static class Effects
 		}
 		((CBaseModelEntity)beam).Render = color;
 		beam.Width = width;
+		beam.EndWidth = width;
 		((CBaseEntity)beam).Teleport(start, new QAngle(0f, 0f, 0f), new Vector(0f, 0f, 0f));
 		beam.EndPos.X = end.X;
 		beam.EndPos.Y = end.Y;
@@ -122,6 +215,19 @@ public static class Effects
 		((CBaseEntity)beam).DispatchSpawn();
 		Track(beam, lifeSeconds);
 		return beam;
+	}
+
+	/// <summary>从地面点向上竖起一根光束柱（外粗内白），用于"光柱砸落"这类表现。</summary>
+	public static void BeamColumn(Vector? ground, float height, Color color, float width, float? lifeSeconds = null)
+	{
+		if (ground == null)
+		{
+			return;
+		}
+		Vector top = new Vector(ground.X, ground.Y, ground.Z + height);
+		Vector bottom = new Vector(ground.X, ground.Y, ground.Z);
+		Beam(top, bottom, color, width, lifeSeconds);
+		Beam(top, bottom, Color.FromArgb(255, 255, 255, 255), MathF.Max(width * 0.35f, 1f), lifeSeconds);
 	}
 
 	public static void Shake(Vector? position, float amplitude, float frequency, float duration, float radius = 0f)
@@ -143,6 +249,35 @@ public static class Effects
 		((CBaseEntity)shake).DispatchSpawn();
 		shake.AcceptInput("StartShake");
 		Track(shake, duration + 1f);
+	}
+
+	/// <summary>
+	/// 把一个音效事件广播给所有在线真人（从各自身上发声 = 无距离衰减，全图都听得到、听得响）。
+	/// 用于爆炸 / 终极技能那一瞬间的"全服有感"音效；传的是 soundevent 名（如 <c>c4.explode</c>）或 <c>.vsnd</c> 路径。
+	/// </summary>
+	public static void SoundAll(string? soundEvent, float volume = 1f)
+	{
+		if (string.IsNullOrWhiteSpace(soundEvent))
+		{
+			return;
+		}
+		float vol = Math.Clamp(volume, 0f, 1f);
+		foreach (CCSPlayerController target in Utilities.GetPlayers())
+		{
+			if (target == null || !((CEntityInstance)target).IsValid || target.IsBot || target.IsHLTV)
+			{
+				continue;
+			}
+			try
+			{
+				RecipientFilter filter = new RecipientFilter();
+				filter.Add(target);
+				((CBaseEntity)target).EmitSound(soundEvent, filter, vol, 1f);
+			}
+			catch
+			{
+			}
+		}
 	}
 
 	public static void Explosion(Vector? position, int magnitude = 0, string? effectName = null)

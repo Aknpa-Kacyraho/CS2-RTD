@@ -6,6 +6,7 @@ using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -168,6 +169,11 @@ public class FireDragon : DiceBlueprint
 			}
 			int valueOrDefault = _burnDps.GetValueOrDefault(steamId, 20);
 			if (Server.TickCount % 64 != 0)
+			{
+				continue;
+			}
+			// 灼烧是直扣血，必须显式尊重无敌窗口（如亚戈鲁/菲尼克斯/愚者）。
+			if (val != null && val.IsValid && Invulnerability.IsInvulnerable(val))
 			{
 				continue;
 			}

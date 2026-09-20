@@ -8,11 +8,11 @@ public class IceDragonConfig
 	public bool Enabled { get; set; } = true;
 
 	[JsonPropertyName("bonus_hp")]
-	public int BonusHP { get; set; } = 333;
+	public int BonusHP { get; set; } = 400;
 
 	[JsonPropertyName("bonus_armor")]
-	public int BonusArmor { get; set; } = 222;
+	public int BonusArmor { get; set; } = 300;
 
 	[JsonPropertyName("freeze_duration")]
-	public float FreezeDuration { get; set; } = 0.2f;
+	public float FreezeDuration { get; set; } = 0.8f;
 }

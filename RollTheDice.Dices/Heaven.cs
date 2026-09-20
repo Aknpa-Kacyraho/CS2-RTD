@@ -22,6 +22,8 @@ public class Heaven : DiceBlueprint
 
 	public override string ClassName => "Heaven";
 
+	public override List<string> Events => new List<string> { "EventPlayerDeath" };
+
 	public override List<string> Listeners
 	{
 		get
@@ -125,6 +127,30 @@ public class Heaven : DiceBlueprint
 			player.PrintToCenterAlert("\ud83c\udf0c 天堂之门开启！");
 			Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83c\udf0c {((CBasePlayerController)player).PlayerName} 打开了天堂之门！时间从{_config.Dices.Heaven.MinTimescale:F1}x加速！");
 		}
+	}
+
+	/// <summary>持有者击杀敌人时，把全局 timescale 重置回下限（0.5x），重新开始加速爬升。</summary>
+	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
+	{
+		CCSPlayerController killer = @event.Attacker;
+		CCSPlayerController victim = @event.Userid;
+		if (killer == null || !((CEntityInstance)killer).IsValid || victim == null || !((CEntityInstance)victim).IsValid)
+		{
+			return (HookResult)0;
+		}
+		if (!_active || _players.Count == 0 || !_players.Contains(killer))
+		{
+			return (HookResult)0;
+		}
+		if ((CEntityInstance)(object)killer == (CEntityInstance)(object)victim || ((CBaseEntity)killer).TeamNum == ((CBaseEntity)victim).TeamNum)
+		{
+			return (HookResult)0;
+		}
+		_timescale = _config.Dices.Heaven.MinTimescale;
+		_nextStepTime = Server.CurrentTime + _config.Dices.Heaven.StepInterval;
+		Server.ExecuteCommand($"host_timescale {_timescale:F1}");
+		killer.PrintToCenterAlert($"🌌 天堂·击杀重置时间 {_timescale:F1}x");
+		return (HookResult)0;
 	}
 
 	public void OnTick()

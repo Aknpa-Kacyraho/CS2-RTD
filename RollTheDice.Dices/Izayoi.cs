@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
@@ -11,8 +12,8 @@ using RollTheDice.Utils;
 namespace RollTheDice.Dices;
 
 /// <summary>
-/// 十六夜 Izayoi：周期性进入时间加速，自身获得大幅移速加成。
-/// （2026-09-18 重做：原实现用全局 host_timescale 随机加减速，敌我一视同仁、会坑自己；现改为个人时间加速。）
+/// 十六夜 Izayoi：周期扰动全局时间造成全场减速，但持有者自身移速不受影响（速度×timescale 恒为自身基准值）。
+/// （2026-09-19 重做：恢复"时间扰动"主题，但只减速不加速；持有者用 VelocityModifier 补偿全局 timescale。）
 /// </summary>
 public class Izayoi : DiceBlueprint
 {
@@ -22,23 +23,16 @@ public class Izayoi : DiceBlueprint
 
 	private readonly Dictionary<CCSPlayerController, float> _nextTriggerTime = new Dictionary<CCSPlayerController, float>();
 
-	private readonly Dictionary<CCSPlayerController, float> _speedEndTime = new Dictionary<CCSPlayerController, float>();
+	/// <summary>全局减速结束时间（0=未激活）。</summary>
+	private float _slowEndTime;
+
+	private float _slowFactor = 1f;
+
+	private bool _slowActive;
 
 	public override string ClassName => "Izayoi";
 
-	public override List<string> Listeners
-	{
-		get
-		{
-			int num = 1;
-			List<string> list = new List<string>(num);
-			CollectionsMarshal.SetCount(list, num);
-			Span<string> span = CollectionsMarshal.AsSpan(list);
-			int index = 0;
-			span[index] = "OnTick";
-			return list;
-		}
-	}
+	public override List<string> Listeners => new List<string> { "OnTick" };
 
 	public Izayoi(PluginConfig GlobalConfig, MapConfig Config, IStringLocalizer Localizer)
 		: base(GlobalConfig, Config, Localizer)
@@ -48,7 +42,7 @@ public class Izayoi : DiceBlueprint
 
 	public override void Add(CCSPlayerController player)
 	{
-		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid || (CEntityInstance)(object)player.PlayerPawn?.Value == (CEntityInstance)null || !((CEntityInstance)player.PlayerPawn.Value).IsValid)
+		if (player == null || !player.IsValid || player.PlayerPawn?.Value == null || !player.PlayerPawn.Value.IsValid)
 		{
 			return;
 		}
@@ -63,7 +57,7 @@ public class Izayoi : DiceBlueprint
 				CCSPlayerController captured = player;
 				Server.NextFrame((Action)delegate
 				{
-					if (instance != null && ((CEntityInstance)captured).IsValid)
+					if (instance != null && captured != null && captured.IsValid)
 					{
 						instance.RemoveDiceFromPlayer(captured, "Izayoi");
 						instance.RemoveDiceFromPlayer(captured, "Heaven");
@@ -80,32 +74,32 @@ public class Izayoi : DiceBlueprint
 			"playerName",
 			((CBasePlayerController)player).PlayerName
 		} });
-		player.PrintToCenterAlert("⏳ 十六夜！时间加速将周期降临！");
+		player.PrintToCenterAlert("⏳ 十六夜！时间扰动将周期降临！");
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		if (player != null && player.IsValid)
 		{
-			SpeedBonusManager.Unregister(player, "IzayoiTime");
+			RestoreHolderSpeed(player);
 		}
 		_players.Remove(player);
 		_nextTriggerTime.Remove(player);
-		_speedEndTime.Remove(player);
+		if (_players.Count == 0)
+		{
+			StopSlow();
+		}
 	}
 
 	public override void Reset()
 	{
 		foreach (CCSPlayerController item in _players.ToList())
 		{
-			if (item != null && item.IsValid)
-			{
-				SpeedBonusManager.Unregister(item, "IzayoiTime");
-			}
+			RestoreHolderSpeed(item);
 		}
 		_players.Clear();
 		_nextTriggerTime.Clear();
-		_speedEndTime.Clear();
+		StopSlow();
 	}
 
 	public override void Destroy()
@@ -119,45 +113,81 @@ public class Izayoi : DiceBlueprint
 		{
 			return;
 		}
-		float num = Server.CurrentTime;
-		float duration = _config.Dices.Izayoi.DurationSeconds;
+		float now = Server.CurrentTime;
+
+		if (_slowActive && now >= _slowEndTime)
+		{
+			StopSlow();
+		}
+
 		foreach (CCSPlayerController item in _players.ToList())
 		{
-			try
+			if (item == null || !item.IsValid || item.PlayerPawn?.Value == null || !item.PlayerPawn.Value.IsValid)
 			{
-				if (item == null || !item.IsValid || item.PlayerPawn?.Value == null || !item.PlayerPawn.Value.IsValid)
-				{
-					continue;
-				}
-				if (_speedEndTime.TryGetValue(item, out float endTime))
-				{
-					if (num >= endTime)
-					{
-						_speedEndTime.Remove(item);
-						SpeedBonusManager.Unregister(item, "IzayoiTime");
-						item.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item, 100f);
-						Utilities.SetStateChanged(item.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
-					}
-					else
-					{
-						item.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item, 100f);
-						Utilities.SetStateChanged(item.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
-					}
-				}
-				if (_nextTriggerTime.TryGetValue(item, out float next) && num >= next)
-				{
-					_nextTriggerTime[item] = num + _config.Dices.Izayoi.IntervalSeconds;
-					float mult = 1.5f + (float)_random.NextDouble() * 0.7f;
-					SpeedBonusManager.Register(item, "IzayoiTime", mult - 1f);
-					_speedEndTime[item] = num + duration;
-					item.PlayerPawn.Value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(item, 100f);
-					Utilities.SetStateChanged(item.PlayerPawn.Value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
-					item.PrintToCenterAlert($"⏳ 时间加速！移速 ×{mult:F1}，{duration:F0}s");
-				}
+				continue;
 			}
-			catch
+			if (_nextTriggerTime.TryGetValue(item, out float next) && now >= next)
 			{
+				_nextTriggerTime[item] = now + _config.Dices.Izayoi.IntervalSeconds;
+				float min = _config.Dices.Izayoi.MinFactor;
+				float max = _config.Dices.Izayoi.MaxFactor;
+				if (max < min)
+				{
+					(min, max) = (max, min);
+				}
+				float factor = min + (float)_random.NextDouble() * (max - min);
+				factor = Math.Clamp(factor, 0.1f, 0.99f);
+				// 多个持有者同时扰动时，取最慢（最有利于持有者）。
+				_slowFactor = _slowActive ? Math.Min(_slowFactor, factor) : factor;
+				_slowEndTime = now + _config.Dices.Izayoi.DurationSeconds;
+				_slowActive = true;
+				Server.ExecuteCommand("host_timescale " + _slowFactor.ToString("0.00", CultureInfo.InvariantCulture));
+				Server.PrintToChatAll($"⏳ 时间被扰动了！全场减速 {_slowFactor:0.00}x");
+				item.PrintToCenterAlert($"⏳ 时间扰动！全场减速 {_slowFactor:0.00}x");
 			}
+			if (_slowActive)
+			{
+				ApplyHolderSpeed(item);
+			}
+		}
+	}
+
+	/// <summary>持有者速度补偿：全局 timescale=f 时，把自身 VelocityModifier 提到 (基准/f)，保持实际移速不变。</summary>
+	private void ApplyHolderSpeed(CCSPlayerController player)
+	{
+		CCSPlayerPawn pawn = player?.PlayerPawn?.Value;
+		if (pawn == null || !pawn.IsValid)
+		{
+			return;
+		}
+		float bonus = SpeedBonusManager.GetEffective(player, 100f);
+		pawn.VelocityModifier = (1f + bonus) / _slowFactor;
+		Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+	}
+
+	private void RestoreHolderSpeed(CCSPlayerController player)
+	{
+		CCSPlayerPawn pawn = player?.PlayerPawn?.Value;
+		if (pawn == null || !pawn.IsValid)
+		{
+			return;
+		}
+		pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(player, 100f);
+		Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
+	}
+
+	private void StopSlow()
+	{
+		if (!_slowActive)
+		{
+			return;
+		}
+		_slowActive = false;
+		_slowFactor = 1f;
+		Server.ExecuteCommand("host_timescale 1.0");
+		foreach (CCSPlayerController item in _players.ToList())
+		{
+			RestoreHolderSpeed(item);
 		}
 	}
 }

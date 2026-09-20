@@ -163,6 +163,9 @@ public class Phoenix : DiceBlueprint
 		float invulDuration = _config.Dices.Phoenix.InvulDuration;
 		_phoenixEndTime[player] = num + invulDuration;
 		_cooldownEnd[player] = num + 60f;
+		// 同时授予共享无敌：直扣血类伤害（灼烧/核爆等）也会被主插件统一拦截。
+		Invulnerability.Grant(player, invulDuration);
+		RollTheDice.LogDebug($"[Phoenix] TRIGGER: sid={((CBasePlayerController)player).SteamID} invul={invulDuration:F1}s now={num:F2}\n");
 		((CBaseEntity)val).MoveType = (MoveType_t)0;
 		Schema.SetSchemaValue<int>(((NativeEntity)val).Handle, "CBaseEntity", "m_nActualMoveType", 0);
 		Utilities.SetStateChanged((CBaseEntity)(object)val, "CBaseEntity", "m_MoveType", 0);
@@ -238,6 +241,8 @@ public class Phoenix : DiceBlueprint
 			return (HookResult)0;
 		}
 		float num = Server.CurrentTime;
+		bool lethalIncoming = entity.Health - (int)float.Round(info.Damage) <= 0;
+		RollTheDice.LogDebug($"[Phoenix] dmg: sid={((CBasePlayerController)val).SteamID} hp={entity.Health} dmg={info.Damage:F1} lethal={lethalIncoming} invul={(_phoenixEndTime.TryGetValue(val, out var _e) && num < _e)} cd={(_cooldownEnd.TryGetValue(val, out var _c) && num < _c)} now={num:F2}\n");
 		if (_phoenixEndTime.TryGetValue(val, out var value2) && num < value2)
 		{
 			info.Damage = 0f;

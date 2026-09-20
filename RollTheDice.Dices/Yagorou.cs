@@ -4,8 +4,6 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Memory;
-using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
@@ -13,12 +11,14 @@ using RollTheDice.Utils;
 namespace RollTheDice.Dices;
 
 /// <summary>
-/// 亚戈鲁 Yagorou：每次击杀敌人获得 1s 无敌；首次受到的致命伤害被完全免疫，并获得 0.5s 无敌。
-/// 无敌通过 OnPlayerTakeDamagePre 将伤害归零实现（TakesDamage=false 在本版本不可靠）。
+/// 亚戈鲁 Yagorou：每次击杀敌人获得短暂无敌；首次受到的致命伤害被完全免疫并获得无敌。
+/// 无敌统一走共享 Invulnerability（主插件 OnPlayerTakeDamagePreCentral 统一置 0），
+/// 比自建字典 + 本 dice 钩子更可靠（2026-09-19 修：原实现只在本 dice 钩子置 0，容易被别处/直扣血绕过）。
 /// </summary>
 public class Yagorou : DiceBlueprint
 {
-	private readonly Dictionary<ulong, float> _invulnUntil = new Dictionary<ulong, float>();
+	/// <summary>持有者 SteamID 集合：判定持有者不依赖控制器对象引用。</summary>
+	private readonly HashSet<ulong> _holderIds = new HashSet<ulong>();
 
 	private readonly Dictionary<ulong, int> _lethalSaves = new Dictionary<ulong, int>();
 
@@ -40,6 +40,7 @@ public class Yagorou : DiceBlueprint
 		{
 			return;
 		}
+		_holderIds.Add(player.SteamID);
 		_lethalSaves[player.SteamID] = _config.Dices.Yagorou.LethalSavesPerRound;
 	}
 
@@ -50,14 +51,14 @@ public class Yagorou : DiceBlueprint
 			return;
 		}
 		_players.Remove(player);
-		_invulnUntil.Remove(player.SteamID);
+		_holderIds.Remove(player.SteamID);
 		_lethalSaves.Remove(player.SteamID);
 	}
 
 	public override void Reset()
 	{
 		_players.Clear();
-		_invulnUntil.Clear();
+		_holderIds.Clear();
 		_lethalSaves.Clear();
 	}
 
@@ -70,67 +71,46 @@ public class Yagorou : DiceBlueprint
 	{
 		CCSPlayerController killer = @event.Attacker;
 		CCSPlayerController victim = @event.Userid;
-		if ((CEntityInstance)(object)killer == (CEntityInstance)null || !((CEntityInstance)killer).IsValid || (CEntityInstance)(object)victim == (CEntityInstance)null || !((CEntityInstance)victim).IsValid)
+		if (killer == null || !((CEntityInstance)killer).IsValid || victim == null || !((CEntityInstance)victim).IsValid)
 		{
 			return (HookResult)0;
 		}
-		if ((CEntityInstance)(object)killer == (CEntityInstance)(object)victim || !_players.Contains(killer) || ((CBaseEntity)killer).TeamNum == ((CBaseEntity)victim).TeamNum)
+		if ((CEntityInstance)(object)killer == (CEntityInstance)(object)victim || !_holderIds.Contains(killer.SteamID) || ((CBaseEntity)killer).TeamNum == ((CBaseEntity)victim).TeamNum)
 		{
 			return (HookResult)0;
 		}
-		ulong steamID = ((CBasePlayerController)killer).SteamID;
-		float until = Server.CurrentTime + _config.Dices.Yagorou.KillInvulnSeconds;
-		if (!_invulnUntil.TryGetValue(steamID, out float existing) || existing < until)
-		{
-			_invulnUntil[steamID] = until;
-		}
-		killer.PrintToCenterAlert($"亚戈鲁：击杀无敌 {_config.Dices.Yagorou.KillInvulnSeconds:F1}s");
+		float seconds = _config.Dices.Yagorou.KillInvulnSeconds;
+		Invulnerability.Grant(killer, seconds);
+		RollTheDice.LogDebug($"[Yagorou] kill: killer={killer.SteamID} invuln={seconds:F1}s now={Server.CurrentTime:F2}\n");
+		killer.PrintToCenterAlert($"亚戈鲁：击杀无敌 {seconds:F1}s");
 		return (HookResult)0;
 	}
 
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
-		if (_invulnUntil.Count == 0 && _lethalSaves.Count == 0)
+		if (_lethalSaves.Count == 0 || entity == null || !entity.IsValid || info.Damage <= 0f)
 		{
 			return (HookResult)0;
 		}
-		if ((CEntityInstance)(object)entity == (CEntityInstance)null || !((CEntityInstance)entity).IsValid || info.Damage <= 0f)
-		{
-			return (HookResult)0;
-		}
-		CCSPlayerPawn pawn = ((NativeObject)entity).As<CCSPlayerPawn>();
+		CCSPlayerPawn pawn = entity.As<CCSPlayerPawn>();
 		if (pawn == null)
 		{
 			return (HookResult)0;
 		}
-		object obj;
-		CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)pawn).Controller;
-		if (controller == null)
-		{
-			obj = null;
-		}
-		else
-		{
-			CBasePlayerController value = controller.Value;
-			obj = ((value != null) ? ((NativeObject)value).As<CCSPlayerController>() : null);
-		}
-		CCSPlayerController player = (CCSPlayerController)obj;
-		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid)
+		CCSPlayerController player = ((CBasePlayerPawn)pawn).Controller?.Value?.As<CCSPlayerController>();
+		if (player == null || !player.IsValid)
 		{
 			return (HookResult)0;
 		}
-		ulong steamID = ((CBasePlayerController)player).SteamID;
-		if (_invulnUntil.TryGetValue(steamID, out float until))
+		ulong steamID = player.SteamID;
+		if (!_holderIds.Contains(steamID))
 		{
-			if (Server.CurrentTime < until)
-			{
-				info.Damage = 0f;
-				return (HookResult)1;
-			}
-			_invulnUntil.Remove(steamID);
+			return (HookResult)0;
 		}
-		if (_lethalSaves.TryGetValue(steamID, out int saves) && saves > 0 && ((CBaseEntity)pawn).Health - info.Damage <= 0f)
+		// 无敌窗口由主插件统一拦截；这里只处理"首次致命伤害免疫"。
+		if (_lethalSaves.TryGetValue(steamID, out int saves) && saves > 0 && pawn.Health - info.Damage <= 0f)
 		{
+			float incoming = info.Damage;
 			info.Damage = 0f;
 			if (saves <= 1)
 			{
@@ -140,11 +120,9 @@ public class Yagorou : DiceBlueprint
 			{
 				_lethalSaves[steamID] = saves - 1;
 			}
-			float lethalUntil = Server.CurrentTime + _config.Dices.Yagorou.LethalInvulnSeconds;
-			if (!_invulnUntil.TryGetValue(steamID, out float existing) || existing < lethalUntil)
-			{
-				_invulnUntil[steamID] = lethalUntil;
-			}
+			float lethalUntil = _config.Dices.Yagorou.LethalInvulnSeconds;
+			Invulnerability.Grant(player, lethalUntil);
+			RollTheDice.LogDebug($"[Yagorou] lethal save: sid={steamID} hp={pawn.Health} dmg={incoming:F1} invuln={lethalUntil:F1}s\n");
 			player.PrintToCenterAlert("亚戈鲁：致命伤害免疫！");
 			return (HookResult)1;
 		}

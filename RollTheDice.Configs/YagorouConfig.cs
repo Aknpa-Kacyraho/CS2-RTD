@@ -8,10 +8,10 @@ public class YagorouConfig
 	public bool Enabled { get; set; } = true;
 
 	[JsonPropertyName("kill_invuln_seconds")]
-	public float KillInvulnSeconds { get; set; } = 1f;
+	public float KillInvulnSeconds { get; set; } = 2.5f;
 
 	[JsonPropertyName("lethal_invuln_seconds")]
-	public float LethalInvulnSeconds { get; set; } = 0.5f;
+	public float LethalInvulnSeconds { get; set; } = 1f;
 
 	[JsonPropertyName("lethal_saves_per_round")]
 	public int LethalSavesPerRound { get; set; } = 1;

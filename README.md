@@ -159,6 +159,9 @@
 | `NukeLeak` | 核弹泄露 | 60s 后全员死亡 |
 | `Ragnarok` | 终焉 | 30s 无敌，60s 后回合结束 |
 | `Cthulhu` | 克苏恩 | 1HP 不能移动，100s 后全灭 |
+| `SkyVerdict` | 天穹裁决 | 按 E 锁定准星处降下金色光柱，范围高伤 + 上抛 + 全图震屏，CD 60s |
+| `DivineDescent` | 神圣降临 | 按 E 展开光翼：8s 无敌 + 伤害 +100% + 移速 +30% + 破上限回血，CD 90s |
+| `FinalJudgment` | 终焉审判 | 按 E 头顶生成魔法阵，4s 后全图按距离衰减 500 伤害，越近越白，CD 90s |
 | `Twilight` | 黄昏之时 | 全部玩家出生点随机互换 |
 | `Synced` | 心有灵犀 | 全员换弹同步 |
 | `Lottery` | 彩票 | 全员随机获得 0~5000 元 |
@@ -237,6 +240,7 @@
 | `WhiteHole` | 白洞 | 死亡生成白洞推离敌人 |
 | `GravityWell` | 黑洞 | 死亡生成引力井吸附全图 |
 | `Singularity` | 奇点 | 按 E 释放全图引力 |
+| `Supernova` | 光之剑：超新星 | 按 E 释放 5s 穿墙金色激光，路径敌人连续 -100HP/s，CD 30s |
 | `RepulsionField` | 斥力场 | 周围投掷物自动弹回 |
 | `PlayAsChicken` | 鸡神 | 变成大鸡，300HP + 40% 速度 |
 | `HangedMan` | 倒吊者 | 每秒流失 1HP，击杀反转 |

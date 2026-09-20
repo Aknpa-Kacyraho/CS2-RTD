@@ -65,11 +65,12 @@ public class Nirvana : DiceBlueprint
 				CCSPlayerController captured = player;
 				Server.NextFrame((Action)delegate
 				{
-					if (instance != null && ((CEntityInstance)captured).IsValid)
+					if (instance != null && ((CEntityInstance)captured).IsValid && !instance.HasDiceActive(captured, "Phoenix"))
 					{
 						instance.RemoveDiceFromPlayer(captured, "Nirvana");
 						instance.RemoveDiceFromPlayer(captured, "GuardianAngel");
-						instance.ForceDiceForPlayer(captured, "Phoenix");
+						// 必须无视骰子上限发放，否则 ForceDiceForPlayer 会被上限拦截导致组合静默失效。
+						instance.GrantComboDice(captured, "Phoenix");
 					}
 				});
 				return;

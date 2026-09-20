@@ -52,6 +52,9 @@ public class PluginConfig : BasePluginConfig
 	[JsonPropertyName("precache")]
 	public PrecacheConfig Precache { get; set; } = new PrecacheConfig();
 
+	[JsonPropertyName("weapon_reward")]
+	public WeaponRewardConfig WeaponReward { get; set; } = new WeaponRewardConfig();
+
 	[JsonPropertyName("maps")]
 	public Dictionary<string, MapConfig> MapConfigs { get; set; } = new Dictionary<string, MapConfig>();
 

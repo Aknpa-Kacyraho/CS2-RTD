@@ -265,6 +265,7 @@ public class Drone : DiceBlueprint
 					value4.EndPos.X = val2.X;
 					value4.EndPos.Y = val2.Y;
 					value4.EndPos.Z = val2.Z;
+					Utilities.SetStateChanged((CBaseEntity)value4, "CBeam", "m_vecEndPos", 0);
 				}
 				float fireRate = _config.Dices.Drone.FireRate;
 				if (!_lastFireTime.TryGetValue(player, out var value5) || num - value5 < fireRate)

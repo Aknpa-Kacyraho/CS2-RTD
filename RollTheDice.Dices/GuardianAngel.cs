@@ -52,7 +52,24 @@ public class GuardianAngel : DiceBlueprint
 			}
 			if (DiceSynergy.HasPartner(player, "Nirvana"))
 			{
-				DiceSynergy.AnnounceCombo(player, "菲尼克斯", "菲尼克斯联动生效！");
+				// 反序组合（先抽到涅槃的已由 Nirvana.Add 处理；这里补齐"先有涅槃、后有守护天使"的顺序）。
+				RollTheDice instance = RollTheDice.Instance;
+				if (instance != null && instance.HasDiceActive(player, "Nirvana") && !instance.HasDiceActive(player, "Phoenix"))
+				{
+					DiceSynergy.AnnounceCombo(player, "菲尼克斯", "涅槃+守护天使合成为菲尼克斯！");
+					CCSPlayerController captured = player;
+					Server.NextFrame((Action)delegate
+					{
+						if (instance != null && ((CEntityInstance)captured).IsValid && !instance.HasDiceActive(captured, "Phoenix"))
+						{
+							instance.RemoveDiceFromPlayer(captured, "GuardianAngel");
+							instance.RemoveDiceFromPlayer(captured, "Nirvana");
+							instance.GrantComboDice(captured, "Phoenix");
+						}
+					});
+					return;
+				}
+				DiceSynergy.AnnounceCombo(player, "菲尼克斯", "团队联动！涅槃与守护天使共鸣！");
 			}
 			_hasAngel.Add(((CBasePlayerController)player).SteamID);
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 

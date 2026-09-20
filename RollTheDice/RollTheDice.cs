@@ -274,6 +274,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		case "reload":
 			PluginConfigExtensions.Reload<PluginConfig>(Config);
 			LoadMapConfig(_currentMap);
+			ReloadFxTable();
 			command.ReplyToCommand((string?)((BasePlugin)this).Localizer["admin.reload"]);
 			break;
 		case "disable":
@@ -302,6 +303,21 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 	}
 
+	[ConsoleCommand("rtdfx", "RollTheDice fx table admin commands")]
+	[CommandHelper(1, "<reload>")]
+	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
+	public void CommandFxTable(CCSPlayerController player, CommandInfo command)
+	{
+		string arg = command.GetArg(1);
+		if (string.Equals(arg, "reload", StringComparison.OrdinalIgnoreCase))
+		{
+			ReloadFxTable();
+			command.ReplyToCommand("[DiceFX] dicefx.json reloaded (see server console/log for details)");
+			return;
+		}
+		command.ReplyToCommand("rtdfx <reload>");
+	}
+
 	private void ReloadConfigFromDisk()
 	{
 		try
@@ -315,6 +331,35 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			string text = ((BasePlugin)this).Localizer["core.error"].Value.Replace("{error}", ex.Message);
 			Console.WriteLine(text);
 			Server.PrintToChatAll(text);
+		}
+	}
+
+	/// <summary>特效表路径：&lt;css&gt;/configs/plugins/RollTheDice/dicefx.json。</summary>
+	private string FxDiceFxPath()
+	{
+		DirectoryInfo pluginDir = new DirectoryInfo(ModuleDirectory);
+		string cssRoot = pluginDir.Parent?.Parent?.FullName ?? Directory.GetCurrentDirectory();
+		return Path.Combine(cssRoot, "configs", "plugins", Path.GetFileName(ModuleDirectory), "dicefx.json");
+	}
+
+	/// <summary>重载 dicefx.json（fail-soft：失败保留上一份内存表）。</summary>
+	private void ReloadFxTable()
+	{
+		try
+		{
+			List<string> known = new List<string>(_dices.Count);
+			foreach (DiceBlueprint dice in _dices)
+			{
+				known.Add(dice.ClassName);
+			}
+			if (DiceFxTable.Reload(FxDiceFxPath(), known))
+			{
+				DiceEffects.ResetPersistent();
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine("[DiceFX] reload failed: " + ex.Message);
 		}
 	}
 
@@ -388,6 +433,16 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		if (!string.IsNullOrEmpty(Config.Precache.SoundEventFile))
 		{
 			manifest.AddResource(Config.Precache.SoundEventFile);
+		}
+		if (Config.Sounds?.LegendarySounds != null)
+		{
+			foreach (string sound in Config.Sounds.LegendarySounds.Values)
+			{
+				if (!string.IsNullOrEmpty(sound))
+				{
+					manifest.AddResource(sound);
+				}
+			}
 		}
 		manifest.AddResource("models/props/de_dust/hr_dust/dust_soccerball/dust_soccer_ball001.vmdl");
 		Effects.PrecacheAll(manifest);
@@ -1274,6 +1329,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					LogDebug($"{DateTime.Now:HH:mm:ss} ✓ {((CBasePlayerController)player).PlayerName} ← {diceBlueprint.ClassName}\n");
 					RefreshCombos(player);
 					AnnounceDiceRarity(player, diceBlueprint);
+					ApplyLegendaryWeapon(player, diceBlueprint);
 					return (diceBlueprint.ClassName, diceBlueprint.Description);
 				}
 				catch (Exception value)
@@ -1299,6 +1355,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					LogDebug($"{DateTime.Now:HH:mm:ss} ✓ {((CBasePlayerController)player).PlayerName} ← {diceName}\n");
 					RefreshCombos(player);
 					AnnounceDiceRarity(player, diceBlueprint2);
+					ApplyLegendaryWeapon(player, diceBlueprint2);
 					return (diceBlueprint2.ClassName, diceBlueprint2.Description);
 				}
 				catch (Exception value2)
@@ -1444,9 +1501,82 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			{
 				Server.PrintToChatAll($" {prefix}{color}🌟 传说骰子降临！{((CBasePlayerController)player).PlayerName} 抽到了【{localized}】！");
 			}
+			if ((tier == "legendary" || tier == "combo") && Config?.Sounds?.LegendarySounds != null && Config.Sounds.LegendarySounds.TryGetValue(dice.ClassName, out string legendarySound) && !string.IsNullOrEmpty(legendarySound))
+			{
+				BroadcastDiceSound(legendarySound);
+			}
 		}
 		catch
 		{
+		}
+	}
+
+	/// <summary>把音效广播给所有在线真人（从各自身上发声 = 无距离衰减，人人听清）。</summary>
+	private void BroadcastDiceSound(string sound)
+	{
+		try
+		{
+			if (string.IsNullOrEmpty(sound))
+			{
+				return;
+			}
+			float volume = Math.Clamp(Config.Sounds.Volume, 0f, 1f);
+			foreach (CCSPlayerController target in Utilities.GetPlayers())
+			{
+				if (target == null || !((CEntityInstance)target).IsValid || target.IsBot || target.IsHLTV)
+				{
+					continue;
+				}
+				RecipientFilter filter = new RecipientFilter();
+				filter.Add(target);
+				((CBaseEntity)target).EmitSound(sound, filter, volume, 0f);
+			}
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>传说 / combo dice 抽到时按配置附赠换模武器（贴合主题的直接给，其余随机刀 / 雷）。</summary>
+	private void ApplyLegendaryWeapon(CCSPlayerController player, DiceBlueprint dice)
+	{
+		try
+		{
+			if (player == null || !((CEntityInstance)player).IsValid || player.IsBot || player.IsHLTV)
+			{
+				return;
+			}
+			WeaponRewardConfig? cfg = Config?.WeaponReward;
+			if (cfg == null || !cfg.Enabled)
+			{
+				return;
+			}
+			string tier = GetDiceTier(dice);
+			if (tier != "legendary" && tier != "combo")
+			{
+				return;
+			}
+			string? entry = null;
+			if (cfg.Weapons != null && cfg.Weapons.TryGetValue(dice.ClassName, out string mapped) && !string.IsNullOrEmpty(mapped))
+			{
+				entry = mapped;
+			}
+			else
+			{
+				List<string>? pool = ((_random.Next(2) == 0) ? cfg.RandomKnives : cfg.RandomGrenades);
+				if (pool != null && pool.Count > 0)
+				{
+					entry = pool[_random.Next(pool.Count)];
+				}
+			}
+			if (!string.IsNullOrEmpty(entry))
+			{
+				WeaponSubclass.Give(player, entry!);
+			}
+		}
+		catch (Exception ex)
+		{
+			LogErr($"{DateTime.Now:HH:mm:ss} ApplyLegendaryWeapon {dice.ClassName}: {ex.Message}\n");
 		}
 	}
 
@@ -1673,6 +1803,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				_dices.Add(item);
 			}
 		}
+		ReloadFxTable();
 		RegisterListeners();
 		RegisterEventHandlers();
 		RegisterUserMessageHooks();

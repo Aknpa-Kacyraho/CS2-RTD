@@ -10,6 +10,9 @@
 命运之轮（WheelOfFate） - 传说
 狼王（WolfKing） - 传说
 世界（World） - 传说
+天穹裁决（SkyVerdict） - 传说
+神圣降临（DivineDescent） - 传说
+终焉审判（FinalJudgment） - 传说
 超越天堂（BeyondHeaven） - combo
 死亡骑士完全体（DeathKnightComplete） - combo
 火巨龙（FireDragon） - combo
@@ -36,6 +39,7 @@ Forsaken（Forsaken） - 史诗
 轮回（Reincarnation） - 史诗
 皇家壁垒（RoyalBarrier） - 史诗
 奇点（Singularity） - 史诗
+光之剑：超新星（Supernova） - 史诗
 军师（Tactician） - 史诗
 饕餮（Taotie） - 史诗
 泰坦陨落（Titanfall） - 史诗
