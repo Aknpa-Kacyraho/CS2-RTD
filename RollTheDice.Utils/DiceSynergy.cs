@@ -47,7 +47,7 @@ public static class DiceSynergy
 
 	static DiceSynergy()
 	{
-		int num = 70;
+		int num = 68;
 		List<(string, string, string)> list = new List<(string, string, string)>(num);
 		CollectionsMarshal.SetCount(list, num);
 		Span<(string, string, string)> span = CollectionsMarshal.AsSpan(list);
@@ -185,10 +185,6 @@ public static class DiceSynergy
 		span[num2] = ("Supernova", "DivinePunishment", "圣裁天罚");
 		num2++;
 		span[num2] = ("Supernova", "LaserCage", "光轮圣裁");
-		num2++;
-		span[num2] = ("SkyVerdict", "DivinePunishment", "天罚共振");
-		num2++;
-		span[num2] = ("DivineDescent", "God", "神临");
 		num2++;
 		span[num2] = ("FinalJudgment", "Ragnarok", "末日");
 		_combos = list;

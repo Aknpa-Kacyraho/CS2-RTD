@@ -30,8 +30,6 @@ public class RarityConfig
         { "Ragnarok", "legendary" },
         { "WheelOfFate", "legendary" },
         { "SwordSaint", "legendary" },
-        { "SkyVerdict", "legendary" },
-        { "DivineDescent", "legendary" },
         { "FinalJudgment", "legendary" },
         { "WolfKing", "legendary" },
         { "World", "legendary" },

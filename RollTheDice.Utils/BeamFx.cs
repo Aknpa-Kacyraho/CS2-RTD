@@ -54,6 +54,45 @@ public static class BeamFx
 		}
 	}
 
+	/// <summary>运行时改宽度（脉冲 / 收束）。直接写字段不会同步给客户端，必须显式标脏。</summary>
+	public static void SetWidth(CBeam? beam, float width, float endWidth = -1f)
+	{
+		if (beam == null || !beam.IsValid)
+		{
+			return;
+		}
+		try
+		{
+			beam.Width = width;
+			beam.EndWidth = endWidth >= 0f ? endWidth : width;
+			Utilities.SetStateChanged(beam, "CBeam", "m_fWidth");
+			Utilities.SetStateChanged(beam, "CBeam", "m_fEndWidth");
+		}
+		catch
+		{
+		}
+	}
+
+	/// <summary>
+	/// 运行时改颜色（亮度脉冲）。<c>m_clrRender</c> 的同步在 1.0.373 未完全验证，
+	/// 若实机无效则退回"加宽 + 追加内层亮束"方案（见 spec §5）。
+	/// </summary>
+	public static void SetColor(CBeam? beam, Color color)
+	{
+		if (beam == null || !beam.IsValid)
+		{
+			return;
+		}
+		try
+		{
+			((CBaseModelEntity)beam).Render = color;
+			Utilities.SetStateChanged(beam, "CBaseModelEntity", "m_clrRender");
+		}
+		catch
+		{
+		}
+	}
+
 	public static bool IsAlive(CBeam? beam)
 	{
 		return beam != null && beam.IsValid;

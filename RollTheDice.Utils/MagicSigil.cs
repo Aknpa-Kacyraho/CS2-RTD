@@ -13,7 +13,7 @@ namespace RollTheDice.Utils;
 /// 圆环 / 辐条全部由服务器画 CBeam，无素材依赖，大小和范围完全可控（见
 /// <c>docs/research/2026-09-20-cs2-particle-system.md</c>：现成 vpcf 无法通用放大 / 转向）。
 /// </summary>
-public sealed class MagicSigil
+public sealed class MagicSigil : IBeamGroup
 {
 	private sealed class Layer
 	{
@@ -24,6 +24,13 @@ public sealed class MagicSigil
 	}
 
 	private readonly List<Layer> _layers = new List<Layer>();
+	private ArcaneGroundSigil? _arcane;
+
+	/// <summary>新版"多层次刻画"法阵（五芒星 / 符文带 / 刻度环 / 内嵌多边形…）。</summary>
+	public MagicSigil(Vector center, float radius, SigilParams parameters, SigilPalette palette, float width, float spin = 0.9f)
+	{
+		_arcane = new ArcaneGroundSigil(center, radius, parameters, palette, width, spin);
+	}
 
 	public MagicSigil(Vector center, float radius, float outerRadius, Color color, float width, int segments, int spokes, int layerCount, float layerShrink, float spin, float zOffset = 4f)
 	{
@@ -55,6 +62,11 @@ public sealed class MagicSigil
 		{
 			scale = 0.01f;
 		}
+		if (_arcane != null)
+		{
+			_arcane.Update(center, time, scale);
+			return;
+		}
 		foreach (Layer layer in _layers)
 		{
 			layer.Circle.SetRadius(layer.BaseRadius * scale, layer.BaseOuter * scale);
@@ -64,10 +76,28 @@ public sealed class MagicSigil
 
 	public void Remove()
 	{
+		if (_arcane != null)
+		{
+			_arcane.Remove();
+			return;
+		}
 		foreach (Layer layer in _layers)
 		{
 			layer.Circle.Remove();
 		}
 		_layers.Clear();
+	}
+
+	public bool IsEmpty => _arcane != null ? _arcane.IsEmpty : _layers.Count == 0;
+
+	/// <summary>分帧拆除（arcane 支持；legacy 直接全拆）。</summary>
+	public int RemoveChunk(int budget)
+	{
+		if (_arcane != null)
+		{
+			return _arcane.RemoveChunk(budget);
+		}
+		Remove();
+		return 1 << 20;
 	}
 }

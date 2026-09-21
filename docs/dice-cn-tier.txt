@@ -10,9 +10,7 @@
 命运之轮（WheelOfFate） - 传说
 狼王（WolfKing） - 传说
 世界（World） - 传说
-天穹裁决（SkyVerdict） - 传说
-神圣降临（DivineDescent） - 传说
-终焉审判（FinalJudgment） - 传说
+坠落天空（FinalJudgment） - 传说
 超越天堂（BeyondHeaven） - combo
 死亡骑士完全体（DeathKnightComplete） - combo
 火巨龙（FireDragon） - combo

@@ -230,6 +230,34 @@ public static class Effects
 		Beam(top, bottom, Color.FromArgb(255, 255, 255, 255), MathF.Max(width * 0.35f, 1f), lifeSeconds);
 	}
 
+	/// <summary>
+	/// "坠落天空"的通天光柱：多层同心 CBeam 叠加模拟「炽白核心 → 蓝白边缘」的径向渐变，
+	/// 再在柱内加几根偏移细亮束做"能量翻腾"。
+	/// <paramref name="radius"/> 是光柱半径（外层最粗 = 直径 2×radius）。
+	/// </summary>
+	public static void SkyPillar(Vector? ground, float height, Color core, Color mid, Color halo, float radius, float lifeSeconds)
+	{
+		if (ground == null)
+		{
+			return;
+		}
+		float r = MathF.Max(radius, 8f);
+		Vector top = new Vector(ground.X, ground.Y, ground.Z + height);
+		Vector bottom = new Vector(ground.X, ground.Y, ground.Z);
+		Beam(top, bottom, halo, r * 2f, lifeSeconds);
+		Beam(top, bottom, mid, r * 1.15f, lifeSeconds);
+		Beam(top, bottom, core, r * 0.5f, lifeSeconds);
+		for (int i = 0; i < 4; i++)
+		{
+			float angle = i * MathF.PI * 0.5f;
+			float ox = MathF.Cos(angle) * r * 0.42f;
+			float oy = MathF.Sin(angle) * r * 0.42f;
+			Vector o = new Vector(ground.X + ox, ground.Y + oy, ground.Z);
+			Vector t = new Vector(ground.X + ox, ground.Y + oy, ground.Z + height);
+			Beam(t, o, core, r * 0.18f, lifeSeconds);
+		}
+	}
+
 	public static void Shake(Vector? position, float amplitude, float frequency, float duration, float radius = 0f)
 	{
 		if (position == null || duration <= 0f)

@@ -30,8 +30,6 @@ public class SoundConfig
 		{ "Ragnarok", "sounds/touhou/xrole/remilia/spear_throw.vsnd" },
 		{ "WheelOfFate", "sounds/touhou/timeout.vsnd" },
 		{ "SwordSaint", "sounds/touhou/xrole/youmu/slash_glow.vsnd" },
-		{ "SkyVerdict", "sounds/touhou/public/warning.vsnd" },
-		{ "DivineDescent", "sounds/touhou/public/boon.vsnd" },
 		{ "FinalJudgment", "sounds/touhou/bullet/explode4.vsnd" },
 		{ "WolfKing", "sounds/touhou/public/wolf.vsnd" },
 		{ "World", "sounds/touhou/xrole/sakuya/the_world.vsnd" },

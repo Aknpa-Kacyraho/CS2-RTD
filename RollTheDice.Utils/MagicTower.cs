@@ -14,7 +14,7 @@ namespace RollTheDice.Utils;
 /// 设计口径：够高（不被地形遮挡）、够大（远处看得清）、够多（默认 8 层往上）、够炫（双色交替）。
 /// 全部是服务器端 CBeam，无素材依赖（见 docs/research/2026-09-20-cs2-particle-system.md）。
 /// </summary>
-public sealed class MagicTower
+public sealed class MagicTower : IBeamGroup
 {
 	private sealed class Ring
 	{
@@ -26,6 +26,13 @@ public sealed class MagicTower
 	}
 
 	private readonly List<Ring> _rings = new List<Ring>();
+	private ArcaneTower? _arcane;
+
+	/// <summary>新版法阵塔：每层 = 细底环 + 1 种刻画（符文带 / 五芒星 / 多边形 / 刻度环…），8 层循环不同刻画。</summary>
+	public MagicTower(Vector center, float radius, SigilParams parameters, SigilPalette palette, float width, int count, float heightBase, float heightStep, float radiusDecay, float spin)
+	{
+		_arcane = new ArcaneTower(center, radius, parameters, palette, width, count, heightBase, heightStep, radiusDecay, spin);
+	}
 
 	public MagicTower(Vector center, Color colorA, Color colorB, float width, int segments, int spokes, int count, float heightBase, float heightStep, float radius, float outerRadius, float radiusDecay, float spin)
 	{
@@ -52,6 +59,11 @@ public sealed class MagicTower
 		{
 			scale = 0.01f;
 		}
+		if (_arcane != null)
+		{
+			_arcane.Update(center, time, scale);
+			return;
+		}
 		foreach (Ring ring in _rings)
 		{
 			ring.Circle.SetRadius(ring.Radius * scale, ring.Outer * scale);
@@ -61,10 +73,28 @@ public sealed class MagicTower
 
 	public void Remove()
 	{
+		if (_arcane != null)
+		{
+			_arcane.Remove();
+			return;
+		}
 		foreach (Ring ring in _rings)
 		{
 			ring.Circle.Remove();
 		}
 		_rings.Clear();
+	}
+
+	public bool IsEmpty => _arcane != null ? _arcane.IsEmpty : _rings.Count == 0;
+
+	/// <summary>分帧拆除（arcane 支持；legacy 直接全拆）。</summary>
+	public int RemoveChunk(int budget)
+	{
+		if (_arcane != null)
+		{
+			return _arcane.RemoveChunk(budget);
+		}
+		Remove();
+		return 1 << 20;
 	}
 }

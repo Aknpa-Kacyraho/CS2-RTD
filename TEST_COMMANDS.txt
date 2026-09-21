@@ -130,9 +130,7 @@
 !givedice * Shield                   坚盾         你获得了 点额外护甲！伤害减免50%！
 !givedice * Singularity              奇点         按E释放奇点！15s内全图玩家被不可抗拒地拉向落点，冷却60s！
 !givedice * Supernova                光之剑：超新星   按E释放5s金色激光（穿墙）：路径上敌人连续100HP/s掉血，自身减速50%，冷却30s
-!givedice * SkyVerdict               天穹裁决       按E锁定准星处降下金色光柱：范围高伤+上抛+全图震屏，冷却60s
-!givedice * DivineDescent            神圣降临       按E展开光翼：8s无敌+伤害+100%+移速+30%+破上限回血，冷却90s
-!givedice * FinalJudgment            终焉审判       按E头顶生成魔法阵，4s后全图按距离衰减500伤害，越近越白，冷却90s
+!givedice * FinalJudgment            坠落天空       按E长出穹顶与天空法阵群，20s后光柱贯落，50m内2000→250衰减，越近越白，冷却90s
 !givedice * Skyline                  天际         按E键飞行3秒！在空中自由翱翔！冷却30秒
 !givedice * SlyFox                   狡猾狐狸       投掷物爆炸时间完全随机(0-20s)！
 !givedice * SmokeBomb                迷雾逃生       血量低于25%时自动丢出烟雾弹并隐身10秒！每命一次！
@@ -221,8 +219,6 @@ DeadHand       DeagleKing      致命一击        开枪自伤减半+命中回�
 DragonSoul     Dragonborn      巨龙共鸣        龙裔化龙时额外获得龙魂之力
 Supernova      DivinePunishment 圣裁天罚       激光伤害+50%
 Supernova      LaserCage       光轮圣裁        激光判定半径+40，更易扫中
-SkyVerdict     DivinePunishment 天罚共振       光柱范围+50%
-DivineDescent  God             神临            神圣降临无敌延长4s
-FinalJudgment  Ragnarok        末日            终焉审判伤害范围+30%
+FinalJudgment  Ragnarok        末日            坠落天空伤害范围+30%
 
-当前 Combo 总数: 42 对
+当前 Combo 总数: 40 对

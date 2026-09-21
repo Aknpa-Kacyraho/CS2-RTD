@@ -518,12 +518,6 @@ public class DicesConfig
 	[JsonPropertyName("supernova")]
 	public SupernovaConfig Supernova { get; set; } = new SupernovaConfig();
 
-	[JsonPropertyName("sky_verdict")]
-	public SkyVerdictConfig SkyVerdict { get; set; } = new SkyVerdictConfig();
-
-	[JsonPropertyName("divine_descent")]
-	public DivineDescentConfig DivineDescent { get; set; } = new DivineDescentConfig();
-
 	[JsonPropertyName("final_judgment")]
 	public FinalJudgmentConfig FinalJudgment { get; set; } = new FinalJudgmentConfig();
 }

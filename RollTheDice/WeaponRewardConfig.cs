@@ -20,8 +20,6 @@ public class WeaponRewardConfig
 		{ "Ragnarok", "weapon_knife_gungair" },
 		{ "WolfKing", "weapon_knife_kagerou_claw" },
 		{ "God", "weapon_knife_miko_yubi" },
-		{ "DivineDescent", "weapon_knife_reimu_rod" },
-		{ "SkyVerdict", "weapon_sanae_signnade" },
 		{ "FinalJudgment", "weapon_magic_potion" },
 	};
 

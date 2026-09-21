@@ -13,24 +13,36 @@ using RollTheDice.Utils;
 namespace RollTheDice.Dices;
 
 /// <summary>
-/// 终焉审判 FinalJudgment（传说）。
-/// 按 E：脚下铺开多层同心超位法阵（倒数收缩），头顶再竖起一座**8 层水平法阵塔**（层层抬升、正反旋转、双色交替）。
-/// 20s 后引爆：全图所有人（除施法者，含队友）按距离衰减受 2000→250 伤害，越近白屏越强，
-/// 命中瞬间全服广播 C4 爆炸音效 + 最强震屏 + 扭曲。CD 90s。法阵敌人可见，可跑位降低伤害。
-/// 注：施法后即使施法者阵亡也会照常引爆（20s 太久，不能被死亡打断）。
+/// 坠落天空（内部名 FinalJudgment，传说）。
+///
+/// <para>按 E 两阶段展开：① 落点长出**苍白色立体穹顶**（纬度自下而上生长、内部符文带流转，
+/// 倒数末尾亮度脉冲）；② 头顶高空**由低到高弹入数十个蓝白法阵**，倒数末尾向内合拢蓄力。
+/// 20s 后从阵群中心贯下**通天光柱**（≈50m 直径，多层同心近似径向渐变）+ 地面冲击环 + 结晶/爆炸粒子，
+/// 以落点为球心、半径 <c>falloff_radius</c>（≈50m）内按距离 2000→250 衰减，范围外无伤。</para>
+///
+/// <para>落点按 E 时**锁定不跟随**（施法者可以走出穹顶）。施法后即使施法者阵亡也会照常引爆。</para>
 /// </summary>
 public class FinalJudgment : DiceBlueprint
 {
-	private static readonly Color Gold = Color.FromArgb(255, 255, 205, 40);
-	private static readonly Color GoldPale = Color.FromArgb(255, 255, 240, 190);
+	// 阶段一：苍白色穹顶。
+	private static readonly Color DomeCore = Color.FromArgb(255, 228, 242, 255);
+	private static readonly Color DomeMid = Color.FromArgb(255, 188, 218, 245);
+	private static readonly Color DomeHalo = Color.FromArgb(255, 92, 140, 190);
+
+	// 阶段二：蓝白天空法阵 / 通天光柱。
+	private static readonly Color IceCore = Color.FromArgb(255, 245, 252, 255);
+	private static readonly Color IceMid = Color.FromArgb(255, 158, 214, 255);
+	private static readonly Color IceHalo = Color.FromArgb(255, 66, 126, 198);
 
 	private readonly Dictionary<ulong, float> _cooldownEnd = new Dictionary<ulong, float>();
+	private readonly Dictionary<ulong, float> _castAt = new Dictionary<ulong, float>();
 	private readonly Dictionary<ulong, float> _detonateAt = new Dictionary<ulong, float>();
 	private readonly Dictionary<ulong, Vector> _center = new Dictionary<ulong, Vector>();
-	private readonly Dictionary<ulong, MagicSigil> _ground = new Dictionary<ulong, MagicSigil>();
-	private readonly Dictionary<ulong, MagicTower> _tower = new Dictionary<ulong, MagicTower>();
-	private readonly Dictionary<ulong, int> _nextRingSecond = new Dictionary<ulong, int>();
-	private int _tick;
+	private readonly Dictionary<ulong, SigilDome> _dome = new Dictionary<ulong, SigilDome>();
+	private readonly Dictionary<ulong, SkySigilField> _sky = new Dictionary<ulong, SkySigilField>();
+	private readonly Dictionary<ulong, ShockRingFx> _shock = new Dictionary<ulong, ShockRingFx>();
+	private readonly Dictionary<ulong, int> _nextSecond = new Dictionary<ulong, int>();
+	private readonly SigilTeardown _fade = new SigilTeardown();
 
 	public override string ClassName => "FinalJudgment";
 
@@ -51,7 +63,7 @@ public class FinalJudgment : DiceBlueprint
 		_players.Add(player);
 		_cooldownEnd[player.SteamID] = 0f;
 		NotifyPlayers(player, ClassName, new Dictionary<string, string> { { "playerName", player.PlayerName } });
-		player.PrintToCenterAlert("☄ 按E发动终焉审判！");
+		player.PrintToCenterAlert("☄ 按E发动坠落天空！");
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
@@ -66,21 +78,28 @@ public class FinalJudgment : DiceBlueprint
 
 	public override void Reset()
 	{
-		foreach (MagicSigil sigil in _ground.Values)
+		_fade.Flush();
+		foreach (SigilDome dome in _dome.Values)
 		{
-			sigil.Remove();
+			dome.Remove();
 		}
-		foreach (MagicTower tower in _tower.Values)
+		foreach (SkySigilField sky in _sky.Values)
 		{
-			tower.Remove();
+			sky.Remove();
+		}
+		foreach (ShockRingFx shock in _shock.Values)
+		{
+			shock.Remove();
 		}
 		_players.Clear();
 		_cooldownEnd.Clear();
+		_castAt.Clear();
 		_detonateAt.Clear();
 		_center.Clear();
-		_ground.Clear();
-		_tower.Clear();
-		_nextRingSecond.Clear();
+		_dome.Clear();
+		_sky.Clear();
+		_shock.Clear();
+		_nextSecond.Clear();
 	}
 
 	public override void Destroy()
@@ -134,30 +153,49 @@ public class FinalJudgment : DiceBlueprint
 		Vector center = new Vector(origin.X, origin.Y, origin.Z);
 		FinalJudgmentConfig cfg = _config.Dices.FinalJudgment;
 		ulong sid = player.SteamID;
+		SigilParams sp = SigilParams.From(cfg.SigilDensity, cfg.RuneTicks, cfg.TickRingCount, cfg.StarPoints, cfg.StarSkip, cfg.PolygonSides, cfg.DoubleLine, cfg.SigilSeed);
 
-		_ground[sid] = new MagicSigil(center, cfg.GroundRadius, cfg.GroundOuterRadius, Gold, cfg.RuneWidth, cfg.RuneSegments, cfg.RuneSpokes, cfg.SigilRings, cfg.SigilShrink, cfg.SigilSpin, 4f);
-
-		// 空中法阵塔：8 层水平法阵往上叠成"超位魔法"塔（够高/够大/够多/双色交替）。
-		_tower[sid] = new MagicTower(center, Gold, GoldPale, cfg.RuneWidth, cfg.TowerSegments, cfg.TowerSpokes, cfg.TowerCount, cfg.TowerHeightBase, cfg.TowerHeightStep, cfg.TowerRadius, cfg.TowerOuterRadius, cfg.TowerRadiusDecay, cfg.TowerSpin);
+		if (cfg.DomeEnabled)
+		{
+			SigilPalette domePalette = new SigilPalette(DomeCore, DomeMid, DomeHalo);
+			_dome[sid] = new SigilDome(center, cfg.DomeRadius, domePalette, cfg.SigilWidth, cfg.DomeLatitudeRings, cfg.DomeSegments, cfg.DomeMeridians, 8, cfg.DomeSpin, cfg.DomeGrowSeconds, now);
+		}
+		if (cfg.SkyEnabled)
+		{
+			SigilPalette skyPalette = new SigilPalette(IceCore, IceMid, IceHalo);
+			_sky[sid] = new SkySigilField(center, cfg.SkyCount, cfg.SkyHeightStart, cfg.SkyHeightEnd, cfg.SkyRadiusStart, cfg.SkyRadiusEnd, cfg.SkyRadiusAlternate, cfg.SkyStartDelay, cfg.SkyLayerDelay, cfg.SkyGrowSeconds, cfg.SkySpin, sp, skyPalette, cfg.SigilWidth, now);
+		}
 
 		Effects.Play(new Vector(center.X, center.Y, center.Z + 2f), ParticlePaths.PingGroundRings, cfg.DelaySeconds + 1.5f);
+		_castAt[sid] = now;
 		_detonateAt[sid] = now + cfg.DelaySeconds;
 		_center[sid] = center;
-		_nextRingSecond[sid] = (int)MathF.Ceiling(cfg.DelaySeconds);
+		_nextSecond[sid] = (int)MathF.Ceiling(cfg.DelaySeconds);
 		_cooldownEnd[sid] = now + cfg.CooldownSeconds;
-		player.PrintToCenterAlert($"☄ 终焉审判！{cfg.DelaySeconds:0}s 后引爆，快离开中心！");
-		Server.PrintToChatAll($" {_localizer["command.prefix"].Value}☄ {player.PlayerName} 发动了终焉审判！");
+		player.PrintToCenterAlert($"☄ 坠落天空！{cfg.DelaySeconds:0}s 后降临，快离开中心！");
+		Server.PrintToChatAll($" {_localizer["command.prefix"].Value}☄ {player.PlayerName} 发动了坠落天空！");
 	}
 
 	public void OnTick()
 	{
+		float now = Server.CurrentTime;
+		if (_fade.Any)
+		{
+			_fade.Tick(now);
+		}
+		foreach (KeyValuePair<ulong, ShockRingFx> kv in _shock.ToList())
+		{
+			kv.Value.Update(now);
+			if (kv.Value.Finished)
+			{
+				kv.Value.Remove();
+				_shock.Remove(kv.Key);
+			}
+		}
 		if (_detonateAt.Count == 0)
 		{
 			return;
 		}
-		_tick++;
-		bool visual = (_tick & 1) == 0;
-		float now = Server.CurrentTime;
 		FinalJudgmentConfig cfg = _config.Dices.FinalJudgment;
 		float delay = MathF.Max(cfg.DelaySeconds, 0.1f);
 		foreach (KeyValuePair<ulong, float> kv in _detonateAt.ToList())
@@ -170,30 +208,39 @@ public class FinalJudgment : DiceBlueprint
 				continue;
 			}
 			float remain = MathF.Max(kv.Value - now, 0f);
-			float frac = Math.Clamp(remain / delay, 0f, 1f);
-			if (visual)
+
+			if (_dome.TryGetValue(sid, out SigilDome dome))
 			{
-				float scale = 1f + cfg.SigilContract * frac;
-				if (_ground.TryGetValue(sid, out MagicSigil ground))
+				dome.Update(center, now, 1f);
+				float pulse = 0f;
+				if (cfg.DomePulseSeconds > 0f && remain <= cfg.DomePulseSeconds)
 				{
-					ground.Update(center, now, scale);
+					pulse = Math.Clamp(1f - remain / cfg.DomePulseSeconds, 0f, 1f);
 				}
-				if (_tower.TryGetValue(sid, out MagicTower tower))
-				{
-					tower.Update(center, now, 1f + cfg.TowerContract * frac);
-				}
+				dome.SetPulse(pulse);
 			}
+			if (_sky.TryGetValue(sid, out SkySigilField sky))
+			{
+				float contract = 1f;
+				float contractSeconds = MathF.Max(cfg.SkyContractSeconds, 0.1f);
+				if (remain < contractSeconds)
+				{
+					contract = 1f - cfg.SkyContract * (1f - remain / contractSeconds);
+				}
+				sky.Update(center, now, contract);
+			}
+
 			if (now >= kv.Value)
 			{
-				ClearPending(sid);
+				DetachSigil(sid, center);
 				Detonate(sid, center);
 				continue;
 			}
 			int remaining = (int)MathF.Ceiling(kv.Value - now);
-			if (_nextRingSecond.TryGetValue(sid, out int last) && remaining < last)
+			if (_nextSecond.TryGetValue(sid, out int last) && remaining < last)
 			{
-				_nextRingSecond[sid] = remaining;
-				FindBySteamId(sid)?.PrintToCenterAlert($"☄ 终焉审判 {remaining}s");
+				_nextSecond[sid] = remaining;
+				FindBySteamId(sid)?.PrintToCenterAlert($"☄ 坠落天空 {remaining}s");
 			}
 		}
 	}
@@ -201,23 +248,34 @@ public class FinalJudgment : DiceBlueprint
 	private void Detonate(ulong casterSid, Vector center)
 	{
 		FinalJudgmentConfig cfg = _config.Dices.FinalJudgment;
-		float falloff = MathF.Max(cfg.FalloffRadius, 1f);
+		float radius = MathF.Max(cfg.FalloffRadius, 1f);
 		CCSPlayerController caster = FindBySteamId(casterSid);
 		if (caster != null && DiceSynergy.HasPartner(caster, "Ragnarok"))
 		{
-			falloff *= 1.3f;
+			radius *= 1.3f;
 		}
-		Effects.BeamColumn(new Vector(center.X, center.Y, center.Z), cfg.PillarHeight, Gold, cfg.PillarWidth, cfg.PillarLife);
+
+		// 通天光柱：多层同心 CBeam 近似"炽白核心 → 蓝白边缘"。
+		Effects.SkyPillar(new Vector(center.X, center.Y, center.Z), cfg.PillarHeight, IceCore, IceMid, IceHalo, cfg.PillarRadius, cfg.PillarLife);
 		Effects.Play(center, ParticlePaths.ExplosionHegrenade, 2f);
 		Effects.Play(center, ParticlePaths.ExplosionDistort, 2f);
 		Effects.Play(center, ParticlePaths.ExplosionFlashbang, 2f);
+		Effects.Play(center, ParticlePaths.SnowBurst, 2f);
 		Effects.Explosion(center, 0, null);
 		Effects.SoundAll(cfg.ExplosionSound, cfg.ExplosionSoundVolume);
 		Effects.Shake(center, cfg.ShakeAmplitude, cfg.ShakeFrequency, cfg.ShakeDuration, cfg.ShakeRadius);
 
+		// 地面冲击环：从落点向外扩散（每 tick 在 OnTick 里 Update）。
+		if (_shock.TryGetValue(casterSid, out ShockRingFx existing))
+		{
+			existing.Remove();
+		}
+		_shock[casterSid] = new ShockRingFx(center, cfg.ShockRings, cfg.ShockRadius, cfg.ShockSeconds, IceMid, cfg.SigilWidth * 1.5f, Server.CurrentTime);
+
+		// 范围伤害：落点球心、radius 内 2000→250 线性衰减；范围外无伤。施法者自己也在范围内。
 		foreach (CCSPlayerController victim in Utilities.GetPlayers())
 		{
-			if (victim == null || !victim.IsValid || victim.IsHLTV || victim.SteamID == casterSid)
+			if (victim == null || !victim.IsValid || victim.IsHLTV)
 			{
 				continue;
 			}
@@ -231,13 +289,19 @@ public class FinalJudgment : DiceBlueprint
 			float dy = pos.Y - center.Y;
 			float dz = pos.Z - center.Z;
 			float dist = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
-			float proximity = Math.Clamp(1f - dist / falloff, 0f, 1f);
+			float proximity = Math.Clamp(1f - dist / radius, 0f, 1f);
+			if (proximity <= 0f)
+			{
+				continue;
+			}
 			Effects.Whiteout(victim, cfg.WhiteoutSeconds * proximity, 255f * proximity);
 			if (Invulnerability.IsInvulnerable(victim))
 			{
 				continue;
 			}
-			int dmg = cfg.MinDamage + (int)MathF.Round((cfg.MaxDamage - cfg.MinDamage) * proximity);
+			int dmg = cfg.FalloffEnabled
+				? cfg.MinDamage + (int)MathF.Round((cfg.MaxDamage - cfg.MinDamage) * proximity)
+				: cfg.MaxDamage;
 			if (dmg <= 0)
 			{
 				continue;
@@ -264,20 +328,49 @@ public class FinalJudgment : DiceBlueprint
 		}
 	}
 
+	/// <summary>引爆前把穹顶 / 法阵群交给分帧拆除队列：不在爆炸同一帧删除上千实体。</summary>
+	private void DetachSigil(ulong sid, Vector? center)
+	{
+		_detonateAt.Remove(sid);
+		_nextSecond.Remove(sid);
+		_center.Remove(sid);
+		_castAt.Remove(sid);
+		_dome.Remove(sid, out SigilDome? dome);
+		_sky.Remove(sid, out SkySigilField? sky);
+
+		List<IBeamGroup> groups = new List<IBeamGroup>();
+		if (dome != null)
+		{
+			groups.Add(dome);
+		}
+		if (sky != null)
+		{
+			groups.Add(sky);
+		}
+		if (center != null)
+		{
+			_fade.Add(groups, center);
+			return;
+		}
+		foreach (IBeamGroup group in groups)
+		{
+			group.Remove();
+		}
+	}
+
 	private void ClearPending(ulong sid)
 	{
 		_detonateAt.Remove(sid);
+		_nextSecond.Remove(sid);
 		_center.Remove(sid);
-		_nextRingSecond.Remove(sid);
-		if (_ground.TryGetValue(sid, out MagicSigil ground))
+		_castAt.Remove(sid);
+		if (_dome.Remove(sid, out SigilDome? dome))
 		{
-			ground.Remove();
-			_ground.Remove(sid);
+			dome.Remove();
 		}
-		if (_tower.TryGetValue(sid, out MagicTower tower))
+		if (_sky.Remove(sid, out SkySigilField? sky))
 		{
-			tower.Remove();
-			_tower.Remove(sid);
+			sky.Remove();
 		}
 	}
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Globalization;
 using System.IO;
 using System.IO.Enumeration;
@@ -50,6 +51,10 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	private readonly Random _random;
 
 	private const int DefaultMaxDicePerPlayer = 1;
+
+	private readonly List<(float End, ArcaneGroundSigil Sigil, ArcaneTower Tower, Vector Center)> _sigilTests = new List<(float End, ArcaneGroundSigil Sigil, ArcaneTower Tower, Vector Center)>();
+
+	private bool _sigilTimerStarted;
 
 	public required PluginConfig Config { get; set; }
 
@@ -162,6 +167,72 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		};
 		string normalized = Effects.Normalize(path);
 		command.ReplyToCommand(system != null ? $"OK {normalized}" : $"FAILED {normalized}");
+	}
+
+	[ConsoleCommand("rtdsigil", "Spawn a test arcane sigil at your feet (debug)")]
+	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
+	[CommandHelper(0, "[radius] [density] [seconds]")]
+	public void CommandSigil(CCSPlayerController player, CommandInfo command)
+	{
+		if (player == null || !player.IsValid)
+		{
+			return;
+		}
+		Vector origin = player.PlayerPawn?.Value?.AbsOrigin;
+		if (origin == null)
+		{
+			command.ReplyToCommand("rtdsigil: no pawn origin");
+			return;
+		}
+		float radius = 520f;
+		if (float.TryParse(command.GetArg(1), NumberStyles.Float, CultureInfo.InvariantCulture, out float parsedRadius) && parsedRadius > 0f)
+		{
+			radius = parsedRadius;
+		}
+		float density = 1f;
+		if (float.TryParse(command.GetArg(2), NumberStyles.Float, CultureInfo.InvariantCulture, out float parsedDensity) && parsedDensity > 0f)
+		{
+			density = parsedDensity;
+		}
+		float seconds = 20f;
+		if (float.TryParse(command.GetArg(3), NumberStyles.Float, CultureInfo.InvariantCulture, out float parsedSeconds) && parsedSeconds > 0f)
+		{
+			seconds = parsedSeconds;
+		}
+		Vector center = new Vector(origin.X, origin.Y, origin.Z);
+		SigilParams parameters = new SigilParams { Density = density };
+		SigilPalette palette = new SigilPalette(Color.FromArgb(255, 255, 248, 220), Color.FromArgb(255, 255, 205, 40), Color.FromArgb(255, 255, 180, 30));
+		ArcaneGroundSigil sigil = new ArcaneGroundSigil(center, radius, parameters, palette, 2.4f);
+		ArcaneTower tower = new ArcaneTower(center, radius * 1.1f, parameters, palette, 2.4f, 8, 300f, 240f, 0f, 0.5f);
+		_sigilTests.Add((Server.CurrentTime + seconds, sigil, tower, center));
+		if (!_sigilTimerStarted)
+		{
+			_sigilTimerStarted = true;
+			AddTimer(0.05f, SigilTestTick, TimerFlags.REPEAT);
+		}
+		command.ReplyToCommand($"[rtdsigil] beams = {sigil.BeamCount + tower.BeamCount} (ground {sigil.BeamCount} + tower {tower.BeamCount}), density {density:0.##}, {seconds:0}s");
+	}
+
+	private void SigilTestTick()
+	{
+		if (_sigilTests.Count == 0)
+		{
+			return;
+		}
+		float now = Server.CurrentTime;
+		for (int i = _sigilTests.Count - 1; i >= 0; i--)
+		{
+			(float end, ArcaneGroundSigil sigil, ArcaneTower tower, Vector center) = _sigilTests[i];
+			if (now >= end)
+			{
+				sigil.Remove();
+				tower.Remove();
+				_sigilTests.RemoveAt(i);
+				continue;
+			}
+			sigil.Update(center, now, 1f);
+			tower.Update(center, now, 1f);
+		}
 	}
 
 	[ConsoleCommand("rtd", "Roll the Dice")]
