@@ -126,6 +126,11 @@ public class Sacrifice : DiceBlueprint
 			{
 				Server.NextFrame((Action)delegate
 				{
+					// ★ 两帧后才执行：目标玩家可能已断开/换边 → 先验有效性再读 schema（否则原生崩）。
+					if (reviveTarget == null || !((CEntityInstance)reviveTarget).IsValid)
+					{
+						return;
+					}
 					CCSPlayerController obj = reviveTarget;
 					if (!((CEntityInstance)(object)((obj == null) ? null : obj.PlayerPawn?.Value) != (CEntityInstance)null) || ((CBaseEntity)reviveTarget.PlayerPawn.Value).LifeState != 0)
 					{
@@ -137,6 +142,11 @@ public class Sacrifice : DiceBlueprint
 							//IL_01aa: Unknown result type (might be due to invalid IL or missing references)
 							//IL_01af: Unknown result type (might be due to invalid IL or missing references)
 							//IL_01b8: Expected O, but got Unknown
+							// ★ 再等一帧后仍需重新验有效性（断线/换边窗口）。
+							if (reviveTarget == null || !((CEntityInstance)reviveTarget).IsValid)
+							{
+								return;
+							}
 							CCSPlayerController obj2 = reviveTarget;
 							if (!((CEntityInstance)(object)((obj2 == null) ? null : obj2.PlayerPawn?.Value) == (CEntityInstance)null) && ((CBaseEntity)reviveTarget.PlayerPawn.Value).LifeState == 0)
 							{

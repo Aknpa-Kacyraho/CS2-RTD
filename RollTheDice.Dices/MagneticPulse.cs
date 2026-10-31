@@ -374,25 +374,16 @@ public class MagneticPulse : DiceBlueprint
 			float value2 = pos.Y + num2 * MathF.Sin(x);
 			float num4 = pos.X + num2 * MathF.Cos(x2);
 			float num5 = pos.Y + num2 * MathF.Sin(x2);
-			CBeam val2 = Utilities.CreateEntityByName<CBeam>("beam");
-			if ((CEntityInstance)(object)val2 == (CEntityInstance)null)
+			CBeam? val2 = BeamFx.Create(Color.FromArgb(200, 30, 144, 255), 3f);
+			if (val2 == null)
 			{
 				continue;
 			}
-			((CBaseModelEntity)val2).Render = Color.FromArgb(200, 30, 144, 255);
-			val2.Width = 3f;
-			((CBaseEntity)val2).Teleport(new Vector((float?)value, (float?)value2, (float?)(pos.Z + 30f)), new QAngle((float?)null, (float?)null, (float?)null), new Vector((float?)null, (float?)null, (float?)null));
-			val2.EndPos.X = num4;
-			val2.EndPos.Y = num5;
-			val2.EndPos.Z = pos.Z + 30f;
-			((CBaseEntity)val2).DispatchSpawn();
+			BeamFx.Move(val2, new Vector((float?)value, (float?)value2, (float?)(pos.Z + 30f)), new Vector((float?)num4, (float?)num5, (float?)(pos.Z + 30f)));
 			CBeam capturedBeam = val2;
 			new Timer(1f, (Action)delegate
 			{
-				if ((CEntityInstance)(object)capturedBeam != (CEntityInstance)null && ((CEntityInstance)capturedBeam).IsValid)
-				{
-					((CEntityInstance)capturedBeam).Remove();
-				}
+				BeamFx.Kill(capturedBeam);
 			}, (TimerFlags?)null);
 		}
 	}

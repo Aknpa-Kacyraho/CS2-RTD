@@ -135,6 +135,11 @@ public class Corona : DiceBlueprint
 				{
 					Server.NextFrame((Action)delegate
 					{
+						// ★ 复活后再等两帧才写属性：玩家可能已断开/换边 → 先验有效性（否则原生崩）。
+						if (victim == null || !((CEntityInstance)victim).IsValid)
+						{
+							return;
+						}
 						CCSPlayerPawn val2 = victim.PlayerPawn?.Value;
 						if (val2 != null && ((CEntityInstance)val2).IsValid)
 						{

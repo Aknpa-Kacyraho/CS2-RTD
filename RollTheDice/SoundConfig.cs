@@ -31,6 +31,7 @@ public class SoundConfig
 		{ "WheelOfFate", "sounds/touhou/timeout.vsnd" },
 		{ "SwordSaint", "sounds/touhou/xrole/youmu/slash_glow.vsnd" },
 		{ "FinalJudgment", "sounds/touhou/bullet/explode4.vsnd" },
+		{ "Excalibur", "sounds/touhou/xrole/sanae/laser_draw.vsnd" },
 		{ "WolfKing", "sounds/touhou/public/wolf.vsnd" },
 		{ "World", "sounds/touhou/xrole/sakuya/the_world.vsnd" },
 		// combo

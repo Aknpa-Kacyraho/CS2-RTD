@@ -81,7 +81,7 @@ public class FogOfWar : DiceBlueprint
 		if ((CEntityInstance)(object)_fogController == (CEntityInstance)null || !((CEntityInstance)_fogController).IsValid)
 		{
 			_fogController = Utilities.CreateEntityByName<CFogController>("env_fog_controller");
-			if ((CEntityInstance)(object)_fogController == (CEntityInstance)null)
+			if ((CEntityInstance)(object)_fogController == (CEntityInstance)null || !((CEntityInstance)_fogController).IsValid)
 			{
 				return;
 			}
@@ -102,15 +102,15 @@ public class FogOfWar : DiceBlueprint
 			return;
 		}
 		_playerVisibility = Utilities.FindAllEntitiesByDesignerName<CPlayerVisibility>("env_player_visibility").FirstOrDefault();
-		if ((CEntityInstance)(object)_playerVisibility == (CEntityInstance)null)
+		if ((CEntityInstance)(object)_playerVisibility == (CEntityInstance)null || !((CEntityInstance)_playerVisibility).IsValid)
 		{
 			_playerVisibility = Utilities.CreateEntityByName<CPlayerVisibility>("env_player_visibility");
-			if ((CEntityInstance)(object)_playerVisibility != (CEntityInstance)null)
+			if ((CEntityInstance)(object)_playerVisibility != (CEntityInstance)null && ((CEntityInstance)_playerVisibility).IsValid)
 			{
 				((CBaseEntity)_playerVisibility).DispatchSpawn();
 			}
 		}
-		if ((CEntityInstance)(object)_playerVisibility != (CEntityInstance)null)
+		if ((CEntityInstance)(object)_playerVisibility != (CEntityInstance)null && ((CEntityInstance)_playerVisibility).IsValid)
 		{
 			_playerVisibility.FogMaxDensityMultiplier = _config.Dices.FogOfWar.PlayerVisibility;
 			Utilities.SetStateChanged((CBaseEntity)(object)_playerVisibility, "CPlayerVisibility", "m_flFogMaxDensityMultiplier", 0);

@@ -63,7 +63,6 @@ C4专家（C4Expert） - 稀有
 愚者（Fool） - 稀有
 前线巨兽（FrontlineBeast） - 稀有
 巨人（Giant） - 稀有
-暴食者（Glutton） - 稀有
 神后（Goddess） - 稀有
 黑洞（GravityWell） - 稀有
 手雷王（GrenadeKing） - 稀有

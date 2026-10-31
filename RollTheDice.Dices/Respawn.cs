@@ -150,6 +150,11 @@ public class Respawn : DiceBlueprint
 						//IL_00d6: Unknown result type (might be due to invalid IL or missing references)
 						//IL_00e0: Expected O, but got Unknown
 						//IL_00e0: Expected O, but got Unknown
+						// ★ 两帧后才执行：玩家可能已断开/换边 → 先验有效性再读 schema（否则原生崩）。
+						if (victim == null || !((CEntityInstance)victim).IsValid)
+						{
+							return;
+						}
 						CCSPlayerController obj4 = victim;
 						if (!((CEntityInstance)(object)((obj4 == null) ? null : obj4.PlayerPawn?.Value) == (CEntityInstance)null) && _players.Contains(victim) && ((CBaseEntity)victim.PlayerPawn.Value).LifeState != 0)
 						{
@@ -170,6 +175,11 @@ public class Respawn : DiceBlueprint
 								//IL_00bc: Unknown result type (might be due to invalid IL or missing references)
 								//IL_00c1: Unknown result type (might be due to invalid IL or missing references)
 								//IL_00ca: Expected O, but got Unknown
+								// ★ 再等一帧后仍需重新验有效性（断线/换边窗口）。
+								if (victim == null || !((CEntityInstance)victim).IsValid)
+								{
+									return;
+								}
 								CCSPlayerController obj5 = victim;
 								if (!((CEntityInstance)(object)((obj5 == null) ? null : obj5.PlayerPawn?.Value) == (CEntityInstance)null))
 								{

@@ -144,7 +144,14 @@ public static class Effects
 		}
 		Vector position = new Vector(origin.X, origin.Y, origin.Z + zOffset);
 		CParticleSystem system = Utilities.CreateEntityByName<CParticleSystem>("info_particle_system");
-		return Init(system, particle, position, null, target, lifeSeconds) ? system : null;
+		if (!Init(system, particle, position, null, target, lifeSeconds))
+		{
+			return null;
+		}
+		// ★ 挂了 SetParent 的粒子在父实体（玩家 pawn）被删除后会留下悬垂父链 → 引擎算世界坐标时崩。
+		// 交给看门狗，父一失效立刻拆。
+		ChildGuard.Track(system, target);
+		return system;
 	}
 
 	public static CEnvParticleGlow? Glow(Vector? position, string particle, Color tint, float radiusScale = 1f, float alphaScale = 1f, float? lifeSeconds = null)

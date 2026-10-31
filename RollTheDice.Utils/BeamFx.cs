@@ -54,6 +54,64 @@ public static class BeamFx
 		}
 	}
 
+	/// <summary>
+	/// 一次性建好带"样式"的 CBeam（起点 → 终点）：光晕 / beam flags / 纹理滚动速度 / 淡出长度。
+	///
+	/// <para>★ 这些参数**必须在 <c>DispatchSpawn</c> 之前设**——它们是初始快照的一部分；spawn 之后
+	/// 再改（<c>m_flHaloScale</c>/<c>m_nBeamFlags</c> 等）在 1.0.373 没有可靠的标脏路径，改了也不一定同步。
+	/// 之后唯一还能安全改的是宽度（<see cref="SetWidth"/>，已验证）与颜色（<see cref="SetColor"/>，未完全验证）。</para>
+	///
+	/// <para><paramref name="beamFlags"/> 是 Source 的 beam flags 位掩码：<c>32768</c>=HALOBEAM（柔光晕）、
+	/// <c>16</c>=SINENOISE（正弦蛇形）、<c>4|8</c>=FADEIN|FADEOUT（首尾淡出，配 <see cref="FadeLength"/>）。0 = 默认。</para>
+	/// </summary>
+	public static CBeam? CreateStyled(Vector start, Vector end, Color color, float width, float haloScale = 0f, int beamFlags = 0, float scrollSpeed = 0f, float fadeLength = 0f)
+	{
+		CBeam? beam = Utilities.CreateEntityByName<CBeam>("beam");
+		if (beam == null || !beam.IsValid)
+		{
+			return null;
+		}
+		try
+		{
+			((CBaseModelEntity)beam).Render = color;
+			beam.Width = width;
+			beam.EndWidth = width;
+			if (haloScale > 0f)
+			{
+				beam.HaloScale = haloScale;
+			}
+			if (beamFlags != 0)
+			{
+				beam.BeamFlags = (uint)beamFlags;
+			}
+			if (scrollSpeed != 0f)
+			{
+				beam.Speed = scrollSpeed;
+			}
+			if (fadeLength > 0f)
+			{
+				beam.FadeLength = fadeLength;
+			}
+		}
+		catch
+		{
+		}
+		// ★ spawn 必须无条件执行：上面任一"样式字段"在本机不被支持时，也不能让这根 beam 变成
+		// "没 DispatchSpawn 的废实体"（会白占实体位且不显示）。
+		try
+		{
+			((CBaseEntity)beam).Teleport(start, new QAngle(0f, 0f, 0f), new Vector(0f, 0f, 0f));
+			beam.EndPos.X = end.X;
+			beam.EndPos.Y = end.Y;
+			beam.EndPos.Z = end.Z;
+			((CBaseEntity)beam).DispatchSpawn();
+		}
+		catch
+		{
+		}
+		return beam;
+	}
+
 	/// <summary>运行时改宽度（脉冲 / 收束）。直接写字段不会同步给客户端，必须显式标脏。</summary>
 	public static void SetWidth(CBeam? beam, float width, float endWidth = -1f)
 	{

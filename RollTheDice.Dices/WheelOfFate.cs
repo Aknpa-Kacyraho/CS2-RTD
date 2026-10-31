@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
@@ -14,6 +15,9 @@ namespace RollTheDice.Dices;
 public class WheelOfFate : DiceBlueprint
 {
 	public readonly Random _random = new Random();
+
+	// 本回合已复活次数（按 SteamID 记，跨死亡保留；回合结束 Reset 清空）。
+	private readonly Dictionary<ulong, int> _reviveCount = new Dictionary<ulong, int>();
 
 	public override string ClassName => "WheelOfFate";
 
@@ -54,7 +58,7 @@ public class WheelOfFate : DiceBlueprint
 			} });
 			if (DiceSynergy.HasPartner(player, "Fate"))
 			{
-				DiceSynergy.AnnounceCombo(player, "命运双生", "命运之轮复活率提升至 80%！");
+				DiceSynergy.AnnounceCombo(player, "命运双生", "命运之轮复活率衰减减半（每次 -5%）！");
 			}
 		}
 	}
@@ -64,147 +68,174 @@ public class WheelOfFate : DiceBlueprint
 		if (reason != DiceRemoveReason.Death)
 		{
 			_players.Remove(player);
+			_reviveCount.Remove(((CBasePlayerController)player).SteamID);
 		}
 	}
 
 	public override void Reset()
 	{
 		_players.Clear();
+		_reviveCount.Clear();
 	}
 
 	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
 	{
-		//IL_006a: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0353: Unknown result type (might be due to invalid IL or missing references)
-		//IL_00eb: Unknown result type (might be due to invalid IL or missing references)
-		//IL_034f: Unknown result type (might be due to invalid IL or missing references)
-		//IL_01ac: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0200: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0239: Unknown result type (might be due to invalid IL or missing references)
-		//IL_0272: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02a8: Unknown result type (might be due to invalid IL or missing references)
-		//IL_02de: Unknown result type (might be due to invalid IL or missing references)
 		CCSPlayerController victim = @event.Userid;
-		if (!((CEntityInstance)(object)victim == (CEntityInstance)null) && _players.Contains(victim))
+		if ((CEntityInstance)(object)victim == (CEntityInstance)null || !((CEntityInstance)victim).IsValid || !_players.Contains(victim))
 		{
-			CHandle<CCSPlayerPawn> playerPawn = victim.PlayerPawn;
-			object obj;
-			if (playerPawn == null)
+			return (HookResult)0;
+		}
+		CCSPlayerController obj = victim;
+		CCSPlayerPawn victimPawn = ((obj == null) ? null : obj.PlayerPawn?.Value);
+		if (victimPawn == null || !((CEntityInstance)victimPawn).IsValid || ((CBasePlayerPawn)victimPawn).WeaponServices == null)
+		{
+			return (HookResult)0;
+		}
+		var cfg = _config.Dices.WheelOfFate;
+		ulong steamId = ((CBasePlayerController)victim).SteamID;
+		int revivesUsed = (_reviveCount.TryGetValue(steamId, out int used) ? used : 0);
+		float decay = cfg.ReviveDecay * (DiceSynergy.HasPartner(victim, "Fate") ? 0.5f : 1f);
+		float reviveChance = MathF.Max(cfg.ReviveChanceMin, cfg.ReviveChance - decay * revivesUsed);
+		RollTheDice.LogDebug($"[WheelOfFate] death: sid={steamId} used={revivesUsed} chance={reviveChance:F2}\n");
+		if ((float)_random.NextDouble() >= reviveChance)
+		{
+			string value2 = _localizer["dice_WheelOfFate_failed"].Value;
+			if (!string.IsNullOrEmpty(value2))
 			{
-				obj = null;
+				victim.PrintToCenterAlert(value2
+					.Replace("{playerName}", ((CBasePlayerController)victim).PlayerName)
+					.Replace("{chance}", MathF.Round(reviveChance * 100f).ToString("F0")));
 			}
-			else
+			return (HookResult)0;
+		}
+		_reviveCount[steamId] = revivesUsed + 1;
+		// 50% 概率顺手拉一名阵亡队友（概率不随复活次数衰减）。
+		CCSPlayerController teammate = null;
+		if ((float)_random.NextDouble() < cfg.TeammateReviveChance)
+		{
+			teammate = PickDeadTeammate(victim);
+		}
+		CCSPlayerController capturedVictim = victim;
+		CCSPlayerController capturedTeammate = teammate;
+		Server.NextFrame((Action)delegate
+		{
+			Server.NextFrame((Action)delegate
 			{
-				CCSPlayerPawn value = playerPawn.Value;
-				obj = ((value != null) ? ((CBasePlayerPawn)value).WeaponServices : null);
+				// ★ 两帧后才执行：玩家可能已断开/换边 → 先验有效性再读 schema（否则原生崩）。
+				TryRevive(capturedVictim, false);
+				if (capturedTeammate != null)
+				{
+					TryRevive(capturedTeammate, true);
+				}
+			});
+		});
+		return (HookResult)0;
+	}
+
+	/// <summary>随机挑一名同队阵亡队友（没有则返回 null）。</summary>
+	private CCSPlayerController PickDeadTeammate(CCSPlayerController victim)
+	{
+		try
+		{
+			List<CCSPlayerController> candidates = (from p in Utilities.GetPlayers()
+				where (CEntityInstance)(object)p != (CEntityInstance)null && ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV
+					&& (CEntityInstance)(object)p != (CEntityInstance)(object)victim
+					&& ((CBaseEntity)p).TeamNum == ((CBaseEntity)victim).TeamNum
+					&& (CEntityInstance)(object)((CBasePlayerController)p).Pawn?.Value != (CEntityInstance)null
+					&& ((CEntityInstance)((CBasePlayerController)p).Pawn.Value).IsValid
+					&& ((CBaseEntity)((CBasePlayerController)p).Pawn.Value).LifeState != 0
+				select p).ToList();
+			if (candidates.Count == 0)
+			{
+				return null;
 			}
-			if (obj != null)
+			return candidates[_random.Next(candidates.Count)];
+		}
+		catch
+		{
+			return null;
+		}
+	}
+
+	/// <summary>把阵亡玩家拉起来（等一帧再发装备，避免刚 Respawn 时 schema 还没就绪）。</summary>
+	private void TryRevive(CCSPlayerController player, bool asTeammate)
+	{
+		if (player == null || !((CEntityInstance)player).IsValid)
+		{
+			return;
+		}
+		CCSPlayerController obj = player;
+		CCSPlayerPawn pawn = ((obj == null) ? null : obj.PlayerPawn?.Value);
+		if (pawn == null || !((CEntityInstance)pawn).IsValid || ((CBaseEntity)pawn).LifeState == 0)
+		{
+			return;
+		}
+		CCSPlayerController captured = player;
+		player.Respawn();
+		Server.NextFrame((Action)delegate
+		{
+			// ★ 再等一帧后仍需重新验有效性（断线/换边窗口）。
+			ApplyReviveKit(captured, asTeammate);
+		});
+	}
+
+	/// <summary>复活装备：全甲（甲+头盔）+ 专属换模 AK + 刀（CT 带拆弹器）。</summary>
+	private void ApplyReviveKit(CCSPlayerController player, bool asTeammate)
+	{
+		if (player == null || !((CEntityInstance)player).IsValid)
+		{
+			return;
+		}
+		CCSPlayerController obj = player;
+		CCSPlayerPawn pawn = ((obj == null) ? null : obj.PlayerPawn?.Value);
+		if (pawn == null || !((CEntityInstance)pawn).IsValid || ((CBasePlayerPawn)pawn).ItemServices == null || ((CBaseEntity)pawn).LifeState != 0)
+		{
+			return;
+		}
+		player.RemoveWeapons();
+		player.GiveNamedItem("weapon_knife");
+		if ((int)player.Team == 3)
+		{
+			new CCSPlayer_ItemServices(((NativeObject)((CBasePlayerPawn)pawn).ItemServices).Handle).HasDefuser = true;
+		}
+		player.GiveNamedItem("item_assaultsuit");
+		pawn.ArmorValue = 100;
+		Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CCSPlayerPawn", "m_ArmorValue", 0);
+		// 普通 AK-47（不再使用自制模型换模）。
+		player.GiveNamedItem("weapon_ak47");
+		Vector absOrigin = ((CBaseEntity)pawn).AbsOrigin;
+		if (absOrigin != null)
+		{
+			Effects.Play(new Vector(absOrigin.X, absOrigin.Y, absOrigin.Z + 40f), ParticlePaths.GoldHaloRaysRadiate, 1.2f);
+		}
+		Effects.SoundAll(_config.Dices.WheelOfFate.ReviveSound, _config.Dices.WheelOfFate.ReviveSoundVolume);
+		if (asTeammate)
+		{
+			Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + _localizer["dice_WheelOfFate_teammate"].Value
+				.Replace("{playerName}", ((CBasePlayerController)player).PlayerName));
+			return;
+		}
+		int revivesUsed = (_reviveCount.TryGetValue(((CBasePlayerController)player).SteamID, out int used) ? used : 1);
+		float decay = _config.Dices.WheelOfFate.ReviveDecay * (DiceSynergy.HasPartner(player, "Fate") ? 0.5f : 1f);
+		float nextChance = MathF.Max(_config.Dices.WheelOfFate.ReviveChanceMin, _config.Dices.WheelOfFate.ReviveChance - decay * revivesUsed);
+		player.PrintToCenterAlert($"☸ 命运之轮复活！下次成功率 {MathF.Round(nextChance * 100f):F0}%");
+		if (Reincarnation.ComboWheelVictims.Remove(((CBasePlayerController)player).SteamID))
+		{
+			ulong comboSteamId = ((CBasePlayerController)player).SteamID;
+			int comboMax = _config.Dices.Reincarnation.MaxStacks;
+			int comboCur = (Reincarnation.PendingExtraDice.TryGetValue(comboSteamId, out var comboValue) ? comboValue : 0);
+			if (comboCur < comboMax)
 			{
-				double num = _random.NextDouble();
-				float reviveChance = (DiceSynergy.HasPartner(victim, "Fate") ? 0.8f : _config.Dices.WheelOfFate.ReviveChance);
-				if (num >= (double)reviveChance)
-				{
-					string value2 = _localizer["dice_WheelOfFate_failed"].Value;
-					if (!string.IsNullOrEmpty(value2))
-					{
-						victim.PrintToCenterAlert(value2.Replace("{playerName}", ((CBasePlayerController)victim).PlayerName));
-					}
-					return (HookResult)0;
-				}
-				List<string> tmpWeaponList = new List<string>();
-				// 保留的是"自己"死亡时的武器，而不是击杀者的武器。
-				foreach (CHandle<CBasePlayerWeapon> myWeapon in ((CBasePlayerPawn)victim.PlayerPawn.Value).WeaponServices.MyWeapons)
-				{
-					if (myWeapon == null || !myWeapon.IsValid || myWeapon.Value == null || ((CEntityInstance)myWeapon.Value).DesignerName == null)
-					{
-						continue;
-					}
-					string designerName = ((CEntityInstance)myWeapon.Value).DesignerName;
-					if (!designerName.Contains("knife") && !designerName.Contains("bayonet") && !designerName.Contains("c4") && !designerName.Contains("taser") && !designerName.Contains("hegrenade") && !designerName.Contains("flashbang") && !designerName.Contains("smokegrenade") && !designerName.Contains("molotov") && !designerName.Contains("decoy"))
-					{
-						tmpWeaponList.Add(designerName);
-					}
-				}
-				Server.NextFrame((Action)delegate
-				{
-					Server.NextFrame((Action)delegate
-					{
-						CCSPlayerController obj3 = victim;
-						if (!((CEntityInstance)(object)((obj3 == null) ? null : obj3.PlayerPawn?.Value) == (CEntityInstance)null) && _players.Contains(victim) && ((CBaseEntity)victim.PlayerPawn.Value).LifeState != 0)
-						{
-							victim.Respawn();
-							Server.NextFrame((Action)delegate
-							{
-								//IL_0094: Unknown result type (might be due to invalid IL or missing references)
-								//IL_009a: Invalid comparison between Unknown and I4
-								//IL_00bb: Unknown result type (might be due to invalid IL or missing references)
-								//IL_00c0: Unknown result type (might be due to invalid IL or missing references)
-								//IL_00c9: Expected O, but got Unknown
-								CCSPlayerController obj4 = victim;
-								if (!((CEntityInstance)(object)((obj4 == null) ? null : obj4.PlayerPawn?.Value) == (CEntityInstance)null))
-								{
-									CCSPlayerController obj5 = victim;
-									object obj6;
-									if (obj5 == null)
-									{
-										obj6 = null;
-									}
-									else
-									{
-										CHandle<CCSPlayerPawn> playerPawn3 = obj5.PlayerPawn;
-										obj6 = ((playerPawn3 != null) ? ((CBasePlayerPawn)playerPawn3.Value).ItemServices : null);
-									}
-									if (obj6 != null && ((CBaseEntity)victim.PlayerPawn.Value).LifeState == 0)
-									{
-										victim.RemoveWeapons();
-										victim.GiveNamedItem("weapon_knife");
-										if ((int)victim.Team == 3)
-										{
-											CCSPlayer_ItemServices val = new CCSPlayer_ItemServices(((NativeObject)((CBasePlayerPawn)victim.PlayerPawn.Value).ItemServices).Handle);
-											val.HasDefuser = true;
-											CCSPlayer_ItemServices val2 = val;
-										}
-										if (tmpWeaponList.Count > 0)
-										{
-											foreach (string item in tmpWeaponList)
-											{
-												victim.GiveNamedItem(item);
-											}
-										}
-										else
-										{
-											victim.GiveNamedItem(_config.Dices.Respawn.DefaultPrimaryWeapon);
-											victim.GiveNamedItem(_config.Dices.Respawn.DefaultSecondaryWeapon);
-										}
-										victim.PlayerPawn.Value.ArmorValue = 100;
-										Utilities.SetStateChanged((CBaseEntity)(object)victim.PlayerPawn.Value, "CCSPlayerPawn", "m_ArmorValue", 0);
-										if (Reincarnation.ComboWheelVictims.Remove(((CBasePlayerController)victim).SteamID))
-										{
-											ulong comboSteamId = ((CBasePlayerController)victim).SteamID;
-											int comboMax = _config.Dices.Reincarnation.MaxStacks;
-											int comboCur = (Reincarnation.PendingExtraDice.TryGetValue(comboSteamId, out var comboValue) ? comboValue : 0);
-											if (comboCur < comboMax)
-											{
-												Reincarnation.PendingExtraDice[comboSteamId] = comboCur + 1;
-												victim.PrintToCenterAlert("\u267b 不死轮回！下回合额外骰子 +1！");
-												Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + "\u267b 不死轮回联动！" + ((CBasePlayerController)victim).PlayerName + " 复活成功，轮回层数 +1！");
-											}
-										}
-										NotifyStatus(victim, ClassName, new Dictionary<string, string> { 
-										{
-											"playerName",
-											((CBasePlayerController)victim).PlayerName
-										} });
-										Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + _localizer["dice_WheelOfFate_broadcast"].Value.Replace("{playerName}", ((CBasePlayerController)victim).PlayerName));
-									}
-								}
-							});
-						}
-					});
-				});
-				return (HookResult)0;
+				Reincarnation.PendingExtraDice[comboSteamId] = comboCur + 1;
+				player.PrintToCenterAlert("\u267b 不死轮回！下回合额外骰子 +1！");
+				Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + "\u267b 不死轮回联动！" + ((CBasePlayerController)player).PlayerName + " 复活成功，轮回层数 +1！");
 			}
 		}
-		return (HookResult)0;
+		NotifyStatus(player, ClassName, new Dictionary<string, string> { 
+		{
+			"playerName",
+			((CBasePlayerController)player).PlayerName
+		} });
+		Server.PrintToChatAll(" " + _localizer["command.prefix"].Value + _localizer["dice_WheelOfFate_broadcast"].Value.Replace("{playerName}", ((CBasePlayerController)player).PlayerName));
 	}
 }

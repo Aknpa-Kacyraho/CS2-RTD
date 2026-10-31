@@ -144,6 +144,11 @@ public class SwordSaint : DiceBlueprint
 				Utilities.SetStateChanged(attackerPawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 				new Timer(0.5f, delegate
 				{
+					// ★ 0.5s 后触发：攻击者可能已断开 → 先验有效性再读 SteamID / pawn（否则原生崩）。
+					if (attacker == null || !((CEntityInstance)attacker).IsValid)
+					{
+						return;
+					}
 					SpeedBonusManager.UnregisterBySteamId(attacker.SteamID, ClassName);
 					CCSPlayerPawn after = attacker.PlayerPawn?.Value;
 					if (after != null && after.IsValid)

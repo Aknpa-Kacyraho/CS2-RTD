@@ -262,7 +262,7 @@ public class SmokeVision : DiceBlueprint
 			}
 			if (obj5 != null)
 			{
-				if (_activeSmokes.Any((CSmokeGrenadeProjectile s) => ((s != null) ? ((CBaseEntity)s).AbsOrigin : null) != null && Vectors.GetDistance(((CBaseEntity)s).AbsOrigin, ((CBaseEntity)victim.PlayerPawn.Value).AbsOrigin) < 150f))
+				if (_activeSmokes.Any((CSmokeGrenadeProjectile s) => s != null && ((CEntityInstance)s).IsValid && ((CBaseEntity)s).AbsOrigin != null && Vectors.GetDistance(((CBaseEntity)s).AbsOrigin, ((CBaseEntity)victim.PlayerPawn.Value).AbsOrigin) < 150f))
 				{
 					info.Damage = (int)(info.Damage * 1.3f);
 					return (HookResult)1;

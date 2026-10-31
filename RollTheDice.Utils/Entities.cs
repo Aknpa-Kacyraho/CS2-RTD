@@ -21,7 +21,7 @@ public static class Entities
 	public static CDynamicProp? CreatePlayerEntity(Vector position, QAngle rotation, string model, string animation, bool loop = false)
 	{
 		CDynamicProp val = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic");
-		if ((CEntityInstance)(object)val == (CEntityInstance)null)
+		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid)
 		{
 			return null;
 		}
@@ -63,7 +63,7 @@ public static class Entities
 		//IL_0096: Unknown result type (might be due to invalid IL or missing references)
 		//IL_009c: Expected O, but got Unknown
 		CDynamicProp val = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic_override");
-		if ((CEntityInstance)(object)val == (CEntityInstance)null)
+		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid)
 		{
 			return null;
 		}
@@ -100,6 +100,8 @@ public static class Entities
 		if (parent != (CEntityInstance)null)
 		{
 			((CEntityInstance)val).AcceptInput("SetParent", parent, parent, "!activator", 0);
+			// ★ 父实体（玩家 pawn 等）会在死亡/换边时被删除：父一失效就把子实体拆掉，避免悬垂父链崩溃。
+			ChildGuard.Track(val, parent);
 		}
 		return val;
 	}

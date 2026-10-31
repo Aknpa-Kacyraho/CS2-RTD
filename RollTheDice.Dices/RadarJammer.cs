@@ -136,6 +136,12 @@ public class RadarJammer : DiceBlueprint
 		}
 		Timer value2 = new Timer(blackoutDuration, (Action)delegate
 		{
+			// ★ 20s 后才触发：击杀者可能已断开/换边 → 先验有效性再读 TeamNum，否则原生崩。
+			if (captured == null || !((CEntityInstance)captured).IsValid)
+			{
+				_restoreTimers.Remove(captured);
+				return;
+			}
 			IEnumerable<CCSPlayerController> enumerable2 = from p in Utilities.GetPlayers()
 				where ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV && ((CBaseEntity)p).TeamNum != ((CBaseEntity)captured).TeamNum
 				select p;

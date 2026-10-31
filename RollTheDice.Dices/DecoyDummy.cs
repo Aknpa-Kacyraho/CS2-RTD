@@ -175,12 +175,13 @@ public class DecoyDummy : DiceBlueprint
 								if (!((CEntityInstance)(object)captured == (CEntityInstance)null) && ((CEntityInstance)captured).IsValid && pos != null)
 								{
 									CDynamicProp val4 = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic_override");
-									if (!((CEntityInstance)(object)val4 == (CEntityInstance)null))
+									if (!((CEntityInstance)(object)val4 == (CEntityInstance)null) && ((CEntityInstance)val4).IsValid)
 									{
-										((CBaseModelEntity)val4).SetModel("models/props/de_dust/hr_dust/dust_soccerball/dust_soccer_ball001.vmdl");
 										((CBaseModelEntity)val4).Render = Color.FromArgb(200, 100, 200, 255);
 										((CBaseEntity)val4).Teleport(pos, new QAngle((float?)0f, (float?)0f, (float?)0f), new Vector((float?)0f, (float?)0f, (float?)0f));
 										((CBaseEntity)val4).DispatchSpawn();
+										// ★ SetModel 放在 DispatchSpawn 之后（staging list 里 SetModel 会触发引擎断言）。
+										((CBaseModelEntity)val4).SetModel("models/props/de_dust/hr_dust/dust_soccerball/dust_soccer_ball001.vmdl");
 										if (!_activeDummies.ContainsKey(captured))
 										{
 											_activeDummies[captured] = new List<CDynamicProp>();

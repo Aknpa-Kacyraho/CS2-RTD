@@ -406,6 +406,11 @@ public class Fate : DiceBlueprint
 			{
 				Server.NextFrame((Action)delegate
 				{
+					// ★ 两帧后才执行：玩家可能已断开/换边 → 先验有效性再读 schema（否则原生崩）。
+					if (player == null || !((CEntityInstance)player).IsValid)
+					{
+						return;
+					}
 					CCSPlayerController obj6 = player;
 					CCSPlayerPawn val5 = ((obj6 == null) ? null : obj6.PlayerPawn?.Value);
 					if (val5 != null && ((CEntityInstance)val5).IsValid && ((CBaseEntity)val5).LifeState == 0)
@@ -691,6 +696,11 @@ public class Fate : DiceBlueprint
 					//IL_0176: Unknown result type (might be due to invalid IL or missing references)
 					//IL_0180: Expected O, but got Unknown
 					//IL_0180: Expected O, but got Unknown
+					// ★ 下一帧才执行：两名玩家都可能已断开/换边 → 先验有效性（否则原生崩）。
+					if (capV == null || !((CEntityInstance)capV).IsValid || capE == null || !((CEntityInstance)capE).IsValid)
+					{
+						return;
+					}
 					CCSPlayerController obj6 = capV;
 					CCSPlayerPawn val4 = ((obj6 == null) ? null : obj6.PlayerPawn?.Value);
 					if (val4 != null && ((CEntityInstance)val4).IsValid)
@@ -751,6 +761,11 @@ public class Fate : DiceBlueprint
 				CCSPlayerController capV = victim;
 				Server.NextFrame((Action)delegate
 				{
+					// ★ 下一帧才执行：玩家可能已断开/换边 → 先验有效性再读 schema（否则原生崩）。
+					if (capV == null || !((CEntityInstance)capV).IsValid)
+					{
+						return;
+					}
 					CCSPlayerController obj = capV;
 					CCSPlayerPawn val = ((obj == null) ? null : obj.PlayerPawn?.Value);
 					if (val != null && ((CEntityInstance)val).IsValid)

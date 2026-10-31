@@ -135,11 +135,16 @@ public class Emperor : DiceBlueprint
 			}
 		}
 		// 全队共享复活次数，已在上方累加。
-		Server.NextFrame((Action)delegate
-		{
 			Server.NextFrame((Action)delegate
 			{
-				CCSPlayerController obj2 = victim;
+				Server.NextFrame((Action)delegate
+				{
+					// ★ 两帧后才执行：玩家可能已断开/换边 → 先验有效性再读 schema（否则原生崩）。
+					if (victim == null || !((CEntityInstance)victim).IsValid)
+					{
+						return;
+					}
+					CCSPlayerController obj2 = victim;
 				if (!((CEntityInstance)(object)((obj2 == null) ? null : obj2.PlayerPawn?.Value) == (CEntityInstance)null) && ((CBaseEntity)victim.PlayerPawn.Value).LifeState != 0)
 				{
 					victim.Respawn();
@@ -151,6 +156,11 @@ public class Emperor : DiceBlueprint
 						//IL_00bb: Unknown result type (might be due to invalid IL or missing references)
 						//IL_00c0: Unknown result type (might be due to invalid IL or missing references)
 						//IL_00c9: Expected O, but got Unknown
+						// ★ 再等一帧后仍需重新验有效性（断线/换边窗口）。
+						if (victim == null || !((CEntityInstance)victim).IsValid)
+						{
+							return;
+						}
 						CCSPlayerController obj3 = victim;
 						if (!((CEntityInstance)(object)((obj3 == null) ? null : obj3.PlayerPawn?.Value) == (CEntityInstance)null))
 						{

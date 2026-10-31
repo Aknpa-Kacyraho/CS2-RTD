@@ -10,101 +10,32 @@ namespace RollTheDice.Utils;
 /// 地面主法阵：把"骨架圆"换成十几项不同半径的刻画（外框双环 / 符文带 / 刻度环 / 大五芒星 / 五边形 /
 /// 顶点辐条 / 中环 / 八边形 / 内环 / 六芒星 / 小五芒星 / 阵眼环 / 阵眼十字）。
 ///
-/// <para>组合表见 `docs/superpowers/specs/2026-09-20-arcane-sigil-detail-design.md` §5。半径分数是内部
-/// 组合常量（描述"长什么样"），只有密度/要素数量由 <see cref="SigilParams"/> 调。</para>
-///
-/// <para>静态/动画分离：圆环旋转对称，转动不可见 → 只在跟随点/缩放变化超过阈值时重摆；只有星/多边/
-/// 刻度/辐条走每 tick 更新。这样实体数上去而每 tick 网络成本不升。</para>
+/// <para>刻画表已移到 <see cref="SigilStyles"/>（<see cref="SigilStyle.Arcane"/>），本类只剩容器职责：
+/// 静态/动画分离（圆环旋转对称 → 只在跟随点/缩放变化超过阈值时重摆）由 <see cref="SigilShapeGroup"/> 承担。
+/// 组合表见 `docs/superpowers/specs/2026-09-20-arcane-sigil-detail-design.md` §5。</para>
 /// </summary>
 public sealed class ArcaneGroundSigil : IBeamGroup
 {
-	private readonly List<SigilShape> _shapes = new List<SigilShape>();
-	private readonly List<SigilShape> _staticShapes = new List<SigilShape>();
-	private float _lastScale = 1f;
-	private Vector? _lastCenter;
+	private readonly SigilShapeGroup _group = new SigilShapeGroup();
 
-	public int BeamCount { get; private set; }
+	public int BeamCount => _group.BeamCount;
 
 	public ArcaneGroundSigil(Vector center, float radius, SigilParams p, SigilPalette pal, float width, float spin = 0.9f)
 	{
-		bool dl = p.DoubleLine;
-		int segOuter = p.Scaled(96);
-		int segMid = p.Scaled(64);
-		int segInner = p.Scaled(48);
-		int segCore = p.Scaled(24);
-
-		// 外框：双同心环（粗/细）本身即"双线"观感。
-		Add(SigilBuilder.Arc(center, radius * 1.000f, segOuter, 4.0f, pal.Core, pal.Halo, width, dl));
-		Add(SigilBuilder.Arc(center, radius * 0.965f, segOuter, 4.8f, pal.Mid, pal.Halo, width * 0.8f, false));
-		// 符文带（密）与刻度环。
-		Add(SigilBuilder.RuneBand(center, radius * 0.800f, radius * 0.930f, p.Scaled(p.RuneTicks), 5.6f, spin * 0.6f, p.Seed, pal.Mid, pal.Halo, width, false));
-		Add(SigilBuilder.TickRing(center, radius * 0.760f, p.Scaled(p.TickRingCount), radius * 0.035f, 6.4f, -spin * 0.4f, pal.Mid, pal.Halo, width, false));
-		// 大五芒星 + 其外框五边形 + 从顶点射到外环的辐条（取代均匀辐条）。
-		Add(SigilBuilder.Star(center, radius * 0.700f, p.StarPoints, p.StarSkip, 7.2f, spin, pal.Core, pal.Halo, width, dl));
-		Add(SigilBuilder.Polygon(center, radius * 0.700f, p.StarPoints, 6.4f, -spin * 0.55f, pal.Mid, pal.Halo, width * 0.8f, false, phase: MathF.PI / MathF.Max(p.StarPoints, 1)));
-		Add(SigilBuilder.Spokes(center, radius * 0.700f, radius * 0.965f, SigilBuilder.StarAngles(p.StarPoints), 8.0f, spin, pal.Core, pal.Halo, width, dl));
-		// 中带。
-		Add(SigilBuilder.Arc(center, radius * 0.550f, segMid, 4.6f, pal.Mid, pal.Halo, width * 0.8f, false));
-		Add(SigilBuilder.Polygon(center, radius * 0.500f, p.PolygonSides, 9.0f, spin * 0.7f, pal.Mid, pal.Halo, width, false));
-		// 内带。
-		Add(SigilBuilder.Arc(center, radius * 0.400f, segInner, 5.0f, pal.Core, pal.Halo, width * 0.8f, false));
-		Add(SigilBuilder.Star(center, radius * 0.340f, 6, 2, 9.8f, -spin * 0.85f, pal.Mid, pal.Halo, width * 0.8f, dl));
-		Add(SigilBuilder.Star(center, radius * 0.220f, p.StarPoints, p.StarSkip, 10.6f, spin * 1.15f, pal.Core, pal.Halo, width, dl));
-		// 阵眼。
-		Add(SigilBuilder.Arc(center, radius * 0.120f, segCore, 5.2f, pal.Mid, pal.Halo, width * 0.8f, false));
-		Add(SigilBuilder.Spokes(center, 0f, radius * 0.100f, new float[] { 0f, MathF.PI / 2f, MathF.PI, MathF.PI * 1.5f }, 10.0f, spin * 1.3f, pal.Core, pal.Halo, width, dl));
-
-		_lastScale = 1f;
-		_lastCenter = new Vector(center.X, center.Y, center.Z);
-	}
-
-	private void Add(SigilShape shape)
-	{
-		_shapes.Add(shape);
-		if (!shape.Animated)
-		{
-			_staticShapes.Add(shape);
-		}
-		BeamCount += shape.BeamCount;
+		_group.AddRange(SigilStyles.Build(SigilStyle.Arcane, center, radius, p, pal, width, spin, 1f, true));
 	}
 
 	public void Update(Vector center, float time, float scale = 1f)
 	{
-		if (scale <= 0f)
-		{
-			scale = 0.01f;
-		}
-		foreach (SigilShape shape in _shapes)
-		{
-			if (shape.Animated)
-			{
-				shape.Update(center, time, scale);
-			}
-		}
-		bool moved = _lastCenter == null || Vectors.GetDistance(_lastCenter, center) > 1f;
-		if (moved || MathF.Abs(scale - _lastScale) > 0.004f)
-		{
-			foreach (SigilShape shape in _staticShapes)
-			{
-				shape.Update(center, time, scale);
-			}
-			_lastScale = scale;
-			_lastCenter = new Vector(center.X, center.Y, center.Z);
-		}
+		_group.Update(center, time, scale);
 	}
 
 	public void Remove()
 	{
-		foreach (SigilShape shape in _shapes)
-		{
-			shape.Remove();
-		}
-		_shapes.Clear();
-		_staticShapes.Clear();
-		BeamCount = 0;
+		_group.Remove();
 	}
 
-	public bool IsEmpty => _shapes.Count == 0;
+	public bool IsEmpty => _group.IsEmpty;
 
 	/// <summary>
 	/// 分帧拆除：最多拆掉约 <paramref name="budget"/> 根 CBeam，返回实际拆掉的根数。
@@ -112,18 +43,7 @@ public sealed class ArcaneGroundSigil : IBeamGroup
 	/// </summary>
 	public int RemoveChunk(int budget)
 	{
-		int removed = 0;
-		while (_shapes.Count > 0 && removed < budget)
-		{
-			int last = _shapes.Count - 1;
-			SigilShape shape = _shapes[last];
-			_shapes.RemoveAt(last);
-			_staticShapes.Remove(shape);
-			removed += shape.BeamCount;
-			BeamCount -= shape.BeamCount;
-			shape.Remove();
-		}
-		return removed;
+		return _group.RemoveChunk(budget);
 	}
 }
 
@@ -269,11 +189,11 @@ public sealed class SigilTeardown
 		{
 			groups.Add(tower);
 		}
-		Add(groups, center);
+		Add(groups);
 	}
 
 	/// <summary>通用重载：任意 beam 组合（穹顶 / 天空法阵群 / 冲击环…）都走同一条分帧拆除队列。</summary>
-	public void Add(IEnumerable<IBeamGroup> groups, Vector center)
+	public void Add(IEnumerable<IBeamGroup> groups)
 	{
 		List<IBeamGroup> list = new List<IBeamGroup>();
 		foreach (IBeamGroup group in groups)
@@ -290,8 +210,18 @@ public sealed class SigilTeardown
 		_entries.Add(new Entry { Groups = list });
 	}
 
-	/// <summary>每 tick 拆一批。默认每批约 300 根（约 5 tick 拆完 1500 根 ≈ 75ms）。</summary>
-	public void Tick(float now, int budgetPerEntry = 300)
+	/// <summary>旧签名（center 未被使用，保留兼容）。</summary>
+	public void Add(IEnumerable<IBeamGroup> groups, Vector center)
+	{
+		Add(groups);
+	}
+
+	/// <summary>
+	/// 每 tick 拆一批。默认每批约 <b>120</b> 根：分帧拆除的目的就是"别让引擎在短时间里吞掉上千实体删除"，
+	/// 300/tick 实测仍偏猛（客户端实体表容易错位 → CopyExistingEntity 致命错误），故调低到 120/tick
+	/// （3700 根 ≈ 31 tick ≈ 0.5s 拆完，视觉上依然干净）。
+	/// </summary>
+	public void Tick(float now, int budgetPerEntry = 120)
 	{
 		for (int i = _entries.Count - 1; i >= 0; i--)
 		{

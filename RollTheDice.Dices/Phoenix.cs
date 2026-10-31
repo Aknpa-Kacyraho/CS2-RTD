@@ -29,6 +29,12 @@ public class Phoenix : DiceBlueprint
 
 	private readonly Dictionary<CCSPlayerController, int> _originalMaxHealth = new Dictionary<CCSPlayerController, int>();
 
+	// 涅槃 10s 的金色光翼（CBeam 自造，每 tick 按朝向重摆）。
+	private readonly Dictionary<CCSPlayerController, WingFx> _phoenixWings = new Dictionary<CCSPlayerController, WingFx>();
+
+	// 涅槃漂浮期的余烬拖尾节流。
+	private readonly Dictionary<CCSPlayerController, float> _emberNext = new Dictionary<CCSPlayerController, float>();
+
 	public override string ClassName => "Phoenix";
 
 
@@ -82,6 +88,8 @@ public class Phoenix : DiceBlueprint
 		_floatAnchor.Remove(player);
 		_floatStart.Remove(player);
 		_originalMaxHealth.Remove(player);
+		_phoenixWings.Remove(player);
+		_emberNext.Remove(player);
 	}
 
 	public override void Reset()
@@ -99,6 +107,8 @@ public class Phoenix : DiceBlueprint
 		_floatAnchor.Clear();
 		_floatStart.Clear();
 		_originalMaxHealth.Clear();
+		_phoenixWings.Clear();
+		_emberNext.Clear();
 	}
 
 	/// <summary>爆炸后 MaxHealth 被设为 444，移除/回合结束必须还原，否则残留到重生。</summary>
@@ -130,6 +140,13 @@ public class Phoenix : DiceBlueprint
 
 	private void DeactivatePhoenix(CCSPlayerController player)
 	{
+		// 光翼即使控制器已失效也要先拆，避免 CBeam 残留。
+		if (_phoenixWings.TryGetValue(player, out WingFx phoenixWing))
+		{
+			phoenixWing.Remove();
+			_phoenixWings.Remove(player);
+		}
+		_emberNext.Remove(player);
 		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid)
 		{
 			return;
@@ -175,7 +192,21 @@ public class Phoenix : DiceBlueprint
 		{
 			_floatAnchor[player] = new Vector(absOrigin.X, absOrigin.Y, absOrigin.Z);
 			_floatStart[player] = num;
+			// 涅槃特效：金色光晕爆发 + 火焰炸开 + 地面震动。
+			Vector fxOrigin = new Vector(absOrigin.X, absOrigin.Y, absOrigin.Z + 40f);
+			Effects.Play(fxOrigin, ParticlePaths.GoldHaloRaysRadiate, 1.4f);
+			Effects.Play(fxOrigin, ParticlePaths.GoldHaloFlare, 1f);
+			Effects.Play(fxOrigin, ParticlePaths.MolotovExplosion, 1.8f);
+			Effects.Shake(absOrigin, 8f, 30f, 0.7f, 900f);
+			// 金色光翼（CBeam 自造，跟随朝向；10s 漂浮期一直展开）。
+			WingFx phoenixWings = new WingFx(Color.Gold, 4f, 6, 120f, 34f, 22f, 52f, 14f);
+			if (!phoenixWings.IsEmpty)
+			{
+				_phoenixWings[player] = phoenixWings;
+			}
+			_emberNext[player] = num + 0.4f;
 		}
+		Effects.SoundAll(_config.Dices.Phoenix.TriggerSound, _config.Dices.Phoenix.TriggerSoundVolume);
 		CCSPlayerController captured = player;
 		Server.NextFrame((Action)delegate
 		{
@@ -187,7 +218,8 @@ public class Phoenix : DiceBlueprint
 
 	private void AttachPhoenixVisual(CCSPlayerController player)
 	{
-		if (player == null || !_phoenixEndTime.ContainsKey(player))
+		// ★ 下一帧才执行：玩家可能已断开/换边 → 先验有效性再读 PlayerPawn（否则原生崩）。
+		if (player == null || !((CEntityInstance)player).IsValid || !_phoenixEndTime.ContainsKey(player))
 		{
 			return;
 		}
@@ -287,6 +319,12 @@ public class Phoenix : DiceBlueprint
 		foreach (KeyValuePair<CCSPlayerController, float> item in _phoenixEndTime.ToList())
 		{
 			CCSPlayerController player = item.Key;
+			// ★ 字典键是控制器：玩家断开后键会失效 → 先验有效性再读 PlayerPawn（否则原生崩）。
+			if (player == null || !((CEntityInstance)player).IsValid)
+			{
+				_phoenixEndTime.Remove(player);
+				continue;
+			}
 			float value = item.Value;
 			if (num >= value)
 			{
@@ -309,15 +347,22 @@ public class Phoenix : DiceBlueprint
 				Utilities.SetStateChanged((CBaseEntity)(object)val, "CBaseEntity", "m_iMaxHealth", 0);
 				Utilities.SetStateChanged((CBaseEntity)(object)val, "CBaseEntity", "m_iHealth", 0);
 				Utilities.SetStateChanged((CBaseEntity)(object)val, "CCSPlayerPawn", "m_ArmorValue", 0);
+				// 涅槃结束发普通 AK-47（不再使用自制模型换模）。
 				player.GiveNamedItem("weapon_ak47");
+				Effects.SoundAll(_config.Dices.Phoenix.FinaleSound, _config.Dices.Phoenix.FinaleSoundVolume);
 				Vector absOrigin = ((CBaseEntity)val).AbsOrigin;
 				if (absOrigin != null)
 				{
+					// 火焰爆炸特效 + 震动（伤害仍由下面的 env_explosion / 范围结算负责）。
+					Vector fxOrigin = new Vector(absOrigin.X, absOrigin.Y, absOrigin.Z + 30f);
+					Effects.Play(fxOrigin, ParticlePaths.MolotovExplosion, 2f);
+					Effects.Play(fxOrigin, ParticlePaths.GoldHaloRaysRadiate, 1.4f);
+					Effects.Shake(absOrigin, 12f, 40f, 0.8f, 1400f);
 					float explosionRadius = _config.Dices.Phoenix.ExplosionRadius;
 					int explosionDamage = _config.Dices.Phoenix.ExplosionDamage;
 					Vector val2 = absOrigin;
 					CBaseEntity val3 = Utilities.CreateEntityByName<CBaseEntity>("env_explosion");
-					if ((CEntityInstance)(object)val3 != (CEntityInstance)null)
+					if ((CEntityInstance)(object)val3 != (CEntityInstance)null && ((CEntityInstance)val3).IsValid)
 					{
 						val3.Teleport(val2, new QAngle((float?)0f, (float?)0f, (float?)0f), new Vector((float?)0f, (float?)0f, (float?)0f));
 						val3.DispatchSpawn();
@@ -381,6 +426,18 @@ public class Phoenix : DiceBlueprint
 					Vector val5 = new Vector(anchor.X, anchor.Y, anchor.Z + floatSpeed * num4);
 					((CBaseEntity)val4).Teleport(val5, ((CBaseEntity)val4).AbsRotation, new Vector(0f, 0f, 0f));
 					((CBaseEntity)val4).BaseVelocity.Z = floatSpeed;
+				}
+				Vector floatOrigin = ((CBaseEntity)val4).AbsOrigin;
+				if (floatOrigin != null && _phoenixWings.TryGetValue(player, out WingFx phoenixWing))
+				{
+					// 光翼跟随朝向（yaw 与 DiceEffects 同口径）并持续扇动。
+					float wingYaw = val4.EyeAngles.Y * MathF.PI / 180f;
+					phoenixWing.Update(floatOrigin, wingYaw, num * 3f);
+				}
+				if (floatOrigin != null && _emberNext.TryGetValue(player, out float nextEmber) && num >= nextEmber)
+				{
+					_emberNext[player] = num + 0.25f;
+					Effects.Play(new Vector(floatOrigin.X, floatOrigin.Y, floatOrigin.Z + 30f), ParticlePaths.Embers, 0.7f);
 				}
 			}
 		}

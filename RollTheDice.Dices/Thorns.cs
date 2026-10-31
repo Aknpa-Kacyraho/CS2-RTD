@@ -122,9 +122,12 @@ public class Thorns : DiceBlueprint
 			return (HookResult)0;
 		}
 		int reflectedDmg = (int)info.Damage;
+		// ★ CTakeDamageInfo 只在钩子期间有效：下一帧再读 info.Attacker 是悬垂原生读（可能原生崩），
+		//   先把攻击者实体缓存下来。
+		CBaseEntity capturedAttackerEntity = info.Attacker.Value;
 		Server.NextFrame((Action)delegate
 		{
-			CBaseEntity value3 = info.Attacker.Value;
+			CBaseEntity value3 = capturedAttackerEntity;
 			CCSPlayerPawn val = ((value3 != null) ? ((NativeObject)value3).As<CCSPlayerPawn>() : null);
 			if (!((CEntityInstance)(object)val == (CEntityInstance)null) && ((CEntityInstance)val).IsValid && ((CBaseEntity)val).LifeState == 0)
 			{

@@ -40,8 +40,10 @@ public class FinalJudgment : DiceBlueprint
 	private readonly Dictionary<ulong, Vector> _center = new Dictionary<ulong, Vector>();
 	private readonly Dictionary<ulong, SigilDome> _dome = new Dictionary<ulong, SigilDome>();
 	private readonly Dictionary<ulong, SkySigilField> _sky = new Dictionary<ulong, SkySigilField>();
+	private readonly Dictionary<ulong, ExpandingBeamColumn> _beam = new Dictionary<ulong, ExpandingBeamColumn>();
 	private readonly Dictionary<ulong, ShockRingFx> _shock = new Dictionary<ulong, ShockRingFx>();
 	private readonly Dictionary<ulong, int> _nextSecond = new Dictionary<ulong, int>();
+	private readonly Dictionary<ulong, float> _burnStamp = new Dictionary<ulong, float>();
 	private readonly SigilTeardown _fade = new SigilTeardown();
 
 	public override string ClassName => "FinalJudgment";
@@ -78,14 +80,14 @@ public class FinalJudgment : DiceBlueprint
 
 	public override void Reset()
 	{
-		_fade.Flush();
-		foreach (SigilDome dome in _dome.Values)
+		// ★ 绝不在同一帧删上千根 CBeam：穹顶 / 天空法阵群交给分帧拆除队列（OnTick 里 Tick）。
+		// 这里也不能 Flush——那等于又退回"同帧批量删除"，实测会引发引擎
+		// CopyExistingEntity: missing client entity 致命错误（客户端实体表错位）。
+		_fade.Add(_dome.Values);
+		_fade.Add(_sky.Values);
+		foreach (ExpandingBeamColumn beam in _beam.Values)
 		{
-			dome.Remove();
-		}
-		foreach (SkySigilField sky in _sky.Values)
-		{
-			sky.Remove();
+			beam.Remove();
 		}
 		foreach (ShockRingFx shock in _shock.Values)
 		{
@@ -98,13 +100,17 @@ public class FinalJudgment : DiceBlueprint
 		_center.Clear();
 		_dome.Clear();
 		_sky.Clear();
+		_beam.Clear();
 		_shock.Clear();
 		_nextSecond.Clear();
+		_burnStamp.Clear();
 	}
 
 	public override void Destroy()
 	{
+		// 卸载 / 换图：没有下一 tick 了，必须立刻拆干净。
 		Reset();
+		_fade.Flush();
 	}
 
 	public override float GetCooldownRemaining(CCSPlayerController player)
@@ -158,12 +164,38 @@ public class FinalJudgment : DiceBlueprint
 		if (cfg.DomeEnabled)
 		{
 			SigilPalette domePalette = new SigilPalette(DomeCore, DomeMid, DomeHalo);
-			_dome[sid] = new SigilDome(center, cfg.DomeRadius, domePalette, cfg.SigilWidth, cfg.DomeLatitudeRings, cfg.DomeSegments, cfg.DomeMeridians, 8, cfg.DomeSpin, cfg.DomeGrowSeconds, now);
+			SigilDomeOptions domeOptions = new SigilDomeOptions
+			{
+				Twist = cfg.DomeTwist,
+				Crown = cfg.DomeCrown,
+				Rim = cfg.DomeRim,
+				Discs = cfg.DomeDiscs,
+				Anchors = cfg.DomeAnchors,
+				Gates = cfg.DomeGates,
+				GateTilt = cfg.DomeGateTilt,
+				GateSize = cfg.DomeGateSize,
+				Tracks = cfg.DomeTracks,
+				Axis = cfg.DomeAxis,
+				Style = cfg.DomeStyle,
+				AnimationStride = cfg.SigilAnimationStride
+			};
+			_dome[sid] = new SigilDome(center, cfg.DomeRadius, domePalette, cfg.SigilWidth, cfg.DomeSpin, cfg.DomeGrowSeconds, now, domeOptions);
 		}
 		if (cfg.SkyEnabled)
 		{
 			SigilPalette skyPalette = new SigilPalette(IceCore, IceMid, IceHalo);
-			_sky[sid] = new SkySigilField(center, cfg.SkyCount, cfg.SkyHeightStart, cfg.SkyHeightEnd, cfg.SkyRadiusStart, cfg.SkyRadiusEnd, cfg.SkyRadiusAlternate, cfg.SkyStartDelay, cfg.SkyLayerDelay, cfg.SkyGrowSeconds, cfg.SkySpin, sp, skyPalette, cfg.SigilWidth, now);
+			SkySigilOptions skyOptions = new SkySigilOptions
+			{
+				Style = cfg.SkyStyle,
+				Detail = cfg.SkyDetail,
+				AnimatedLayers = cfg.SkyAnimatedLayers,
+				BeamBudget = cfg.SkyBeamBudget,
+				AnimationStride = cfg.SigilAnimationStride,
+				Rim = cfg.SkyRim,
+				Spines = cfg.SkySpines,
+				Axis = cfg.SkyAxis
+			};
+			_sky[sid] = new SkySigilField(center, cfg.SkyCount, cfg.SkyHeightStart, cfg.SkyHeightEnd, cfg.SkyRadiusStart, cfg.SkyRadiusEnd, cfg.SkyRadiusAlternate, cfg.SkyStartDelay, cfg.SkyLayerDelay, cfg.SkyGrowSeconds, cfg.SkySpin, sp, skyPalette, cfg.SigilWidth, now, skyOptions);
 		}
 
 		Effects.Play(new Vector(center.X, center.Y, center.Z + 2f), ParticlePaths.PingGroundRings, cfg.DelaySeconds + 1.5f);
@@ -192,6 +224,7 @@ public class FinalJudgment : DiceBlueprint
 				_shock.Remove(kv.Key);
 			}
 		}
+		BurnTick(now);
 		if (_detonateAt.Count == 0)
 		{
 			return;
@@ -248,15 +281,24 @@ public class FinalJudgment : DiceBlueprint
 	private void Detonate(ulong casterSid, Vector center)
 	{
 		FinalJudgmentConfig cfg = _config.Dices.FinalJudgment;
-		float radius = MathF.Max(cfg.FalloffRadius, 1f);
 		CCSPlayerController caster = FindBySteamId(casterSid);
+		float radius = MathF.Max(cfg.PillarRadius, 1f);
 		if (caster != null && DiceSynergy.HasPartner(caster, "Ragnarok"))
 		{
 			radius *= 1.3f;
 		}
 
-		// 通天光柱：多层同心 CBeam 近似"炽白核心 → 蓝白边缘"。
-		Effects.SkyPillar(new Vector(center.X, center.Y, center.Z), cfg.PillarHeight, IceCore, IceMid, IceHalo, cfg.PillarRadius, cfg.PillarLife);
+		// 通天光柱只此一根：从细柱瞬间扩到 radius（视觉与灼烧判定同一个圆）。
+		if (_beam.TryGetValue(casterSid, out ExpandingBeamColumn oldBeam))
+		{
+			oldBeam.Remove();
+		}
+		float now = Server.CurrentTime;
+		// 一根巨柱（2026-09-22：肋条/箍环"光柱壳"实测很抽象，用户要求回退成单根；膨胀也改成近乎瞬现）。
+		_beam[casterSid] = new ExpandingBeamColumn(new Vector(center.X, center.Y, center.Z), cfg.PillarHeight,
+			cfg.BeamRadiusStart, radius, cfg.PillarLife, cfg.BeamExpandSeconds, IceCore, now,
+			cfg.BeamHaloScale, cfg.BeamFlags, cfg.BeamScrollSpeed, 0f, cfg.BeamVisualScale);
+		_burnStamp[casterSid] = now;
 		Effects.Play(center, ParticlePaths.ExplosionHegrenade, 2f);
 		Effects.Play(center, ParticlePaths.ExplosionDistort, 2f);
 		Effects.Play(center, ParticlePaths.ExplosionFlashbang, 2f);
@@ -272,7 +314,7 @@ public class FinalJudgment : DiceBlueprint
 		}
 		_shock[casterSid] = new ShockRingFx(center, cfg.ShockRings, cfg.ShockRadius, cfg.ShockSeconds, IceMid, cfg.SigilWidth * 1.5f, Server.CurrentTime);
 
-		// 范围伤害：落点球心、radius 内 2000→250 线性衰减；范围外无伤。施法者自己也在范围内。
+		// 闪光：按与灼烧圆的距离给白屏（越靠中心越白）。
 		foreach (CCSPlayerController victim in Utilities.GetPlayers())
 		{
 			if (victim == null || !victim.IsValid || victim.IsHLTV)
@@ -295,13 +337,40 @@ public class FinalJudgment : DiceBlueprint
 				continue;
 			}
 			Effects.Whiteout(victim, cfg.WhiteoutSeconds * proximity, 255f * proximity);
-			if (Invulnerability.IsInvulnerable(victim))
+		}
+
+		// 可选"冲击瞬间"伤害（默认关，主伤害是光柱灼烧）；开启后与灼烧叠加，注意别做太狠。
+		if (cfg.FalloffEnabled)
+		{
+			InstantImpact(center, radius, cfg);
+		}
+	}
+
+	/// <summary>可选的一次性范围伤害：落点球心、radius 内按距离衰减。施法者自己也在范围内。</summary>
+	private void InstantImpact(Vector center, float radius, FinalJudgmentConfig cfg)
+	{
+		foreach (CCSPlayerController victim in Utilities.GetPlayers())
+		{
+			if (victim == null || !victim.IsValid || victim.IsHLTV)
 			{
 				continue;
 			}
-			int dmg = cfg.FalloffEnabled
-				? cfg.MinDamage + (int)MathF.Round((cfg.MaxDamage - cfg.MinDamage) * proximity)
-				: cfg.MaxDamage;
+			CCSPlayerPawn vp = victim.PlayerPawn?.Value;
+			Vector pos = vp?.AbsOrigin;
+			if (vp == null || !vp.IsValid || ((CBaseEntity)vp).LifeState != 0 || pos == null)
+			{
+				continue;
+			}
+			float dx = pos.X - center.X;
+			float dy = pos.Y - center.Y;
+			float dz = pos.Z - center.Z;
+			float dist = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+			float proximity = Math.Clamp(1f - dist / radius, 0f, 1f);
+			if (proximity <= 0f || Invulnerability.IsInvulnerable(victim))
+			{
+				continue;
+			}
+			int dmg = cfg.MinDamage + (int)MathF.Round((cfg.MaxDamage - cfg.MinDamage) * proximity);
 			if (dmg <= 0)
 			{
 				continue;
@@ -311,6 +380,60 @@ public class FinalJudgment : DiceBlueprint
 			if (((CBaseEntity)vp).Health <= 0)
 			{
 				Kill(vp);
+			}
+		}
+	}
+
+	/// <summary>
+	/// 光柱灼烧：柱内（水平距圆心 ≤ 当前半径、且在柱体高度内）每秒掉 <c>beam_dps</c> 血。
+	/// 伤害按"时间 × dps"累积小数结算，64tick 下也精确是每秒 200 而不是 192。
+	/// </summary>
+	private void BurnTick(float now)
+	{
+		if (_beam.Count == 0)
+		{
+			return;
+		}
+		FinalJudgmentConfig cfg = _config.Dices.FinalJudgment;
+		foreach (KeyValuePair<ulong, ExpandingBeamColumn> kv in _beam.ToList())
+		{
+			ExpandingBeamColumn beam = kv.Value;
+			if (!beam.Update(now))
+			{
+				beam.Remove();
+				_beam.Remove(kv.Key);
+				_burnStamp.Remove(kv.Key);
+				continue;
+			}
+			float last = _burnStamp.TryGetValue(kv.Key, out float stamp) ? stamp : now;
+			_burnStamp[kv.Key] = now;
+			int damage = beam.AccumulateDamage(cfg.BeamDps, now - last);
+			if (damage <= 0)
+			{
+				continue;
+			}
+			foreach (CCSPlayerController victim in Utilities.GetPlayers())
+			{
+				if (victim == null || !victim.IsValid || victim.IsHLTV)
+				{
+					continue;
+				}
+				CCSPlayerPawn vp = victim.PlayerPawn?.Value;
+				Vector pos = vp?.AbsOrigin;
+				if (vp == null || !vp.IsValid || ((CBaseEntity)vp).LifeState != 0 || pos == null)
+				{
+					continue;
+				}
+				if (!beam.Contains(pos) || Invulnerability.IsInvulnerable(victim))
+				{
+					continue;
+				}
+				((CBaseEntity)vp).Health -= damage;
+				Utilities.SetStateChanged((CBaseEntity)vp, "CBaseEntity", "m_iHealth", 0);
+				if (((CBaseEntity)vp).Health <= 0)
+				{
+					Kill(vp);
+				}
 			}
 		}
 	}
@@ -372,6 +495,11 @@ public class FinalJudgment : DiceBlueprint
 		{
 			sky.Remove();
 		}
+		if (_beam.Remove(sid, out ExpandingBeamColumn? beam))
+		{
+			beam.Remove();
+		}
+		_burnStamp.Remove(sid);
 	}
 
 	private static CCSPlayerController? FindBySteamId(ulong steamId)

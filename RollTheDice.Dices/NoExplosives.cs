@@ -78,7 +78,14 @@ public class NoExplosives : DiceBlueprint
 			return HookResult.Continue;
 		}
 		nint handle = info.Inflictor.Value.Handle;
-		info.Attacker.Raw = _grenadesThrownByPlayers[handle].Pawn.Raw;
+		// ★ 缓存的是投掷当时的控制器：手雷可能要 10s 后才炸，期间投掷者可能已断开/换边 →
+		//   先验有效性再读 .Pawn（在失效控制器上读 schema 会原生崩）。
+		CCSPlayerController thrower = _grenadesThrownByPlayers[handle];
+		if (thrower == null || !((CEntityInstance)thrower).IsValid)
+		{
+			return HookResult.Continue;
+		}
+		info.Attacker.Raw = thrower.Pawn.Raw;
 		info.BitsDamageType = (DamageTypes_t)524288;
 		return HookResult.Changed;
 	}
@@ -158,8 +165,9 @@ public class NoExplosives : DiceBlueprint
 		((CBaseEntity)prop).MaxHealth = 10;
 		CEntityKeyValues keyValues = new CEntityKeyValues();
 		keyValues.SetFloat("modelscale", scale);
-		((CBaseModelEntity)prop).SetModel(model);
 		((CBaseEntity)prop).DispatchSpawn(keyValues);
+		// ★ SetModel 必须在 DispatchSpawn 之后（staging list 里 SetModel 会触发引擎断言）。
+		((CBaseModelEntity)prop).SetModel(model);
 		((CBaseEntity)prop).Teleport(origin, angles, velocity);
 		return prop.Handle;
 	}

@@ -36,7 +36,7 @@
 | **多骰子叠加** | 玩家可同时持有多个不同类型的骰子 |
 | **统一 buff 系统** | 伤害 / 减伤 / 移速经 `StackingBonusManager` 统一结算，支持叠层与限时 |
 | **统一无敌** | `Invulnerability` 由主插件伤害钩子统一拦截，复活类骰子共用 |
-| **作弊指令守卫 (CheatGuard)** | `sv_cheats 1` 环境下，仅 ≥2 真人时拦截非管理员的动作类作弊指令 |
+| **作弊指令守卫 (CheatGuard)** | `sv_cheats 1` 环境下，仅 ≥2 真人时拦截非管理员的作弊指令与常见作弊 cvar |
 | **分类粒子特效** | 169 个骰子逐一配粒子，覆盖「玩家实体（持续附着/环绕/痕迹）、射击战斗（枪口/击杀/击杀者/爆头/伤害反馈）、回合事件（触发/回合开始/回合结束）、UI（HUD 面板/粒子预览菜单）」四类；**稀有度越高覆盖类别越多**。持续类均用每 tick 跟随的独立粒子，**不挂常驻光环** |
 | **全中文界面** | 所有提示、骰子名、描述均已汉化 |
 | **高度可配置** | 每个骰子的参数均通过 JSON 配置，支持地图级覆盖 |
@@ -199,7 +199,6 @@
 | `World` | 世界 | 额外获得 +3 个骰子 |
 | `Fool` | 愚者 | 暗加 1 骰，攻击 50% 无效，受击 50% 无敌 2s |
 | `DragonSoul` | 巨龙之魂 | 250HP，双龙魂合成冰/火巨龙 |
-| `Glutton` | 暴食者 | 每杀一人下回合多一骰子 |
 | `Mimic` | 模仿大师 | 击杀获得其骰子 |
 | `Trickster` | 诡术师 | 假骰子，首次击杀揭露真相 |
 | `Reincarnation` | 轮回 | 每死一次下回合多一骰子 |
@@ -238,7 +237,7 @@
 | `WhiteHole` | 白洞 | 死亡生成白洞推离敌人 |
 | `GravityWell` | 黑洞 | 死亡生成引力井吸附全图 |
 | `Singularity` | 奇点 | 按 E 释放全图引力 |
-| `Supernova` | 光之剑：超新星 | 按 E 释放 5s 穿墙金色激光，路径敌人连续 -100HP/s，CD 30s |
+| `Supernova` | 光之剑：超新星 | 按 E：充能后召唤电磁炮，释放 5s 穿墙白蓝光束，路径敌人连续 -100HP/s，CD 30s |
 | `RepulsionField` | 斥力场 | 周围投掷物自动弹回 |
 | `PlayAsChicken` | 鸡神 | 变成大鸡，300HP + 40% 速度 |
 | `HangedMan` | 倒吊者 | 每秒流失 1HP，击杀反转 |
@@ -507,17 +506,31 @@ dice 的「无扩散」「时间」类效果需要服务器 `sv_cheats 1`，为�
     "enabled": true,
     "bypass_permission": "@css/root",
     "blocked_commands": [
+      // 玩家动作类
       "noclip", "god", "buddha", "notarget", "hurtme",
       "give", "impulse",
       "setpos", "setang", "setpos_exact", "setang_exact", "getpos",
       "ent_create", "ent_remove", "ent_remove_all", "ent_fire", "ent_dump", "ent_info", "ent_text", "ent_teleport", "ent_bbox",
-      "thirdperson"
+      "thirdperson",
+      // cheats 总开关 + 移动/速度/弹药/时间/武器手感/经济/回合流程（常见作弊 cvar，2026-09-21 扩容）
+      "sv_cheats",
+      "sv_infinite_ammo", "sv_gravity", "sv_accelerate", "sv_airaccelerate",
+      "sv_air_max_wishspeed", "sv_friction", "sv_staminajumpcost", "sv_staminalandcost",
+      "sv_maxspeed", "sv_maxvelocity", "sv_enablebunnyhopping", "sv_autobunnyhopping",
+      "host_timescale", "phys_timescale",
+      "weapon_accuracy_nospread", "weapon_recoil_scale", "weapon_air_spread_scale",
+      "mp_buy_anywhere", "mp_buytime", "mp_freezetime", "mp_startmoney", "mp_maxmoney",
+      "mp_roundtime", "mp_roundtime_defuse", "mp_maxrounds", "mp_restartgame",
+      "mp_warmuptime", "mp_warmup_end", "mp_autoteambalance", "mp_limitteams",
+      "mp_teammates_are_enemies", "mp_pause_match", "mp_unpause_match"
     ]
   }
 }
 ```
 
-- 只拦「玩家动作类」作弊，**不拦** `sv_*` / `mp_*` / `bot_*` / `map` / `changelevel`（避免误伤引擎与开局流程）；也不拦普通玩家的 `drop`（丢枪指令）。
+- 拦「玩家动作类」作弊指令与常见作弊 cvar（无限弹药 / 重力 / bhop 加速 / 时间倍率 / 无扩散 / 经济与回合设置等）。
+- **只拦玩家**：服务器控制台与插件执行的命令 `player == null`，一律放行 —— cfg 里的 `sv_infinite_ammo`、dice 自己的 `host_timescale`（`Server.ExecuteCommand`）与无扩散/雷达（`ReplicateConVar`）都不受影响，所以 `sv_*` / `mp_*` / `weapon_*` 可以安全列入。
+- **仍不拦** `bot_*` / `map` / `changelevel` / `kickid` / `banid`（开局与管理流程，曾因误拦导致单机人机起不来）；也不拦普通玩家的 `drop`（丢枪指令）。
 - **只在 ≥2 个真人（非 bot/HLTV）时启用**：单机 / 本地人机完全不受影响。
 - `bypass_permission` 指定的管理员始终放行。
 - 客户端本地 cvar（透视 `r_drawothermodels`、线框 `mat_wireframe`）服务器收不到，无法拦截 —— 引擎层限制。

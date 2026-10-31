@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
@@ -52,7 +53,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private const int DefaultMaxDicePerPlayer = 1;
 
-	private readonly List<(float End, ArcaneGroundSigil Sigil, ArcaneTower Tower, Vector Center)> _sigilTests = new List<(float End, ArcaneGroundSigil Sigil, ArcaneTower Tower, Vector Center)>();
+	private readonly List<(float End, List<IBeamGroup> Groups, Vector Center)> _sigilTests = new List<(float End, List<IBeamGroup> Groups, Vector Center)>();
 
 	private bool _sigilTimerStarted;
 
@@ -169,9 +170,9 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		command.ReplyToCommand(system != null ? $"OK {normalized}" : $"FAILED {normalized}");
 	}
 
-	[ConsoleCommand("rtdsigil", "Spawn a test arcane sigil at your feet (debug)")]
+	[ConsoleCommand("rtdsigil", "Spawn test sigils at your feet (debug): [style] [radius] [density] [seconds]")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
-	[CommandHelper(0, "[radius] [density] [seconds]")]
+	[CommandHelper(0, "[style] [radius] [density] [seconds]")]
 	public void CommandSigil(CCSPlayerController player, CommandInfo command)
 	{
 		if (player == null || !player.IsValid)
@@ -184,33 +185,310 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			command.ReplyToCommand("rtdsigil: no pawn origin");
 			return;
 		}
-		float radius = 520f;
-		if (float.TryParse(command.GetArg(1), NumberStyles.Float, CultureInfo.InvariantCulture, out float parsedRadius) && parsedRadius > 0f)
-		{
-			radius = parsedRadius;
-		}
-		float density = 1f;
-		if (float.TryParse(command.GetArg(2), NumberStyles.Float, CultureInfo.InvariantCulture, out float parsedDensity) && parsedDensity > 0f)
-		{
-			density = parsedDensity;
-		}
-		float seconds = 20f;
-		if (float.TryParse(command.GetArg(3), NumberStyles.Float, CultureInfo.InvariantCulture, out float parsedSeconds) && parsedSeconds > 0f)
-		{
-			seconds = parsedSeconds;
-		}
 		Vector center = new Vector(origin.X, origin.Y, origin.Z);
+		// 第一个参数不是数字就当风格名（arcane / ward / astrolabe / sun / mixed）。
+		int arg = 1;
+		string styleName = "arcane";
+		string first = command.GetArg(1);
+		if (!string.IsNullOrEmpty(first) && !float.TryParse(first, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+		{
+			styleName = first;
+			arg = 2;
+		}
+		float radius = SigilArgFloat(command.GetArg(arg), 520f);
+		float density = SigilArgFloat(command.GetArg(arg + 1), 1f);
+		float seconds = SigilArgFloat(command.GetArg(arg + 2), 20f);
+
 		SigilParams parameters = new SigilParams { Density = density };
 		SigilPalette palette = new SigilPalette(Color.FromArgb(255, 255, 248, 220), Color.FromArgb(255, 255, 205, 40), Color.FromArgb(255, 255, 180, 30));
-		ArcaneGroundSigil sigil = new ArcaneGroundSigil(center, radius, parameters, palette, 2.4f);
-		ArcaneTower tower = new ArcaneTower(center, radius * 1.1f, parameters, palette, 2.4f, 8, 300f, 240f, 0f, 0.5f);
-		_sigilTests.Add((Server.CurrentTime + seconds, sigil, tower, center));
+		List<(IBeamGroup Group, Vector Center, string Label, int Beams)> spawned = new List<(IBeamGroup, Vector, string, int)>();
+
+		if (SigilStyles.IsMixed(styleName))
+		{
+			// 四宫格：四种风格各摆一个，方便一眼比对（半径自动缩小，免得挤在一起）。
+			SigilStyle[] all = new SigilStyle[] { SigilStyle.Arcane, SigilStyle.Ward, SigilStyle.Astrolabe, SigilStyle.Sun };
+			string[] names = new string[] { "arcane", "ward", "astrolabe", "sun" };
+			float r = radius * 0.42f;
+			float offset = r * 1.15f;
+			for (int i = 0; i < all.Length; i++)
+			{
+				Vector c = new Vector(center.X + ((i % 2 == 0) ? -offset : offset), center.Y + ((i < 2) ? -offset : offset), center.Z);
+				SigilShapeGroup group = new SigilShapeGroup();
+				group.AddRange(SigilStyles.Build(all[i], c, r, parameters, palette, 2.4f, 0.9f, 1f, true));
+				group.Update(c, Server.CurrentTime, 1f);
+				spawned.Add((group, c, names[i], group.BeamCount));
+			}
+		}
+		else
+		{
+			SigilStyle style = SigilStyles.Parse(styleName);
+			if (style == SigilStyle.Arcane)
+			{
+				ArcaneGroundSigil sigil = new ArcaneGroundSigil(center, radius, parameters, palette, 2.4f);
+				ArcaneTower tower = new ArcaneTower(center, radius * 1.1f, parameters, palette, 2.4f, 8, 300f, 240f, 0f, 0.5f);
+				spawned.Add((sigil, center, "ground", sigil.BeamCount));
+				spawned.Add((tower, center, "tower", tower.BeamCount));
+			}
+			else
+			{
+				SigilShapeGroup group = new SigilShapeGroup();
+				group.AddRange(SigilStyles.Build(style, center, radius, parameters, palette, 2.4f, 0.9f, 1f, true));
+				group.Update(center, Server.CurrentTime, 1f);
+				spawned.Add((group, center, styleName, group.BeamCount));
+			}
+		}
+
+		int total = 0;
+		foreach ((IBeamGroup group, Vector c, string label, int beams) in spawned)
+		{
+			_sigilTests.Add((Server.CurrentTime + seconds, new List<IBeamGroup> { group }, c));
+			total += beams;
+		}
 		if (!_sigilTimerStarted)
 		{
 			_sigilTimerStarted = true;
 			AddTimer(0.05f, SigilTestTick, TimerFlags.REPEAT);
 		}
-		command.ReplyToCommand($"[rtdsigil] beams = {sigil.BeamCount + tower.BeamCount} (ground {sigil.BeamCount} + tower {tower.BeamCount}), density {density:0.##}, {seconds:0}s");
+		string breakdown = string.Join(", ", spawned.Select((s) => $"{s.Label} {s.Beams}"));
+		command.ReplyToCommand($"[rtdsigil] {styleName} beams = {total} ({breakdown}), radius {radius:0}, density {density:0.##}, {seconds:0}s");
+	}
+
+	private static float SigilArgFloat(string arg, float fallback)
+	{
+		return float.TryParse(arg, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed) && parsed > 0f ? parsed : fallback;
+	}
+
+	/// <summary>
+	/// `rtddome [秒]`：在脚下直接生成「坠落天空」的**浮空装置法阵**（三层轮盘 + 外缘符文带 + 环形轨道 +
+	/// 4 个倾斜侧阵门 + 中心主轴/立体核心 + 支撑柱 + 锚线 + 能量柱），最后 3 秒走一遍发动脉冲。
+	/// 用于**不用等 20s 施法 / 90s 冷却**地快速调外观。
+	/// </summary>
+	[ConsoleCommand("rtddome", "Preview the falling-sky floating sigil at your feet (debug): [seconds]")]
+	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
+	[CommandHelper(0, "[seconds]")]
+	public void CommandDome(CCSPlayerController player, CommandInfo command)
+	{
+		if (player == null || !player.IsValid)
+		{
+			return;
+		}
+		Vector origin = player.PlayerPawn?.Value?.AbsOrigin;
+		if (origin == null)
+		{
+			command.ReplyToCommand("rtddome: no pawn origin");
+			return;
+		}
+		float seconds = SigilArgFloat(command.GetArg(1), 12f);
+		FinalJudgmentConfig cfg = Config.Dices.FinalJudgment;
+		Vector center = new Vector(origin.X, origin.Y, origin.Z);
+		SigilPalette palette = new SigilPalette(
+			Color.FromArgb(255, 228, 242, 255),
+			Color.FromArgb(255, 188, 218, 245),
+			Color.FromArgb(255, 92, 140, 190));
+		SigilDomeOptions options = new SigilDomeOptions
+		{
+			Twist = cfg.DomeTwist,
+			Crown = cfg.DomeCrown,
+			Rim = cfg.DomeRim,
+			Discs = cfg.DomeDiscs,
+			Anchors = cfg.DomeAnchors,
+			Gates = cfg.DomeGates,
+			GateTilt = cfg.DomeGateTilt,
+			GateSize = cfg.DomeGateSize,
+			Tracks = cfg.DomeTracks,
+			Axis = cfg.DomeAxis,
+			Style = cfg.DomeStyle,
+			AnimationStride = 1
+		};
+		SigilDome dome = new SigilDome(center, cfg.DomeRadius, palette, cfg.SigilWidth, cfg.DomeSpin, cfg.DomeGrowSeconds, Server.CurrentTime, options);
+		_sigilTests.Add((Server.CurrentTime + seconds, new List<IBeamGroup> { dome }, center));
+		if (!_sigilTimerStarted)
+		{
+			_sigilTimerStarted = true;
+			AddTimer(0.05f, SigilTestTick, TimerFlags.REPEAT);
+		}
+		command.ReplyToCommand($"[rtddome] {cfg.DomeDiscs} 层轮盘 / 侧阵门 {(cfg.DomeGates ? $"{cfg.DomeGateTilt:0}°/{(int)(cfg.DomeGateSize * 100)}%" : "off")} / 轨道 {(cfg.DomeTracks ? "on" : "off")} / 主轴 {(cfg.DomeAxis ? "on" : "off")} / 外缘 {(cfg.DomeRim ? "on" : "off")} / 锚线 {cfg.DomeAnchors} / style={cfg.DomeStyle} / beams = {dome.BeamCount}, radius {cfg.DomeRadius:0}, {seconds:0}s");
+	}
+
+	/// <summary>`rtdsky [秒]`：在头顶铺一遍「坠落天空」的天空法阵群（含风格轮换与预算降采样）。</summary>
+	[ConsoleCommand("rtdsky", "Preview the falling-sky sky sigil field overhead (debug): [seconds] [count]")]
+	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
+	[CommandHelper(0, "[seconds] [count]")]
+	public void CommandSky(CCSPlayerController player, CommandInfo command)
+	{
+		if (player == null || !player.IsValid)
+		{
+			return;
+		}
+		Vector origin = player.PlayerPawn?.Value?.AbsOrigin;
+		if (origin == null)
+		{
+			command.ReplyToCommand("rtdsky: no pawn origin");
+			return;
+		}
+		float seconds = SigilArgFloat(command.GetArg(1), 12f);
+		FinalJudgmentConfig cfg = Config.Dices.FinalJudgment;
+		int count = (int)SigilArgFloat(command.GetArg(2), cfg.SkyCount);
+		Vector center = new Vector(origin.X, origin.Y, origin.Z);
+		SigilPalette palette = new SigilPalette(
+			Color.FromArgb(255, 245, 252, 255),
+			Color.FromArgb(255, 158, 214, 255),
+			Color.FromArgb(255, 66, 126, 198));
+		SigilParams parameters = SigilParams.From(cfg.SigilDensity, cfg.RuneTicks, cfg.TickRingCount, cfg.StarPoints, cfg.StarSkip, cfg.PolygonSides, cfg.DoubleLine, cfg.SigilSeed);
+		SkySigilOptions options = new SkySigilOptions
+		{
+			Style = cfg.SkyStyle,
+			Detail = cfg.SkyDetail,
+			AnimatedLayers = cfg.SkyAnimatedLayers,
+			BeamBudget = cfg.SkyBeamBudget,
+			AnimationStride = 1
+		};
+		SkySigilField sky = new SkySigilField(center, count, cfg.SkyHeightStart, cfg.SkyHeightEnd, cfg.SkyRadiusStart, cfg.SkyRadiusEnd, cfg.SkyRadiusAlternate, cfg.SkyStartDelay, cfg.SkyLayerDelay, cfg.SkyGrowSeconds, cfg.SkySpin, parameters, palette, cfg.SigilWidth, Server.CurrentTime, options);
+		_sigilTests.Add((Server.CurrentTime + seconds, new List<IBeamGroup> { sky }, center));
+		if (!_sigilTimerStarted)
+		{
+			_sigilTimerStarted = true;
+			AddTimer(0.05f, SigilTestTick, TimerFlags.REPEAT);
+		}
+		// 各层是"到点才建"的，等铺完再回显真实束数（回调里别用 command，改用玩家）。
+		float reportAt = MathF.Max(cfg.SkyStartDelay + count * cfg.SkyLayerDelay + 0.6f, 1f);
+		AddTimer(reportAt, () =>
+		{
+			if (player != null && player.IsValid)
+			{
+				player.PrintToChat($" [RTD] sky beams = {sky.BeamCount}（{count} 层 / detail {cfg.SkyDetail:0.##} / anim {cfg.SkyAnimatedLayers} / budget {cfg.SkyBeamBudget}）");
+			}
+		});
+		command.ReplyToCommand($"[rtdsky] style={cfg.SkyStyle} / count={count} / detail={cfg.SkyDetail:0.##} / anim={cfg.SkyAnimatedLayers} / budget={cfg.SkyBeamBudget} / {seconds:0}s 开始铺阵…");
+	}
+
+	/// <summary>
+	/// `rtdex [秒]`：预览「誓约胜利之剑」——光剑由光丝拼凑成形 + 法阵收拢 + 汇聚流，到点自动朝准星倾泻光炮。
+	/// 0 = 跳过蓄力按满威力立即释放。无需持有 dice、无视冷却。
+	/// </summary>
+	[ConsoleCommand("rtdex", "Preview Excalibur charge & blast (debug): [seconds]")]
+	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
+	[CommandHelper(0, "[seconds]")]
+	public void CommandExcalibur(CCSPlayerController player, CommandInfo command)
+	{
+		if (player == null || !player.IsValid)
+		{
+			return;
+		}
+		Excalibur dice = _dices.OfType<Excalibur>().FirstOrDefault();
+		if (dice == null)
+		{
+			command.ReplyToCommand("rtdex: Excalibur dice not loaded");
+			return;
+		}
+		float seconds = SigilArgFloat(command.GetArg(1), 3f);
+		dice.DebugCast(player, seconds);
+		command.ReplyToCommand($"[rtdex] 蓄力 {seconds:0.##}s → 朝准星倾泻（0 = 立即）");
+	}
+
+	/// <summary>
+	/// `rtdpillar [秒] [半径]`：在脚下前方直接竖一遍「坠落天空」的通天光柱（单根巨柱），
+	/// 用于**不等 20s 施法、不看冷却**地调光柱外观；半径可临时覆盖配置。`rtdpillar off` 立刻拆。
+	/// </summary>
+	[ConsoleCommand("rtdpillar", "Preview the falling-sky beam column (debug): [seconds] [radius]")]
+	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
+	[CommandHelper(0, "[seconds] [radius]")]
+	public void CommandPillar(CCSPlayerController player, CommandInfo command)
+	{
+		if (player == null || !player.IsValid)
+		{
+			return;
+		}
+		if (string.Equals(command.GetArg(1), "off", StringComparison.OrdinalIgnoreCase))
+		{
+			command.ReplyToCommand($"[rtdpillar] removed {ClearPillarTests()}");
+			return;
+		}
+		CCSPlayerPawn? pawn = player.PlayerPawn?.Value;
+		Vector? feet = pawn?.AbsOrigin;
+		if (pawn == null || !pawn.IsValid || feet == null)
+		{
+			command.ReplyToCommand("rtdpillar: no pawn origin");
+			return;
+		}
+		FinalJudgmentConfig cfg = Config.Dices.FinalJudgment;
+		float seconds = SigilArgFloat(command.GetArg(1), 8f);
+		float radius = SigilArgFloat(command.GetArg(2), cfg.PillarRadius);
+		// 放在前方、离得比柱半径还远一点，免得一开始就站在柱子里看不清。
+		float yawRad = pawn.EyeAngles.Y * MathF.PI / 180f;
+		float dist = MathF.Max(2600f, radius * 1.6f);
+		Vector center = new Vector(feet.X + MathF.Cos(yawRad) * dist, feet.Y + MathF.Sin(yawRad) * dist, feet.Z);
+		Color core = Color.FromArgb(255, 245, 252, 255);
+		ExpandingBeamColumn column = new ExpandingBeamColumn(center, cfg.PillarHeight, cfg.BeamRadiusStart, radius,
+			seconds, cfg.BeamExpandSeconds, core, Server.CurrentTime,
+			cfg.BeamHaloScale, cfg.BeamFlags, cfg.BeamScrollSpeed, 0f, cfg.BeamVisualScale);
+		_sigilTests.Add((Server.CurrentTime + seconds, new List<IBeamGroup> { column }, center));
+		if (!_sigilTimerStarted)
+		{
+			_sigilTimerStarted = true;
+			AddTimer(0.05f, SigilTestTick, TimerFlags.REPEAT);
+		}
+		command.ReplyToCommand($"[rtdpillar] 半径 {radius:0} / 高 {cfg.PillarHeight:0} / 扩张 {cfg.BeamExpandSeconds:0.##}s / {seconds:0}s");
+	}
+
+	private int ClearPillarTests()
+	{
+		int removed = 0;
+		for (int i = _sigilTests.Count - 1; i >= 0; i--)
+		{
+			bool any = false;
+			foreach (IBeamGroup group in _sigilTests[i].Groups)
+			{
+				if (group is ExpandingBeamColumn)
+				{
+					group.Remove();
+					removed++;
+					any = true;
+				}
+			}
+			if (any)
+			{
+				_sigilTests.RemoveAt(i);
+			}
+		}
+		return removed;
+	}
+
+	/// <summary>
+	/// `rtdinfo [玩家名]`：打印某玩家（默认自己）的 dice 内部状态——本轮已抽次数/上限及**来源拆解**
+	/// （转世 `PendingExtraDice` / 世界 `PendingExtraRolls` / 女神祝福 / 黑骑禁抽）、当前生效 dice 列表、
+	/// TAB 名字前缀缓存。专治"TAB 上 dice 数量对不上 / 额外 dice 不生效"。
+	/// </summary>
+	[ConsoleCommand("rtdinfo", "Print a player's internal dice state (debug): [name]")]
+	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
+	[CommandHelper(0, "[player name]")]
+	public void CommandInfo(CCSPlayerController player, CommandInfo command)
+	{
+		CCSPlayerController? target = player;
+		string wanted = command.GetArg(1);
+		if (!string.IsNullOrWhiteSpace(wanted))
+		{
+			target = Utilities.GetPlayers().FirstOrDefault((CCSPlayerController p) => p != null && p.IsValid && !p.IsBot && !p.IsHLTV && p.PlayerName.Contains(wanted, StringComparison.OrdinalIgnoreCase));
+		}
+		if (target == null || !target.IsValid)
+		{
+			command.ReplyToCommand("rtdinfo: player not found");
+			return;
+		}
+		ulong sid = target.SteamID;
+		int rolled = GetDiceRollCount(target);
+		int max = GetMaxDiceCount(target);
+		Reincarnation.PendingExtraDice.TryGetValue(sid, out int pendingReincarnation);
+		World.PendingExtraRolls.TryGetValue(sid, out int pendingWorld);
+		bool blessed = Goddess.ActiveThisRound && Goddess.BlessedPlayers.Contains(sid);
+		bool denied = DeathKnightComplete.IsDeniedThisRound(sid);
+		List<string> active = GetAllDiceForPlayer(target);
+		string shown = target.PlayerName;
+		string trueName = _originalPlayerNames.TryGetValue(target, out string cached) ? cached : StripDiceNameDecoration(shown);
+		command.ReplyToCommand($"[rtdinfo] {shown} (sid {sid})");
+		command.ReplyToCommand($"[rtdinfo] 本轮已抽 {rolled}/上限 {max} ← 基础1｜转世+{pendingReincarnation}｜世界+{pendingWorld}｜女神{(blessed ? "+1" : "+0")}｜黑骑禁抽{(denied ? "是" : "否")}");
+		command.ReplyToCommand($"[rtdinfo] 生效 dice({active.Count}): {(active.Count == 0 ? "-" : string.Join(", ", active))}");
+		command.ReplyToCommand($"[rtdinfo] 名字：真名缓存={trueName}｜缓存中{(_originalPlayerNames.ContainsKey(target) ? "有" : "无")}（TAB 前缀是显示用，含队友 combo 的 dice 名）");
 	}
 
 	private void SigilTestTick()
@@ -222,16 +500,47 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		float now = Server.CurrentTime;
 		for (int i = _sigilTests.Count - 1; i >= 0; i--)
 		{
-			(float end, ArcaneGroundSigil sigil, ArcaneTower tower, Vector center) = _sigilTests[i];
+			(float end, List<IBeamGroup> groups, Vector center) = _sigilTests[i];
 			if (now >= end)
 			{
-				sigil.Remove();
-				tower.Remove();
+				foreach (IBeamGroup group in groups)
+				{
+					group.Remove();
+				}
 				_sigilTests.RemoveAt(i);
 				continue;
 			}
-			sigil.Update(center, now, 1f);
-			tower.Update(center, now, 1f);
+			foreach (IBeamGroup group in groups)
+			{
+				if (group is SigilShapeGroup shapes)
+				{
+					shapes.Update(center, now, 1f);
+				}
+				else if (group is ArcaneGroundSigil ground)
+				{
+					ground.Update(center, now, 1f);
+				}
+				else if (group is ArcaneTower tower)
+				{
+					tower.Update(center, now, 1f);
+				}
+				else if (group is SigilDome dome)
+				{
+					dome.Update(center, now, 1f);
+					// 最后 3 秒走一遍发动脉冲，方便看"发动信号"。
+					float remain = end - now;
+					dome.SetPulse(remain < 3f ? Math.Clamp(1f - remain / 3f, 0f, 1f) : 0f);
+				}
+				else if (group is SkySigilField sky)
+				{
+					sky.Update(center, now, 1f);
+				}
+				else if (group is ExpandingBeamColumn column)
+				{
+					// 到期由上面的 End 统一 Remove（构造/摆放已在 Update 里做）。
+					column.Update(now);
+				}
+			}
 		}
 	}
 
@@ -509,17 +818,50 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			foreach (string sound in Config.Sounds.LegendarySounds.Values)
 			{
-				if (!string.IsNullOrEmpty(sound))
-				{
-					manifest.AddResource(sound);
-				}
+				PrecacheSound(manifest, sound);
 			}
 		}
+		PrecacheSound(manifest, Config.Sounds?.DiceRollSound);
+		PrecacheSound(manifest, Config.Dices?.Supernova?.BlastSound);
+		PrecacheSound(manifest, Config.Dices?.FinalJudgment?.ExplosionSound);
+		PrecacheSound(manifest, Config.Dices?.Excalibur?.ChargeSound);
+		PrecacheSound(manifest, Config.Dices?.Excalibur?.ChargeLoopSound);
+		PrecacheSound(manifest, Config.Dices?.Excalibur?.ReadySound);
+		PrecacheSound(manifest, Config.Dices?.Excalibur?.BurstSound);
+		PrecacheSound(manifest, Config.Dices?.Phoenix?.TriggerSound);
+		PrecacheSound(manifest, Config.Dices?.Phoenix?.FinaleSound);
+		PrecacheSound(manifest, Config.Dices?.WheelOfFate?.ReviveSound);
 		manifest.AddResource("models/props/de_dust/hr_dust/dust_soccerball/dust_soccer_ball001.vmdl");
+		// 誓约胜利之剑的实体剑模型（+ 冰剑材质；换模型/新装素材后要换图才生效）。
+		if (!string.IsNullOrWhiteSpace(Config.Dices?.Excalibur?.SwordModel))
+		{
+			manifest.AddResource(Config.Dices.Excalibur.SwordModel.Trim());
+		}
+		manifest.AddResource("models/bullet/ice/tex/icicle2.vmat");
+		manifest.AddResource("models/bullet/ice/tex/snow.vmat");
 		Effects.PrecacheAll(manifest);
+		int fxParticles = DiceFxTable.Precache(manifest);
+		if (fxParticles > 0)
+		{
+			Console.WriteLine($"[DiceFX] Precache: {fxParticles} particle path(s) referenced by dicefx.json");
+		}
 		foreach (string precacheModel in _precacheModels)
 		{
 			manifest.AddResource(precacheModel);
+		}
+	}
+
+	/// <summary>把运行期音效文件路径加进预缓存（soundevent 名如 <c>c4.explode</c> 不是文件，跳过）。</summary>
+	private static void PrecacheSound(ResourceManifest manifest, string? path)
+	{
+		if (string.IsNullOrWhiteSpace(path))
+		{
+			return;
+		}
+		string sound = path.Trim().Replace('\\', '/');
+		if (sound.EndsWith(".vsnd", StringComparison.OrdinalIgnoreCase) || sound.EndsWith(".vsndevts", StringComparison.OrdinalIgnoreCase))
+		{
+			manifest.AddResource(sound);
 		}
 	}
 
@@ -553,6 +895,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		((BasePlugin)this).RegisterListener<Listeners.OnPlayerButtonsChanged>(new Listeners.OnPlayerButtonsChanged(OnPlayerButtonsChanged));
 		((BasePlugin)this).RegisterListener<Listeners.OnPlayerTakeDamagePre>(new Listeners.OnPlayerTakeDamagePre(OnPlayerTakeDamagePreCentral));
 		((BasePlugin)this).RegisterListener<Listeners.OnTick>(new Listeners.OnTick(DiceEffects.OnTick));
+		// 带父实体的子实体看门狗（FollowEntity / SetParent 造出来的 prop/粒子）：父失效即拆，避免悬垂父链崩溃。
+		((BasePlugin)this).RegisterListener<Listeners.OnTick>(new Listeners.OnTick(ChildGuard.OnTick));
 		RegisterCheatGuard();
 		if (hotReload)
 		{
@@ -588,6 +932,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		((BasePlugin)this).RemoveListener<Listeners.OnPlayerButtonsChanged>(new Listeners.OnPlayerButtonsChanged(OnPlayerButtonsChanged));
 		((BasePlugin)this).RemoveListener<Listeners.OnPlayerTakeDamagePre>(new Listeners.OnPlayerTakeDamagePre(OnPlayerTakeDamagePreCentral));
 		((BasePlugin)this).RemoveListener<Listeners.OnTick>(new Listeners.OnTick(DiceEffects.OnTick));
+		((BasePlugin)this).RemoveListener<Listeners.OnTick>(new Listeners.OnTick(ChildGuard.OnTick));
+		ChildGuard.ClearAll();
 		Effects.ClearAll();
 		DiceEffects.ClearAll();
 		// 卸载时彻底清掉静态/实例状态，避免 css_reload 后残留（旧实例的 Instance、玩家键集合、buff 域）。
@@ -607,8 +953,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	/// <summary>
 	/// CheatGuard 的每条被拦指令需要<em>各自独立</em>的委托实例。
 	/// 原因：<c>BasePlugin.AddCommandListener</c> 内部用 <c>Dictionary&lt;Delegate,...&gt;</c> 以委托为键，
-	/// 若 22 条指令共用同一个 <c>OnCheatGuardCommand</c> 方法组委托，键会互相覆盖 →
-	/// <c>RemoveCommandListener</c> 只能摘掉最后一个，其余 21 个原生钩子在卸载/热重载后泄漏并叠加。
+	/// 若所有被拦指令共用同一个 <c>OnCheatGuardCommand</c> 方法组委托，键会互相覆盖 →
+	/// <c>RemoveCommandListener</c> 只能摘掉最后一个，其余原生钩子在卸载/热重载后泄漏并叠加。
 	/// 每条指令包一个 <see cref="CheatGuardHook"/> 实例（Target 不同 → 委托不等）即可对称摘除。
 	/// </summary>
 	private sealed class CheatGuardHook
@@ -695,10 +1041,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		//IL_0173: Unknown result type (might be due to invalid IL or missing references)
 		Server.ExecuteCommand("host_timescale 1.0");
 		_playersThatRolledTheDice.Clear();
-		((BasePlugin)this).AddTimer(4f, (Action)delegate
-		{
-			Glutton.KillCounts.Clear();
-		}, (TimerFlags?)null);
 		Goddess.ActiveThisRound = false;
 		Goddess.BlessedPlayers.Clear();
 		World.PendingExtraRolls.Clear();
@@ -1400,7 +1742,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					LogDebug($"{DateTime.Now:HH:mm:ss} ✓ {((CBasePlayerController)player).PlayerName} ← {diceBlueprint.ClassName}\n");
 					RefreshCombos(player);
 					AnnounceDiceRarity(player, diceBlueprint);
-					ApplyLegendaryWeapon(player, diceBlueprint);
 					return (diceBlueprint.ClassName, diceBlueprint.Description);
 				}
 				catch (Exception value)
@@ -1426,7 +1767,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					LogDebug($"{DateTime.Now:HH:mm:ss} ✓ {((CBasePlayerController)player).PlayerName} ← {diceName}\n");
 					RefreshCombos(player);
 					AnnounceDiceRarity(player, diceBlueprint2);
-					ApplyLegendaryWeapon(player, diceBlueprint2);
 					return (diceBlueprint2.ClassName, diceBlueprint2.Description);
 				}
 				catch (Exception value2)
@@ -1608,49 +1948,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 	}
 
-	/// <summary>传说 / combo dice 抽到时按配置附赠换模武器（贴合主题的直接给，其余随机刀 / 雷）。</summary>
-	private void ApplyLegendaryWeapon(CCSPlayerController player, DiceBlueprint dice)
-	{
-		try
-		{
-			if (player == null || !((CEntityInstance)player).IsValid || player.IsBot || player.IsHLTV)
-			{
-				return;
-			}
-			WeaponRewardConfig? cfg = Config?.WeaponReward;
-			if (cfg == null || !cfg.Enabled)
-			{
-				return;
-			}
-			string tier = GetDiceTier(dice);
-			if (tier != "legendary" && tier != "combo")
-			{
-				return;
-			}
-			string? entry = null;
-			if (cfg.Weapons != null && cfg.Weapons.TryGetValue(dice.ClassName, out string mapped) && !string.IsNullOrEmpty(mapped))
-			{
-				entry = mapped;
-			}
-			else
-			{
-				List<string>? pool = ((_random.Next(2) == 0) ? cfg.RandomKnives : cfg.RandomGrenades);
-				if (pool != null && pool.Count > 0)
-				{
-					entry = pool[_random.Next(pool.Count)];
-				}
-			}
-			if (!string.IsNullOrEmpty(entry))
-			{
-				WeaponSubclass.Give(player, entry!);
-			}
-		}
-		catch (Exception ex)
-		{
-			LogErr($"{DateTime.Now:HH:mm:ss} ApplyLegendaryWeapon {dice.ClassName}: {ex.Message}\n");
-		}
-	}
-
 	private List<DiceBlueprint> GetDrawablePool()
 	{
 		return _dices.Where((DiceBlueprint d) => d.CanBeDrawn).ToList();
@@ -1713,6 +2010,11 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					}
 				}
 			}
+			foreach (CCSPlayerController p in affected)
+			{
+				// combo 伙伴的 dice 变了 → 队里其他人的 TAB 名字前缀也要重算（否则会残留上一轮的搭档 dice 名）。
+				RefreshPlayerDiceName(p, false);
+			}
 		}
 		catch
 		{
@@ -1735,15 +2037,9 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			if ((CEntityInstance)(object)item.Key != (CEntityInstance)null && ((CEntityInstance)item.Key).IsValid)
 			{
-				string text = ((CBasePlayerController)item.Key).PlayerName;
-				int num = text.LastIndexOf("] ");
-				if (num > 0)
-				{
-					string text2 = text;
-					int num2 = num + 2;
-					text = text2.Substring(num2, text2.Length - num2).Trim();
-				}
-				((CBasePlayerController)item.Key).PlayerName = text;
+				// ★ 直接用缓存里的"真名"（item.Value），别再解析当前名：
+				// `[A]+2 名字` 这种格式解析不出来，会把装饰名原样写回去 → 跨回合残留。
+				((CBasePlayerController)item.Key).PlayerName = item.Value;
 				Utilities.SetStateChanged((CBaseEntity)(object)item.Key, "CBasePlayerController", "m_iszPlayerName", 0);
 			}
 		}
@@ -1756,7 +2052,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		RefreshCombos(null);
 	}
 
-	private void RefreshPlayerDiceName(CCSPlayerController player)
+	private void RefreshPlayerDiceName(CCSPlayerController player, bool scheduleReapply = true)
 	{
 		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid)
 		{
@@ -1767,13 +2063,10 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			string text = ((CBasePlayerController)player).PlayerName;
 			if (!_originalPlayerNames.TryGetValue(player, out string value))
 			{
-				int num = text.LastIndexOf("] ");
-				if (num > 0)
-				{
-					string text2 = text;
-					int num2 = num + 2;
-					text = text2.Substring(num2, text2.Length - num2).Trim();
-				}
+				// ★ 用正则剥掉**插件自己加的** dice 前缀（`[A] [B] 名字` / `[A]+2 名字`）。
+				// 旧写法只认 "] "：遇到 `[A]+2 名字` 剥不掉 → 把装饰名当成"真名"缓存，
+				// 于是 TAB 上的 dice 前缀跨回合残留、还越滚越长（就是"下回合还显示那么多 dice"）。
+				text = StripDiceNameDecoration(text);
 				_originalPlayerNames[player] = text;
 			}
 			else
@@ -1810,21 +2103,34 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			string text3 = ((list.Count > 2) ? ($"[{list[0]}]+{list.Count - 1} " + text) : ((list.Count <= 0) ? text : (string.Join(" ", list.Select((string n) => "[" + n + "]")) + " " + text)));
 			((CBasePlayerController)player).PlayerName = text3;
 			Utilities.SetStateChanged((CBaseEntity)(object)player, "CBasePlayerController", "m_iszPlayerName", 0);
-			CCSPlayerController captured = player;
-			string capturedName = text3;
-			((BasePlugin)this).AddTimer(1f, (Action)delegate
+			if (scheduleReapply)
 			{
-				if ((CEntityInstance)(object)captured != (CEntityInstance)null && ((CEntityInstance)captured).IsValid)
+				CCSPlayerController captured = player;
+				((BasePlugin)this).AddTimer(1f, (Action)delegate
 				{
-					((CBasePlayerController)captured).PlayerName = capturedName;
-					Utilities.SetStateChanged((CBaseEntity)(object)captured, "CBasePlayerController", "m_iszPlayerName", 0);
-				}
-			}, (TimerFlags?)null);
+					if ((CEntityInstance)(object)captured != (CEntityInstance)null && ((CEntityInstance)captured).IsValid)
+					{
+						// ★ 重算而不是回写 1 秒前那个字符串：跨回合时旧字符串会把上回合的 dice 前缀重新贴回 TAB。
+						RefreshPlayerDiceName(captured, false);
+					}
+				}, (TimerFlags?)null);
+			}
 		}
 		catch (Exception ex)
 		{
 			LogErr($"{DateTime.Now:HH:mm:ss} RefreshPlayerDiceName error for {((CBasePlayerController)player).PlayerName}: {ex.Message}\n");
 		}
+	}
+
+	/// <summary>剥掉插件自己加的 dice 前缀（`[A] [B] 名字` / `[A]+2 名字`）；剥完为空则保留原名。</summary>
+	private static string StripDiceNameDecoration(string name)
+	{
+		if (string.IsNullOrEmpty(name))
+		{
+			return name ?? string.Empty;
+		}
+		string stripped = Regex.Replace(name, "^(?:\\[[^\\[\\]]{1,48}\\](?:\\+\\d+)?[ \\u3000]+)+", string.Empty).Trim();
+		return stripped.Length > 0 ? stripped : name.Trim();
 	}
 
 	private void InitializeModules()
@@ -2148,11 +2454,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			return 0;
 		}
 		int num = 1;
-		if (Glutton.KillCounts.TryGetValue(((CBasePlayerController)player).SteamID, out var value))
-		{
-			int num2 = Math.Min(value, 2);
-			num += num2;
-		}
 		if (Reincarnation.PendingExtraDice.TryGetValue(((CBasePlayerController)player).SteamID, out var value2) && value2 > 0)
 		{
 			num += value2;

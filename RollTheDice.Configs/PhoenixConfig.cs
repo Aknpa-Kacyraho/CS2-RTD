@@ -24,4 +24,18 @@ public class PhoenixConfig
 
 	[JsonPropertyName("float_speed")]
 	public float FloatSpeed { get; set; } = 30f;
+
+	/// <summary>触发涅槃瞬间的全服音效（从每个真人身上发声）。</summary>
+	[JsonPropertyName("trigger_sound")]
+	public string TriggerSound { get; set; } = "sounds/touhou/extend.vsnd";
+
+	[JsonPropertyName("trigger_sound_volume")]
+	public float TriggerSoundVolume { get; set; } = 0.7f;
+
+	/// <summary>涅槃结束爆炸的全服音效（soundevent 名如 c4.explode，或 .vsnd 路径）。</summary>
+	[JsonPropertyName("finale_sound")]
+	public string FinaleSound { get; set; } = "c4.explode";
+
+	[JsonPropertyName("finale_sound_volume")]
+	public float FinaleSoundVolume { get; set; } = 0.8f;
 }

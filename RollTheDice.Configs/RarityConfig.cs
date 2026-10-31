@@ -31,6 +31,7 @@ public class RarityConfig
         { "WheelOfFate", "legendary" },
         { "SwordSaint", "legendary" },
         { "FinalJudgment", "legendary" },
+        { "Excalibur", "legendary" },
         { "WolfKing", "legendary" },
         { "World", "legendary" },
 
@@ -91,7 +92,6 @@ public class RarityConfig
         { "Fool", "rare" },
         { "FrontlineBeast", "rare" },
         { "Giant", "rare" },
-        { "Glutton", "rare" },
         { "Goddess", "rare" },
         { "GravityWell", "rare" },
         { "GrenadeKing", "rare" },

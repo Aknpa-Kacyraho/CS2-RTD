@@ -155,8 +155,13 @@ public class ChaosStorm : DiceBlueprint
 				CCSPlayerController capturedSlowed = slowed;
 				new Timer(1.5f, (Action)delegate
 				{
+					// ★ 1.5s 后触发：玩家可能已断开 → 先验有效性再读 schema（否则原生崩）。
+					if (capturedSlowed == null || !((CEntityInstance)capturedSlowed).IsValid)
+					{
+						return;
+					}
 					SpeedBonusManager.Unregister(capturedSlowed, "ChaosStormCombo");
-					CCSPlayerPawn after = capturedSlowed?.PlayerPawn?.Value;
+					CCSPlayerPawn after = capturedSlowed.PlayerPawn?.Value;
 					if (after != null && ((CEntityInstance)after).IsValid)
 					{
 						after.VelocityModifier = 1f + SpeedBonusManager.GetEffective(capturedSlowed, 100f);

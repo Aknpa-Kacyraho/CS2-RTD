@@ -120,7 +120,12 @@ public class Nirvana : DiceBlueprint
 			select _).ToList();
 		foreach (CBaseEntity item in list)
 		{
-			if (((item != null) ? item.AbsOrigin : null) != null)
+			// ★ 出生点实体是跨回合缓存的：换图/回合重建后句柄会失效，先验再读 AbsOrigin（否则原生崩）。
+			if (item == null || !((CEntityInstance)item).IsValid)
+			{
+				continue;
+			}
+			if (item.AbsOrigin != null)
 			{
 				return item.AbsOrigin;
 			}

@@ -190,7 +190,7 @@ public class WhiteHole : DiceBlueprint
 		//IL_0140: Expected O, but got Unknown
 		//IL_0140: Expected O, but got Unknown
 		_particle = Utilities.CreateEntityByName<CParticleSystem>("info_particle_system");
-		if ((CEntityInstance)(object)_particle != (CEntityInstance)null)
+		if ((CEntityInstance)(object)_particle != (CEntityInstance)null && ((CEntityInstance)_particle).IsValid)
 		{
 			_particle.EffectName = ParticlePaths.AmbientEmbersBright;
 			_particle.StartActive = true;
@@ -198,7 +198,7 @@ public class WhiteHole : DiceBlueprint
 			((CBaseEntity)_particle).DispatchSpawn();
 		}
 		_beam = Utilities.CreateEntityByName<CBeam>("beam");
-		if ((CEntityInstance)(object)_beam != (CEntityInstance)null)
+		if ((CEntityInstance)(object)_beam != (CEntityInstance)null && ((CEntityInstance)_beam).IsValid)
 		{
 			((CBaseModelEntity)_beam).Render = Color.FromArgb(200, 255, 255, 255);
 			_beam.Width = 12f;
@@ -240,7 +240,7 @@ public class WhiteHole : DiceBlueprint
 				Vector whiteHolePos = _whiteHolePos;
 				CleanupWhiteHole();
 				CBaseEntity val = Utilities.CreateEntityByName<CBaseEntity>("env_explosion");
-				if ((CEntityInstance)(object)val != (CEntityInstance)null)
+				if ((CEntityInstance)(object)val != (CEntityInstance)null && ((CEntityInstance)val).IsValid)
 				{
 					val.Teleport(whiteHolePos, new QAngle((float?)null, (float?)null, (float?)null), new Vector((float?)null, (float?)null, (float?)null));
 					val.DispatchSpawn();
@@ -307,7 +307,8 @@ public class WhiteHole : DiceBlueprint
 					IEnumerable<CBaseEntity> enumerable = Utilities.FindAllEntitiesByDesignerName<CBaseEntity>(text);
 					foreach (CBaseEntity item2 in enumerable)
 					{
-						if (((item2 != null) ? item2.AbsOrigin : null) == null || !((CEntityInstance)item2).IsValid)
+						// ★ 先判 IsValid 再读 AbsOrigin：枚举结果可能是失效包装，直接读 schema 会原生崩。
+						if (item2 == null || !((CEntityInstance)item2).IsValid || item2.AbsOrigin == null)
 						{
 							continue;
 						}
@@ -405,7 +406,8 @@ public class WhiteHole : DiceBlueprint
 				IEnumerable<CBaseEntity> enumerable2 = Utilities.FindAllEntitiesByDesignerName<CBaseEntity>(text2);
 				foreach (CBaseEntity item4 in enumerable2)
 				{
-					if (((item4 != null) ? item4.AbsOrigin : null) == null || !((CEntityInstance)item4).IsValid)
+					// ★ 先判 IsValid 再读 AbsOrigin（同上）。
+					if (item4 == null || !((CEntityInstance)item4).IsValid || item4.AbsOrigin == null)
 					{
 						continue;
 					}

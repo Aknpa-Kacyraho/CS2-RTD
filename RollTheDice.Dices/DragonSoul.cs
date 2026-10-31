@@ -140,6 +140,12 @@ public class DragonSoul : DiceBlueprint
 				instance.RemoveDiceFromPlayer(second, "DragonSoul");
 				Server.NextFrame((Action)delegate
 				{
+					// ★ 下一帧才读名字：两名玩家都可能已断开 → 先验有效性（否则读失效控制器 schema 会原生崩）。
+					if (first == null || !((CEntityInstance)first).IsValid || second == null || !((CEntityInstance)second).IsValid)
+					{
+						_transforming = false;
+						return;
+					}
 					instance.ForceDiceForPlayer(first, "IceDragon");
 					instance.ForceDiceForPlayer(second, "FireDragon");
 					Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83e\uddca\ud83d\udd25 {((CBasePlayerController)first).PlayerName} 和 {((CBasePlayerController)second).PlayerName} 的巨龙之魂共鸣！分别进化为冰巨龙与火巨龙！");

@@ -74,7 +74,12 @@ public class Payback : DiceBlueprint
 		PaybackConfig cfg = _config.Dices.Payback;
 		Server.NextFrame(delegate
 		{
-			CCSPlayerPawn pawn = captured?.PlayerPawn?.Value;
+			// ★ 下一帧才执行：攻击者可能已断开 → 先验有效性再读 schema（否则原生崩）。
+			if (captured == null || !((CEntityInstance)captured).IsValid)
+			{
+				return;
+			}
+			CCSPlayerPawn pawn = captured.PlayerPawn?.Value;
 			if (pawn == null || !pawn.IsValid)
 			{
 				return;

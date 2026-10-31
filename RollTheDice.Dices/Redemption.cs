@@ -114,12 +114,22 @@ public class Redemption : DiceBlueprint
 				{
 					Server.NextFrame((Action)delegate
 					{
+						// ★ 两帧后才执行：玩家可能已断开/换边 → 先验有效性再读 schema（否则原生崩）。
+						if (capturedDead == null || !((CEntityInstance)capturedDead).IsValid)
+						{
+							return;
+						}
 						CCSPlayerController obj = capturedDead;
 						if (!((CEntityInstance)(object)((obj == null) ? null : obj.PlayerPawn?.Value) == (CEntityInstance)null) && ((CBaseEntity)capturedDead.PlayerPawn.Value).LifeState != 0)
 						{
 							capturedDead.Respawn();
 							Server.NextFrame((Action)delegate
 							{
+								// ★ 再等一帧后仍需重新验有效性（断线/换边窗口）。
+								if (capturedDead == null || !((CEntityInstance)capturedDead).IsValid)
+								{
+									return;
+								}
 								CCSPlayerController obj2 = capturedDead;
 								if (!((CEntityInstance)(object)((obj2 == null) ? null : obj2.PlayerPawn?.Value) == (CEntityInstance)null) && ((CBaseEntity)capturedDead.PlayerPawn.Value).LifeState == 0)
 								{

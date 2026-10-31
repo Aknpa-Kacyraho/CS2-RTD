@@ -131,6 +131,11 @@ public class DivineResurrection : DiceBlueprint
 		{
 			Server.NextFrame((Action)delegate
 			{
+				// ★ 两帧后才执行：玩家可能已断开/换边 → 控制器包装会失效，先验再读 schema（否则原生崩）。
+				if (capturedDead == null || !((CEntityInstance)capturedDead).IsValid)
+				{
+					return;
+				}
 				CCSPlayerController obj2 = capturedDead;
 				if (!((CEntityInstance)(object)((obj2 == null) ? null : obj2.PlayerPawn?.Value) == (CEntityInstance)null) && ((CBaseEntity)capturedDead.PlayerPawn.Value).LifeState != 0)
 				{
@@ -143,6 +148,12 @@ public class DivineResurrection : DiceBlueprint
 						//IL_00a1: Unknown result type (might be due to invalid IL or missing references)
 						//IL_00a6: Unknown result type (might be due to invalid IL or missing references)
 						//IL_00b0: Expected O, but got Unknown
+						// ★ 同上：再等一帧后仍需重新验有效性（断线/换边窗口）。
+						if (capturedDead == null || !((CEntityInstance)capturedDead).IsValid
+							|| capturedAttacker == null || !((CEntityInstance)capturedAttacker).IsValid)
+						{
+							return;
+						}
 						CCSPlayerController obj3 = capturedDead;
 						if (!((CEntityInstance)(object)((obj3 == null) ? null : obj3.PlayerPawn?.Value) == (CEntityInstance)null) && ((CBaseEntity)capturedDead.PlayerPawn.Value).LifeState == 0)
 						{

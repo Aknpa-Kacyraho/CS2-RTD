@@ -6,6 +6,7 @@ using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -107,7 +108,12 @@ public class Prophet : DiceBlueprint
 	{
 		if (_players.Count == 0 || info.Damage <= 0f)
 		{
-			return (HookResult)0;
+			return HookResult.Continue;
+		}
+		// ★ 非玩家实体（道具/世界/炸弹）直接放行，避免当 pawn 读 schema（越界读 → 错实体甚至原生崩）。
+		if (PlayerResolver.FromEntity(entity) == null)
+		{
+			return HookResult.Continue;
 		}
 		CCSPlayerController victim = ResolvePlayerController(entity);
 		if ((CEntityInstance)(object)victim == (CEntityInstance)null || !((CEntityInstance)victim).IsValid)

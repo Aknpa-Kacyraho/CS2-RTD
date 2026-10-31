@@ -65,8 +65,14 @@ namespace RollTheDice.Dices;
 		}
 		_activeBoosts[attacker] = new Timer(duration, (Action)delegate
 		{
+			// ★ 定时器到期时玩家可能已断开/换边：先验有效性再读 schema（含 SteamID），否则原生崩。
+			if (attacker == null || !((CEntityInstance)attacker).IsValid)
+			{
+				_activeBoosts.Remove(attacker);
+				return;
+			}
 			SpeedBonusManager.Unregister(attacker, "SpeedOnKill");
-			CCSPlayerPawn value = attacker?.PlayerPawn?.Value;
+			CCSPlayerPawn value = attacker.PlayerPawn?.Value;
 			if (value != null && ((CEntityInstance)value).IsValid)
 			{
 				value.VelocityModifier = 1f + SpeedBonusManager.GetEffective(attacker, 100f);
@@ -168,9 +174,15 @@ namespace RollTheDice.Dices;
 		}
 		_activeBoosts[attacker] = new Timer(num2, (Action)delegate
 		{
+			// ★ 同上：先验有效性再读 schema。
+			if (attacker == null || !((CEntityInstance)attacker).IsValid)
+			{
+				_activeBoosts.Remove(attacker);
+				return;
+			}
 			CCSPlayerController obj = attacker;
 			SpeedBonusManager.Unregister(obj, "SpeedOnKill");
-			CCSPlayerPawn val = ((obj == null) ? null : obj.PlayerPawn?.Value);
+			CCSPlayerPawn val = obj.PlayerPawn?.Value;
 			if (val != null && ((CEntityInstance)val).IsValid)
 			{
 				val.VelocityModifier = 1f + SpeedBonusManager.GetEffective(obj, 100f);

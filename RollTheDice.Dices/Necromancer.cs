@@ -200,6 +200,11 @@ public class Necromancer : DiceBlueprint
 		{
 			Server.NextFrame((Action)delegate
 			{
+				// ★ 两帧后才执行：玩家可能已断开/换边 → 先验有效性再读 schema（否则原生崩）。
+				if (capturedDead == null || !((CEntityInstance)capturedDead).IsValid)
+				{
+					return;
+				}
 				CCSPlayerController obj2 = capturedDead;
 				if (!((CEntityInstance)(object)((obj2 == null) ? null : obj2.PlayerPawn?.Value) == (CEntityInstance)null) && ((CBaseEntity)capturedDead.PlayerPawn.Value).LifeState != 0)
 				{
@@ -208,6 +213,11 @@ public class Necromancer : DiceBlueprint
 					{
 						//IL_00c8: Unknown result type (might be due to invalid IL or missing references)
 						//IL_0253: Unknown result type (might be due to invalid IL or missing references)
+						// ★ 再等一帧后仍需重新验有效性（断线/换边窗口）。
+						if (capturedDead == null || !((CEntityInstance)capturedDead).IsValid)
+						{
+							return;
+						}
 						CCSPlayerController obj3 = capturedDead;
 						if (!((CEntityInstance)(object)((obj3 == null) ? null : obj3.PlayerPawn?.Value) == (CEntityInstance)null) && ((CBaseEntity)capturedDead.PlayerPawn.Value).LifeState == 0)
 						{

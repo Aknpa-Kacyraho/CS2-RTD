@@ -157,6 +157,12 @@ public class ShadowWarrior : DiceBlueprint
 	{
 		foreach (CCSPlayerController item in _cloneUntil.Keys.ToList())
 		{
+			// ★ 字典键是控制器：玩家断开后键会失效 → 先验有效性再读 PlayerPawn（否则原生崩）。
+			if (item == null || !((CEntityInstance)item).IsValid)
+			{
+				RemoveClone(item);
+				continue;
+			}
 			if (!_cloneUntil.TryGetValue(item, out float end))
 			{
 				continue;

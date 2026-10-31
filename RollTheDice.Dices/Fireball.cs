@@ -90,7 +90,7 @@ public class Fireball : DiceBlueprint
 			//IL_006a: Expected O, but got Unknown
 			//IL_006a: Expected O, but got Unknown
 			CBaseEntity val = Utilities.CreateEntityByName<CBaseEntity>("env_explosion");
-			if ((CEntityInstance)(object)val != (CEntityInstance)null)
+			if ((CEntityInstance)(object)val != (CEntityInstance)null && ((CEntityInstance)val).IsValid)
 			{
 				val.Teleport(origin, new QAngle((float?)0f, (float?)0f, (float?)0f), new Vector((float?)0f, (float?)0f, (float?)0f));
 				val.DispatchSpawn();

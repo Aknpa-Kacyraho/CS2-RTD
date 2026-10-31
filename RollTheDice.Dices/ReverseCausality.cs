@@ -131,6 +131,11 @@ public class ReverseCausality : DiceBlueprint
 
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
+		// ★ 非玩家实体（道具/世界/炸弹）直接放行，避免当 pawn 读 schema（越界读 → 错实体甚至原生崩）。
+		if (PlayerResolver.FromEntity(entity) == null)
+		{
+			return (HookResult)0;
+		}
 		//IL_0016: Unknown result type (might be due to invalid IL or missing references)
 		//IL_01d4: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0072: Unknown result type (might be due to invalid IL or missing references)

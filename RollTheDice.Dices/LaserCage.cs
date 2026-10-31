@@ -109,6 +109,27 @@ public class LaserCage : DiceBlueprint
 		_activeBeams.Remove(player);
 	}
 
+	/// <summary>取回可复用的光束组：数量不变且全部有效时沿用旧实体，只由 OnTick 重设端点（旧实现每 tick 删除重建）。</summary>
+	private List<CBeam> EnsureBeams(CCSPlayerController player, int count)
+	{
+		if (_activeBeams.TryGetValue(player, out List<CBeam>? beams) && beams.Count > 0 && beams.TrueForAll(beam => beam != null && ((CEntityInstance)beam).IsValid))
+		{
+			return beams;
+		}
+		DestroyBeams(player);
+		List<CBeam> list = new List<CBeam>(count);
+		for (int i = 0; i < count; i++)
+		{
+			CBeam? beam = BeamFx.Create(Color.FromArgb(255, 255, 50, 50), 1.5f);
+			if (beam != null)
+			{
+				list.Add(beam);
+			}
+		}
+		_activeBeams[player] = list;
+		return list;
+	}
+
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
 		//IL_0014: Unknown result type (might be due to invalid IL or missing references)
@@ -216,27 +237,15 @@ public class LaserCage : DiceBlueprint
 				float radius = _config.Dices.LaserCage.Radius;
 				int beamCount = _config.Dices.LaserCage.BeamCount;
 				Vector absOrigin = ((CBaseEntity)value2).AbsOrigin;
-				DestroyBeams(player);
-				_activeBeams[player] = new List<CBeam>();
-				for (int i = 0; i < beamCount; i++)
+				List<CBeam> beams = EnsureBeams(player, beamCount);
+				for (int i = 0; i < beams.Count; i++)
 				{
-					float num2 = _rotationAngle + (float)i * 2f * (float)Math.PI / (float)beamCount;
+					float num2 = _rotationAngle + (float)i * 2f * (float)Math.PI / (float)Math.Max(beams.Count, 1);
 					float value3 = absOrigin.X + MathF.Cos(num2) * radius;
 					float value4 = absOrigin.Y + MathF.Sin(num2) * radius;
 					float num3 = absOrigin.X + MathF.Cos(num2 + 0.3f) * radius;
 					float num4 = absOrigin.Y + MathF.Sin(num2 + 0.3f) * radius;
-					CBeam val = Utilities.CreateEntityByName<CBeam>("beam");
-					if ((CEntityInstance)(object)val != (CEntityInstance)null && ((CEntityInstance)val).IsValid)
-					{
-						((CBaseModelEntity)val).Render = Color.FromArgb(255, 255, 50, 50);
-						val.Width = 1.5f;
-						((CBaseEntity)val).Teleport(new Vector((float?)value3, (float?)value4, (float?)absOrigin.Z), new QAngle((float?)null, (float?)null, (float?)null), new Vector((float?)null, (float?)null, (float?)null));
-						val.EndPos.X = num3;
-						val.EndPos.Y = num4;
-						val.EndPos.Z = absOrigin.Z + 90f;
-						((CBaseEntity)val).DispatchSpawn();
-						_activeBeams[player].Add(val);
-					}
+					BeamFx.Move(beams[i], new Vector((float?)value3, (float?)value4, (float?)absOrigin.Z), new Vector((float?)num3, (float?)num4, (float?)absOrigin.Z + 90f));
 				}
 				float tickInterval = _config.Dices.LaserCage.TickInterval;
 				if (_lastDamageTime.TryGetValue(player, out var value5) && num - value5 < tickInterval)

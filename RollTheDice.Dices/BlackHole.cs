@@ -163,23 +163,14 @@ public class BlackHole : DiceBlueprint
 			//IL_00a3: Expected O, but got Unknown
 			//IL_00a3: Expected O, but got Unknown
 			//IL_011a: Unknown result type (might be due to invalid IL or missing references)
-			CBeam val = Utilities.CreateEntityByName<CBeam>("beam");
-			if ((CEntityInstance)(object)val != (CEntityInstance)null && ((CEntityInstance)val).IsValid)
+			CBeam? val = BeamFx.Create(Color.FromArgb(255, 100, 0, 200), 4f);
+			if (val != null)
 			{
-				((CBaseModelEntity)val).Render = Color.FromArgb(255, 100, 0, 200);
-				val.Width = 4f;
-				((CBaseEntity)val).Teleport(deathPos, new QAngle((float?)0f, (float?)0f, (float?)0f), new Vector((float?)0f, (float?)0f, (float?)0f));
-				val.EndPos.X = deathPos.X;
-				val.EndPos.Y = deathPos.Y;
-				val.EndPos.Z = deathPos.Z + 50f;
-				((CBaseEntity)val).DispatchSpawn();
+				BeamFx.Move(val, deathPos, new Vector((float?)deathPos.X, (float?)deathPos.Y, (float?)(deathPos.Z + 50f)));
 				CBeam capturedBeam = val;
 				new Timer(9.5f, (Action)delegate
 				{
-					if ((CEntityInstance)(object)capturedBeam != (CEntityInstance)null && ((CEntityInstance)capturedBeam).IsValid)
-					{
-						((CEntityInstance)capturedBeam).Remove();
-					}
+					BeamFx.Kill(capturedBeam);
 				}, (TimerFlags?)null);
 			}
 		});

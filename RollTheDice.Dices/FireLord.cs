@@ -258,7 +258,7 @@ public class FireLord : DiceBlueprint
 							Vector val5 = new Vector((float?)((CBaseEntity)val).AbsVelocity.X, (float?)((CBaseEntity)val).AbsVelocity.Y, (float?)((CBaseEntity)val).AbsVelocity.Z);
 							((CEntityInstance)val).AcceptInput("Kill", (CEntityInstance)null, (CEntityInstance)null, "", 0);
 							CMolotovProjectile molotov = Utilities.CreateEntityByName<CMolotovProjectile>("molotov_projectile");
-							if (!((CEntityInstance)(object)molotov == (CEntityInstance)null))
+							if (!((CEntityInstance)(object)molotov == (CEntityInstance)null) && ((CEntityInstance)molotov).IsValid)
 							{
 								((CBaseEntity)molotov).Teleport(val4, new QAngle((float?)0f, (float?)0f, (float?)0f), val5);
 								Entities.SetSchemaValue((CBaseEntity)(object)molotov, "CBaseGrenade", "m_hThrower", ((NativeEntity)val2).Handle);

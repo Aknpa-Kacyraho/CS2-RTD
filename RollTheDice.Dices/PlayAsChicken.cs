@@ -212,11 +212,20 @@ public class PlayAsChicken : DiceBlueprint
 		{
 			if ((long)pressed == 4)
 			{
-				((CBaseEntity)(CDynamicProp)_chickens[player]["prop"]).Teleport(new Vector((float?)((CBaseEntity)player.PlayerPawn.Value).AbsOrigin.X, (float?)((CBaseEntity)player.PlayerPawn.Value).AbsOrigin.Y, (float?)(((CBaseEntity)player.PlayerPawn.Value).AbsOrigin.Z - 18f)), (QAngle)null, (Vector)null);
+				CDynamicProp pressedProp = (CDynamicProp)_chickens[player]["prop"];
+				// ★ 鸡模型 prop 可能已被引擎/清理删掉：先验有效性再 Teleport（否则写失效实体 schema 崩）。
+				if (((CEntityInstance)pressedProp).IsValid)
+				{
+					((CBaseEntity)pressedProp).Teleport(new Vector((float?)((CBaseEntity)player.PlayerPawn.Value).AbsOrigin.X, (float?)((CBaseEntity)player.PlayerPawn.Value).AbsOrigin.Y, (float?)(((CBaseEntity)player.PlayerPawn.Value).AbsOrigin.Z - 18f)), (QAngle)null, (Vector)null);
+				}
 			}
 			else if ((long)released == 4)
 			{
-				((CBaseEntity)(CDynamicProp)_chickens[player]["prop"]).Teleport(new Vector((float?)((CBaseEntity)player.PlayerPawn.Value).AbsOrigin.X, (float?)((CBaseEntity)player.PlayerPawn.Value).AbsOrigin.Y, (float?)((CBaseEntity)player.PlayerPawn.Value).AbsOrigin.Z), (QAngle)null, (Vector)null);
+				CDynamicProp releasedProp = (CDynamicProp)_chickens[player]["prop"];
+				if (((CEntityInstance)releasedProp).IsValid)
+				{
+					((CBaseEntity)releasedProp).Teleport(new Vector((float?)((CBaseEntity)player.PlayerPawn.Value).AbsOrigin.X, (float?)((CBaseEntity)player.PlayerPawn.Value).AbsOrigin.Y, (float?)((CBaseEntity)player.PlayerPawn.Value).AbsOrigin.Z), (QAngle)null, (Vector)null);
+				}
 			}
 		}
 	}

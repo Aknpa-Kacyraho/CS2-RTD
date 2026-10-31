@@ -146,9 +146,6 @@ public class DicesConfig
 	[JsonPropertyName("sword_saint")]
 	public SwordSaintConfig SwordSaint { get; set; } = new SwordSaintConfig();
 
-	[JsonPropertyName("glutton")]
-	public GluttonConfig Glutton { get; set; } = new GluttonConfig();
-
 	[JsonPropertyName("c4_expert")]
 	public C4ExpertConfig C4Expert { get; set; } = new C4ExpertConfig();
 
@@ -520,4 +517,7 @@ public class DicesConfig
 
 	[JsonPropertyName("final_judgment")]
 	public FinalJudgmentConfig FinalJudgment { get; set; } = new FinalJudgmentConfig();
+
+	[JsonPropertyName("excalibur")]
+	public ExcaliburConfig Excalibur { get; set; } = new ExcaliburConfig();
 }

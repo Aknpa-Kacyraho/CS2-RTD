@@ -101,6 +101,12 @@ public class Frostmourne : DiceBlueprint
 
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
+		// ★ 伤害目标可能是任意实体（道具/世界/炸弹）：非玩家直接放行，
+		//   避免把非 pawn 实体当 CCSPlayerPawn 读 schema（越界读 → 错实体甚至原生崩）。
+		if (PlayerResolver.FromEntity(entity) == null)
+		{
+			return (HookResult)0;
+		}
 		//IL_0054: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00fb: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00f7: Unknown result type (might be due to invalid IL or missing references)

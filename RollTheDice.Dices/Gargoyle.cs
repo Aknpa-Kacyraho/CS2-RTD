@@ -294,12 +294,13 @@ public class Gargoyle : DiceBlueprint
 			CCSPlayerController key = item.Key;
 			if (num >= item.Value)
 			{
-				Unpetrify(key);
-				_petrifyEndTime.Remove(key);
-				if (key != null)
+				// ★ 石化到期时玩家可能已断开/换边：先验有效性再 Unpetrify（内部会读 pawn schema，否则原生崩）。
+				if (key != null && ((CEntityInstance)key).IsValid)
 				{
-					key.PrintToCenterAlert("\ud83d\uddff 石化解除了!");
+					Unpetrify(key);
+					key.PrintToCenterAlert("\ud83d\uddff ʯ�������!");
 				}
+				_petrifyEndTime.Remove(key);
 			}
 			else
 			{

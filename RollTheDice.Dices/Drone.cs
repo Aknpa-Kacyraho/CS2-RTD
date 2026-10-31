@@ -93,13 +93,7 @@ public class Drone : DiceBlueprint
 
 	public override void Destroy()
 	{
-		foreach (CBeam item in _shotBeams.ToList())
-		{
-			if ((CEntityInstance)(object)item != (CEntityInstance)null && ((CEntityInstance)item).IsValid)
-			{
-				((CEntityInstance)item).Remove();
-			}
-		}
+		BeamFx.KillAll(_shotBeams.ToList());
 		_shotBeams.Clear();
 		Reset();
 	}
@@ -108,11 +102,10 @@ public class Drone : DiceBlueprint
 	{
 		DestroyDrone(player);
 		CDynamicProp val = Utilities.CreateEntityByName<CDynamicProp>("prop_dynamic_override");
-		if ((CEntityInstance)(object)val == (CEntityInstance)null)
+		if ((CEntityInstance)(object)val == (CEntityInstance)null || !((CEntityInstance)val).IsValid)
 		{
 			return;
 		}
-		((CBaseModelEntity)val).SetModel("models/props/de_dust/hr_dust/dust_soccerball/dust_soccer_ball001.vmdl");
 		((CBaseModelEntity)val).Collision.SolidType = (SolidType_t)6;
 		CBodyComponent cBodyComponent = ((CBaseEntity)val).CBodyComponent;
 		object obj;
@@ -138,6 +131,9 @@ public class Drone : DiceBlueprint
 			((CBaseEntity)val).CBodyComponent.SceneNode.Owner.Entity.Flags &= 4294967291u;
 		}
 		((CBaseEntity)val).DispatchSpawn();
+		// ★ SetModel 必须在 DispatchSpawn 之后：对还在 staging list 里的实体调它会让引擎
+		// CModelState::SetupModel() 断言失败（写 minidump）并让实体模型状态变脏。
+		((CBaseModelEntity)val).SetModel("models/props/de_dust/hr_dust/dust_soccerball/dust_soccer_ball001.vmdl");
 		((CBaseModelEntity)val).Render = Color.FromArgb(255, 100, 220, 255);
 		Utilities.SetStateChanged((CBaseEntity)(object)val, "CBaseModelEntity", "m_clrRender", 0);
 		CBodyComponent cBodyComponent2 = ((CBaseEntity)val).CBodyComponent;
@@ -157,13 +153,10 @@ public class Drone : DiceBlueprint
 			((CGameSceneNode)val2).Scale = 0.5f;
 		}
 		_droneProps[player] = val;
-		CBeam val3 = Utilities.CreateEntityByName<CBeam>("beam");
-		if ((CEntityInstance)(object)val3 != (CEntityInstance)null)
+		CBeam? tether = BeamFx.Create(Color.FromArgb(80, 80, 200, 255), 0.8f);
+		if (tether != null)
 		{
-			((CBaseModelEntity)val3).Render = Color.FromArgb(80, 80, 200, 255);
-			val3.Width = 0.8f;
-			((CBaseEntity)val3).DispatchSpawn();
-			_tetherBeams[player] = val3;
+			_tetherBeams[player] = tether;
 		}
 	}
 
@@ -215,11 +208,16 @@ public class Drone : DiceBlueprint
 			}
 			else
 			{
-				val.Width -= Server.TickInterval * 8f;
-				if (val.Width <= 0.1f)
+				float num3 = val.Width - Server.TickInterval * 8f;
+				if (num3 <= 0.1f)
 				{
-					((CEntityInstance)val).Remove();
+					BeamFx.Kill(val);
 					_shotBeams.RemoveAt(num2);
+				}
+				else
+				{
+					// 改宽度必须显式标脏（BeamFx.SetWidth），否则客户端看不到收束/消失过程。
+					BeamFx.SetWidth(val, num3);
 				}
 			}
 		}
@@ -259,13 +257,9 @@ public class Drone : DiceBlueprint
 				_orbitAngles[player] = num3;
 				Vector val2 = new Vector((float?)(absOrigin.X + MathF.Cos(num3) * orbitRadius), (float?)(absOrigin.Y + MathF.Sin(num3) * orbitRadius), (float?)(absOrigin.Z + orbitHeight));
 				((CBaseEntity)value2).Teleport(val2, new QAngle((float?)null, (float?)null, (float?)null), new Vector((float?)null, (float?)null, (float?)null));
-				if (_tetherBeams.TryGetValue(player, out CBeam value4) && (CEntityInstance)(object)value4 != (CEntityInstance)null && ((CEntityInstance)value4).IsValid)
+				if (_tetherBeams.TryGetValue(player, out CBeam value4))
 				{
-					((CBaseEntity)value4).Teleport(new Vector((float?)absOrigin.X, (float?)absOrigin.Y, (float?)(absOrigin.Z + 64f)), new QAngle((float?)null, (float?)null, (float?)null), new Vector((float?)null, (float?)null, (float?)null));
-					value4.EndPos.X = val2.X;
-					value4.EndPos.Y = val2.Y;
-					value4.EndPos.Z = val2.Z;
-					Utilities.SetStateChanged((CBaseEntity)value4, "CBeam", "m_vecEndPos", 0);
+					BeamFx.Move(value4, new Vector((float?)absOrigin.X, (float?)absOrigin.Y, (float?)(absOrigin.Z + 64f)), val2);
 				}
 				float fireRate = _config.Dices.Drone.FireRate;
 				if (!_lastFireTime.TryGetValue(player, out var value5) || num - value5 < fireRate)
@@ -295,16 +289,10 @@ public class Drone : DiceBlueprint
 				}
 				_lastFireTime[player] = num;
 				Vector absOrigin2 = ((CBaseEntity)((CBasePlayerController)val3).Pawn.Value).AbsOrigin;
-				CBeam val4 = Utilities.CreateEntityByName<CBeam>("beam");
-				if ((CEntityInstance)(object)val4 != (CEntityInstance)null)
+				CBeam? val4 = BeamFx.Create(Color.FromArgb(255, 255, 60, 60), 2f);
+				if (val4 != null)
 				{
-					((CBaseModelEntity)val4).Render = Color.FromArgb(255, 255, 60, 60);
-					val4.Width = 2f;
-					((CBaseEntity)val4).Teleport(val2, new QAngle((float?)null, (float?)null, (float?)null), new Vector((float?)null, (float?)null, (float?)null));
-					val4.EndPos.X = absOrigin2.X;
-					val4.EndPos.Y = absOrigin2.Y;
-					val4.EndPos.Z = absOrigin2.Z;
-					((CBaseEntity)val4).DispatchSpawn();
+					BeamFx.Move(val4, val2, absOrigin2);
 					_shotBeams.Add(val4);
 				}
 			int num9 = _random.Next(_config.Dices.Drone.DamageMin, _config.Dices.Drone.DamageMax + 1);

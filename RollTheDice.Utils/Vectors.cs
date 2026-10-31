@@ -41,4 +41,32 @@ public static class Vectors
 		//IL_0073: Expected O, but got Unknown
 		return new Vector((float?)(a.Y * b.Z - a.Z * b.Y), (float?)(a.Z * b.X - a.X * b.Z), (float?)(a.X * b.Y - a.Y * b.X));
 	}
+
+	/// <summary>
+	/// 点到线段的最短距离；点在线段正投影范围外时返回 <see cref="float.PositiveInfinity"/>（视为未命中）。
+	/// 用于光炮 / 激光类"沿一条线段命中"的判定（Excalibur；Supernova 另有其私有实现）。
+	/// </summary>
+	public static float DistanceToSegment(Vector point, Vector a, Vector b)
+	{
+		float abx = b.X - a.X;
+		float aby = b.Y - a.Y;
+		float abz = b.Z - a.Z;
+		float apx = point.X - a.X;
+		float apy = point.Y - a.Y;
+		float apz = point.Z - a.Z;
+		float ab2 = abx * abx + aby * aby + abz * abz;
+		if (ab2 <= 0.0001f)
+		{
+			return MathF.Sqrt(apx * apx + apy * apy + apz * apz);
+		}
+		float t = (apx * abx + apy * aby + apz * abz) / ab2;
+		if (t < 0f || t > 1f)
+		{
+			return float.PositiveInfinity;
+		}
+		float dx = apx - abx * t;
+		float dy = apy - aby * t;
+		float dz = apz - abz * t;
+		return MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+	}
 }

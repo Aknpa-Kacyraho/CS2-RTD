@@ -191,6 +191,11 @@ public class SmokeBomb : DiceBlueprint
 		});
 		new Timer(num2, (Action)delegate
 		{
+			// ★ 定时器到期时玩家可能已断开/换边 → 先验有效性再读 schema（否则原生崩）。
+			if (capturedVictim == null || !((CEntityInstance)capturedVictim).IsValid)
+			{
+				return;
+			}
 			CCSPlayerController obj3 = capturedVictim;
 			CCSPlayerPawn val2 = ((obj3 == null) ? null : obj3.PlayerPawn?.Value);
 			if ((CEntityInstance)(object)val2 != (CEntityInstance)null && ((CEntityInstance)val2).IsValid)

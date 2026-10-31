@@ -225,6 +225,12 @@ public class IceBeam : DiceBlueprint
 		CCSPlayerController capturedVictim = userid;
 		_frozenPlayers[userid] = new Timer(DiceSynergy.HasPartner(attacker, "Amber") ? (_config.Dices.IceBeam.FreezeDuration * 2f) : (DiceSynergy.HasPartner(attacker, "PoisonBlade") || DiceSynergy.HasPartner(attacker, "Amber") ? (_config.Dices.IceBeam.FreezeDuration * 1.5f) : _config.Dices.IceBeam.FreezeDuration), (Action)delegate
 		{
+			// ★ 冻结结束在数秒后：目标可能已断开/换边 → 先验有效性再读 SteamID / pawn（否则原生崩）。
+			if (capturedVictim == null || !((CEntityInstance)capturedVictim).IsValid)
+			{
+				_frozenPlayers.Remove(capturedVictim);
+				return;
+			}
 			MoveLockManager.Unlock(capturedVictim, "IceBeam");
 			_frozenSteamIDs.Remove(((CBasePlayerController)capturedVictim).SteamID);
 			CCSPlayerController obj2 = capturedVictim;

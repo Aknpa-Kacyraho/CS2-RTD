@@ -5,6 +5,7 @@ using System.IO;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CounterStrikeSharp.API.Modules.Utils;
 
 namespace RollTheDice.Utils;
 
@@ -160,6 +161,9 @@ public static class DiceFxTable
 
 	private static Dictionary<string, FxProfile> _profiles = new Dictionary<string, FxProfile>(StringComparer.OrdinalIgnoreCase);
 
+	/// <summary>本图已进预缓存清单的粒子路径（服务端 OnServerPrecacheResources 调用 <see cref="Precache"/> 时记录）。</summary>
+	private static readonly HashSet<string> Precached = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
 	public static int Count => _profiles.Count;
 
 	public static IEnumerable<KeyValuePair<string, FxProfile>> All => _profiles;
@@ -178,6 +182,75 @@ public static class DiceFxTable
 	public static void Clear()
 	{
 		_profiles = new Dictionary<string, FxProfile>(StringComparer.OrdinalIgnoreCase);
+	}
+
+	/// <summary>表里实际引用到的全部粒子路径（去重；已规范化为运行期 <c>.vpcf</c>）。</summary>
+	public static IEnumerable<string> AllParticles()
+	{
+		HashSet<string> paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		foreach (FxProfile profile in _profiles.Values)
+		{
+			AddParticle(paths, profile.Trigger.Burst);
+			AddParticle(paths, profile.Trigger.Remove);
+			AddParticle(paths, profile.Attach.Particle);
+			AddParticle(paths, profile.Orbit.Particle);
+			AddParticle(paths, profile.Trail.Particle);
+			AddParticle(paths, profile.Events.Fire);
+			AddParticle(paths, profile.Events.Kill);
+			AddParticle(paths, profile.Events.KillSelf);
+			AddParticle(paths, profile.Events.KillHeadshot);
+			AddParticle(paths, profile.Events.Death);
+			AddParticle(paths, profile.Events.Hurt);
+			AddParticle(paths, profile.Events.Hit);
+			AddParticle(paths, profile.Events.HitHeadshot);
+			AddParticle(paths, profile.Events.RoundStart);
+			AddParticle(paths, profile.Events.RoundEnd);
+		}
+		return paths;
+	}
+
+	private static void AddParticle(HashSet<string> paths, string? particle)
+	{
+		string path = Effects.Normalize(particle);
+		if (!string.IsNullOrEmpty(path))
+		{
+			paths.Add(path);
+		}
+	}
+
+	/// <summary>
+	/// 把表里引用的粒子全部加入本图预缓存清单（由服务端在 OnServerPrecacheResources 调用）。
+	/// 返回加入的路径数；调用后这些路径标记为"本图已预缓存"。
+	/// </summary>
+	public static int Precache(ResourceManifest? manifest)
+	{
+		if (manifest == null)
+		{
+			return 0;
+		}
+		int count = 0;
+		foreach (string path in AllParticles())
+		{
+			manifest.AddResource(path);
+			Precached.Add(path);
+			count++;
+		}
+		return count;
+	}
+
+	/// <summary>本图还没进预缓存的粒子（改 dicefx.json 后未换图时会非空）。</summary>
+	public static List<string> UncachedParticles()
+	{
+		List<string> list = new List<string>();
+		foreach (string path in AllParticles())
+		{
+			if (!Precached.Contains(path))
+			{
+				list.Add(path);
+			}
+		}
+		list.Sort(StringComparer.OrdinalIgnoreCase);
+		return list;
 	}
 
 	/// <summary>
@@ -229,6 +302,15 @@ public static class DiceFxTable
 
 			_profiles = config.Dice;
 			Report($"[DiceFX] Loaded {_profiles.Count} fx profiles from {path}");
+			if (Precached.Count > 0)
+			{
+				// 本图已至少预缓存过一次才比对；否则只是"还没换图"，不算异常。
+				List<string> uncached = UncachedParticles();
+				if (uncached.Count > 0)
+				{
+					Report($"[DiceFX] {uncached.Count} particle path(s) not precached on this map yet (change map to load them): {string.Join(", ", uncached)}");
+				}
+			}
 			return true;
 		}
 		catch (Exception ex)

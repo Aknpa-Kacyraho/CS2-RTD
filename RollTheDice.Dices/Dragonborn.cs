@@ -236,12 +236,22 @@ public class Dragonborn : DiceBlueprint
 			{
 				Server.NextFrame((Action)delegate
 				{
+					// ★ 两帧后才执行：玩家可能已断开/换边 → 先验有效性再读 schema（否则原生崩）。
+					if (captured == null || !((CEntityInstance)captured).IsValid)
+					{
+						return;
+					}
 					CCSPlayerController obj = captured;
 					if (!((CEntityInstance)(object)((obj == null) ? null : obj.PlayerPawn?.Value) == (CEntityInstance)null) && ((CBaseEntity)captured.PlayerPawn.Value).LifeState != 0)
 					{
 						captured.Respawn();
 						Server.NextFrame((Action)delegate
 						{
+							// ★ 再等一帧后仍需重新验有效性（断线/换边窗口）。
+							if (captured == null || !((CEntityInstance)captured).IsValid)
+							{
+								return;
+							}
 							CCSPlayerController obj2 = captured;
 							if (!((CEntityInstance)(object)((obj2 == null) ? null : obj2.PlayerPawn?.Value) == (CEntityInstance)null) && ((CBaseEntity)captured.PlayerPawn.Value).LifeState == 0)
 							{

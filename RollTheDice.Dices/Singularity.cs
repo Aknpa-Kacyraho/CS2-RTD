@@ -105,10 +105,7 @@ public class Singularity : DiceBlueprint
 			((CEntityInstance)_particle).Remove();
 		}
 		_particle = null;
-		if ((CEntityInstance)(object)_glowBall != (CEntityInstance)null && ((CEntityInstance)_glowBall).IsValid)
-		{
-			((CEntityInstance)_glowBall).Remove();
-		}
+		BeamFx.Kill(_glowBall);
 		_glowBall = null;
 	}
 
@@ -159,20 +156,18 @@ public class Singularity : DiceBlueprint
 		//IL_0141: Expected O, but got Unknown
 		CleanupSingularity();
 		_particle = Utilities.CreateEntityByName<CParticleSystem>("info_particle_system");
-		if ((CEntityInstance)(object)_particle != (CEntityInstance)null)
+		if ((CEntityInstance)(object)_particle != (CEntityInstance)null && ((CEntityInstance)_particle).IsValid)
 		{
 			_particle.EffectName = ParticlePaths.AmbientEmbersBlack;
 			_particle.StartActive = true;
 			((CBaseEntity)_particle).Teleport(pos, new QAngle((float?)null, (float?)null, (float?)null), new Vector((float?)null, (float?)null, (float?)null));
 			((CBaseEntity)_particle).DispatchSpawn();
 		}
-		_glowBall = Utilities.CreateEntityByName<CBeam>("beam");
-		if ((CEntityInstance)(object)_glowBall != (CEntityInstance)null)
+		_glowBall = BeamFx.Create(Color.FromArgb(200, 100, 50, 200), 8f);
+		if (_glowBall != null)
 		{
-			((CBaseModelEntity)_glowBall).Render = Color.FromArgb(200, 100, 50, 200);
-			_glowBall.Width = 8f;
-			((CBaseEntity)_glowBall).Teleport(pos, new QAngle((float?)null, (float?)null, (float?)null), new Vector((float?)null, (float?)null, (float?)null));
-			((CBaseEntity)_glowBall).DispatchSpawn();
+			// 点状光球：显式给一个极短终点，避免 m_vecEndPos 默认值把光柱拉向世界原点。
+			BeamFx.Move(_glowBall, pos, new Vector((float?)pos.X, (float?)pos.Y, (float?)(pos.Z + 1f)));
 		}
 	}
 
