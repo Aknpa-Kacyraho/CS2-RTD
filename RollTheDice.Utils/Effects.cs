@@ -35,7 +35,7 @@ public static class Effects
 		{
 			return null;
 		}
-		CParticleSystem system = Utilities.CreateEntityByName<CParticleSystem>("info_particle_system");
+		CParticleSystem? system = Utilities.CreateEntityByName<CParticleSystem>("info_particle_system");
 		return Init(system, particle, position, angles, null, lifeSeconds) ? system : null;
 	}
 
@@ -52,8 +52,8 @@ public static class Effects
 		{
 			return null;
 		}
-		CEnvParticleGlow glow = Utilities.CreateEntityByName<CEnvParticleGlow>("env_particle_glow");
-		if (!Init(glow, particle, position, angles, null, lifeSeconds))
+		CEnvParticleGlow? glow = Utilities.CreateEntityByName<CEnvParticleGlow>("env_particle_glow");
+		if (glow == null || !Init(glow, particle, position, angles, null, lifeSeconds))
 		{
 			return null;
 		}
@@ -75,8 +75,8 @@ public static class Effects
 			return null;
 		}
 		Vector position = new Vector(origin.X, origin.Y, origin.Z + zOffset);
-		CEnvParticleGlow glow = Utilities.CreateEntityByName<CEnvParticleGlow>("env_particle_glow");
-		if (!Init(glow, particle, position, null, target, lifeSeconds))
+		CEnvParticleGlow? glow = Utilities.CreateEntityByName<CEnvParticleGlow>("env_particle_glow");
+		if (glow == null || !Init(glow, particle, position, null, target, lifeSeconds))
 		{
 			return null;
 		}
@@ -143,8 +143,8 @@ public static class Effects
 			return null;
 		}
 		Vector position = new Vector(origin.X, origin.Y, origin.Z + zOffset);
-		CParticleSystem system = Utilities.CreateEntityByName<CParticleSystem>("info_particle_system");
-		if (!Init(system, particle, position, null, target, lifeSeconds))
+		CParticleSystem? system = Utilities.CreateEntityByName<CParticleSystem>("info_particle_system");
+		if (system == null || !Init(system, particle, position, null, target, lifeSeconds))
 		{
 			return null;
 		}
@@ -160,8 +160,8 @@ public static class Effects
 		{
 			return null;
 		}
-		CEnvParticleGlow glow = Utilities.CreateEntityByName<CEnvParticleGlow>("env_particle_glow");
-		if (!Init(glow, particle, position, null, null, lifeSeconds))
+		CEnvParticleGlow? glow = Utilities.CreateEntityByName<CEnvParticleGlow>("env_particle_glow");
+		if (glow == null || !Init(glow, particle, position, null, null, lifeSeconds))
 		{
 			return null;
 		}
@@ -207,7 +207,7 @@ public static class Effects
 		{
 			return null;
 		}
-		CBeam beam = Utilities.CreateEntityByName<CBeam>("beam");
+		CBeam? beam = Utilities.CreateEntityByName<CBeam>("beam");
 		if (beam == null || !beam.IsValid)
 		{
 			return null;
@@ -271,7 +271,7 @@ public static class Effects
 		{
 			return;
 		}
-		CEnvShake shake = Utilities.CreateEntityByName<CEnvShake>("env_shake");
+		CEnvShake? shake = Utilities.CreateEntityByName<CEnvShake>("env_shake");
 		if (shake == null || !shake.IsValid)
 		{
 			return;
@@ -321,7 +321,7 @@ public static class Effects
 		{
 			return;
 		}
-		CEnvExplosion explosion = Utilities.CreateEntityByName<CEnvExplosion>("env_explosion");
+		CEnvExplosion? explosion = Utilities.CreateEntityByName<CEnvExplosion>("env_explosion");
 		if (explosion == null || !explosion.IsValid)
 		{
 			return;
