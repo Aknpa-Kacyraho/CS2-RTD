@@ -2,7 +2,7 @@
 
 [![License](https://img.shields.io/badge/License-GPLv3-blue)](LICENSE)
 
-**基于 [Kandru/cs2-roll-the-dice](https://github.com/Kandru/cs2-roll-the-dice) 的深度修改版**，扩展至 169 个骰子、65 对组合技（Combo Synergy）、四档稀有度抽取、多骰子叠加、统一无敌/buff 系统与作弊指令守卫等大量新机制。
+**基于 [Kandru/cs2-roll-the-dice](https://github.com/Kandru/cs2-roll-the-dice) 的深度修改版**，扩展至 171 个骰子、68 条组合技（Combo Synergy）、四档稀有度抽取、多骰子叠加、统一无敌/buff 系统与作弊指令守卫等大量新机制。
 
 > **原项目**：[Kandru/cs2-roll-the-dice](https://github.com/Kandru/cs2-roll-the-dice) by [@Kandru](https://github.com/Kandru) & [@derkalle4](https://github.com/derkalle4)  
 > 本项目遵循 GPLv3 协议，保留原作者全部版权。
@@ -215,7 +215,7 @@
 | `SoulEater` | 噬魂者 | 击杀吸取灵魂回复 + 获得投掷物 |
 | `Taotie` | 饕餮 | 攻击吃掉对方骰子 + 100HP |
 | `Lucky` | 幸运星 | 定时获随机金币 + Buff |
-| `FortyTwo` | 42 | 每 42s 获得无敌 + 隐身 |
+| `FourtyTwo` | 42 | 每 22s 获得 6s 无敌 + 2s 加速 |
 | `Eclipse` | 月蚀 | 新月/满月循环切换 |
 | `Cupid` | 丘比特 | 死亡随机带走一名玩家 |
 | `Traitor` | 叛徒 | 杀队友随机杀一敌人 |
@@ -242,7 +242,6 @@
 | `PlayAsChicken` | 鸡神 | 变成大鸡，300HP + 40% 速度 |
 | `HangedMan` | 倒吊者 | 每秒流失 1HP，击杀反转 |
 | `Jester` | 小丑 | 移动掉血 + 速度，击杀反转 |
-| `Molt` | 蜕皮 | 死亡复活，体型缩小 |
 | `DeathKnight` | 死亡骑士 | 每失 1HP 获得 1% 减伤，持刀回血 |
 | `Frostmourne` | 霜之哀伤 | 持刀 60% 减伤 + 回血 |
 | `God` | 上帝 | 90s 试炼：3× 移速 / 3× 伤害、+500 护甲、60% 减伤；击杀回 150HP 并短暂无敌 |
@@ -257,6 +256,10 @@
 | `Curse` | 怨念 | 自身阵亡后标记击杀者受伤增加，存活队友获得短时伤害加成 |
 | `Yagorou` | 亚戈鲁 | 击杀后短时无敌；每回合一次致命伤免疫 |
 | `Teneril` | 忒尼尔 | 队友阵亡时随机诅咒一名敌人（减速 + 削减当前血量） |
+| `Excalibur` | 誓约胜利之剑 | 按住 E 蓄力、松手释放：光丝拼凑成剑，挥落后贯穿全场的金色光带（穿墙），命中 500 伤害，CD 90s |
+| `Fate` | 命运 | 被击杀者的骰子必掉落，可触发平衡/预兆/命运效果 |
+| `MagneticPulse` | 磁力脉冲 | 1s 内造成 20+ 伤害时把附近敌人吸到身边并减速 40%，CD 12s |
+| `Thorns` | 荆棘 | 受击时 100% 反弹伤害给攻击者 |
 
 ### 🧬 合成 / 进化骰（稀有度 combo 档）
 
@@ -277,8 +280,9 @@
 
 ### 前提条件
 
-- CS2 服务器已安装 [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp)（net10.0 运行时）
-- 服务器安装 [Metamod:Source](https://www.sourcemm.net/)
+- CS2 1.41.9.3（2026-10-28 更新）
+- [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp) **1.0.379**（net10.0 运行时）
+- [Metamod:Source](https://www.sourcemm.net/) **2.0.0-dev+1483**（dev 构建）
 
 ### 安装步骤
 
