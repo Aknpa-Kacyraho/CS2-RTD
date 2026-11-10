@@ -205,6 +205,10 @@ public class Dragonborn : DiceBlueprint
 										captured.Respawn();
 										Server.NextFrame((Action)delegate
 										{
+											if (captured == null || !((CEntityInstance)captured).IsValid)
+											{
+												return;
+											}
 											instance2.ForceDiceForPlayer(captured, dragonType);
 											Server.PrintToChatAll($" {_localizer["command.prefix"].Value}\ud83d\udc09\ud83d\udd25 {((CBasePlayerController)captured).PlayerName} 龙魂共鸣，化身为{((dragonType == "IceDragon") ? "冰巨龙" : "火巨龙")}！");
 										});
