@@ -175,7 +175,7 @@ public static class DiceEffects
 		try
 		{
 			ulong id = player.SteamID;
-			if (!Active.TryGetValue(id, out HashSet<string> dice))
+			if (!Active.TryGetValue(id, out var dice) || dice is null)
 			{
 				dice = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 				Active[id] = dice;
@@ -204,7 +204,7 @@ public static class DiceEffects
 		try
 		{
 			ulong id = player.SteamID;
-			if (Active.TryGetValue(id, out HashSet<string> dice))
+			if (Active.TryGetValue(id, out var dice) && dice is not null)
 			{
 				dice.Remove(className);
 				if (dice.Count == 0)
@@ -260,7 +260,7 @@ public static class DiceEffects
 				{
 					continue;
 				}
-				if (!Active.TryGetValue(player.SteamID, out HashSet<string> dice) || dice.Count == 0)
+				if (!Active.TryGetValue(player.SteamID, out var dice) || dice is null || dice.Count == 0)
 				{
 					continue;
 				}
@@ -837,7 +837,7 @@ public static class DiceEffects
 
 	private static HashSet<string> DiceOf(CCSPlayerController player)
 	{
-		return Active.TryGetValue(player.SteamID, out HashSet<string> dice) ? dice : Empty;
+		return Active.TryGetValue(player.SteamID, out var dice) && dice is not null ? dice : Empty;
 	}
 
 }
