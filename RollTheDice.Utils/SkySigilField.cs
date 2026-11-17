@@ -12,13 +12,13 @@ public sealed class SkySigilOptions
 	public string Style { get; set; } = "mixed";
 
 	/// <summary>整体细节系数（0.2~1.5）：越小每层束数越少，是"卡不卡"的第一旋钮。</summary>
-	public float Detail { get; set; } = 0.75f;
+	public float Detail { get; set; } = 0.45f;
 
 	/// <summary>参与自转的层数（0 = 全静态）。只有这些层走每 tick 更新，其余层几乎零成本。</summary>
-	public int AnimatedLayers { get; set; } = 3;
+	public int AnimatedLayers { get; set; } = 1;
 
 	/// <summary>整片天空法阵的 CBeam 预算上限，按半径权重分给每层，超出就把该层最内侧的刻画摘掉。</summary>
-	public int BeamBudget { get; set; } = 1600;
+	public int BeamBudget { get; set; } = 400;
 
 	/// <summary>自转图元的更新间隔（tick）：2 = 隔一 tick（省一半每 tick 网络），1 = 每 tick。</summary>
 	public int AnimationStride { get; set; } = 2;
@@ -75,7 +75,7 @@ public sealed class SkySigilField : IBeamGroup
 	private readonly bool _axis;
 
 	/// <summary>单层"风格刻画"的硬上限：同时兜底"单帧创建大量 CBeam"的风险（装置件不计入）。</summary>
-	private const int MaxStyleBeamsPerLayer = 420;
+	private const int MaxStyleBeamsPerLayer = 120;
 
 	/// <summary>中央主轴绕中心小圆的半径（绝对单位，不随层缩放）。</summary>
 	private const float AxisRadius = 52f;
@@ -103,8 +103,8 @@ public sealed class SkySigilField : IBeamGroup
 		_growSeconds = MathF.Max(growSeconds, 0.05f);
 		_styles = SigilStyles.Pool(options.Style);
 		_detail = Math.Clamp(options.Detail, 0.2f, 1.5f);
-		_animatedLayers = Math.Clamp(options.AnimatedLayers, 0, 48);
-		_budget = Math.Clamp(options.BeamBudget, 120, 8000);
+		_animatedLayers = Math.Clamp(options.AnimatedLayers, 0, 2);
+		_budget = Math.Clamp(options.BeamBudget, 64, 512);
 		_stride = Math.Clamp(options.AnimationStride, 1, 4);
 		_rim = options.Rim;
 		_spines = options.Spines;
@@ -144,6 +144,7 @@ public sealed class SkySigilField : IBeamGroup
 		{
 			contract = 0.01f;
 		}
+		int builtThisTick = 0;
 		foreach (Layer layer in _layers)
 		{
 			if (now < layer.SpawnTime)
@@ -152,7 +153,12 @@ public sealed class SkySigilField : IBeamGroup
 			}
 			if (!layer.Built)
 			{
+				if (builtThisTick >= 1)
+				{
+					continue;
+				}
 				Build(layer, center);
+				builtThisTick++;
 			}
 			float grow = Math.Clamp((now - layer.SpawnTime) / _growSeconds, 0f, 1f);
 			float ease = 1f - (1f - grow) * (1f - grow) * (1f - grow);

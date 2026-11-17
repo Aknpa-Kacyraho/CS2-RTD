@@ -89,7 +89,7 @@ public class FinalJudgmentConfig
 
 	/// <summary>法阵层数（"数十个"）。</summary>
 	[JsonPropertyName("sky_count")]
-	public int SkyCount { get; set; } = 12;
+	public int SkyCount { get; set; } = 8;
 
 	[JsonPropertyName("sky_height_start")]
 	public float SkyHeightStart { get; set; } = 900f;
@@ -114,7 +114,7 @@ public class FinalJudgmentConfig
 
 	/// <summary>相邻两层的出现间隔。</summary>
 	[JsonPropertyName("sky_layer_delay")]
-	public float SkyLayerDelay { get; set; } = 0.45f;
+	public float SkyLayerDelay { get; set; } = 0.6f;
 
 	[JsonPropertyName("sky_grow_seconds")]
 	public float SkyGrowSeconds { get; set; } = 0.5f;
@@ -136,15 +136,15 @@ public class FinalJudgmentConfig
 
 	/// <summary>整体细节系数（0.2~1.5）：越小每层束数越少，是"卡不卡"的第一旋钮。</summary>
 	[JsonPropertyName("sky_detail")]
-	public float SkyDetail { get; set; } = 0.75f;
+	public float SkyDetail { get; set; } = 0.45f;
 
 	/// <summary>参与自转的层数（0 = 全静态）。只有这些层走每 tick 更新。</summary>
 	[JsonPropertyName("sky_animated_layers")]
-	public int SkyAnimatedLayers { get; set; } = 4;
+	public int SkyAnimatedLayers { get; set; } = 1;
 
 	/// <summary>整片天空法阵的 CBeam 预算上限（只限"风格刻画"，装置骨架不计入），超出后自动给后续层降采样。</summary>
 	[JsonPropertyName("sky_beam_budget")]
-	public int SkyBeamBudget { get; set; } = 1600;
+	public int SkyBeamBudget { get; set; } = 400;
 
 	/// <summary>大层外缘的立式短齿（"盘有厚度"，从下往上看是盘的下沿）。</summary>
 	[JsonPropertyName("sky_rim")]
