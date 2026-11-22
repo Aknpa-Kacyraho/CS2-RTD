@@ -110,7 +110,13 @@ public partial class RollTheDice
 				{
 					name = dice.ClassName;
 				}
-				string description = Regex.Replace(dice.Description ?? string.Empty, "\\{[^}]*\\}", string.Empty).Trim();
+				string descriptionKey = "dice_" + dice.ClassName + "_player";
+				string description = ((BasePlugin)this).Localizer[descriptionKey];
+				if (description == descriptionKey)
+				{
+					description = dice.Description ?? string.Empty;
+				}
+				description = Regex.Replace(description, "\\{[^}]*\\}", string.Empty).Trim();
 				string tier = GetDiceTier(dice);
 				command.ReplyToCommand($"  {TierColor(tier)}●\u0001 {name} [{TierLabel(tier)}] — {description}");
 			}

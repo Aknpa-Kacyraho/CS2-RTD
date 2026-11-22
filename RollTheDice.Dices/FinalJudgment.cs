@@ -78,6 +78,8 @@ public class FinalJudgment : DiceBlueprint
 		_players.Remove(player);
 	}
 
+	public override bool NeedsBackgroundTick => _fade.Any;
+
 	public override void Reset()
 	{
 		// ★ 绝不在同一帧删上千根 CBeam：穹顶 / 天空法阵群交给分帧拆除队列（OnTick 里 Tick）。

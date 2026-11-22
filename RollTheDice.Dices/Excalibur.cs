@@ -74,6 +74,8 @@ public class Excalibur : DiceBlueprint
 		_players.Remove(player);
 	}
 
+	public override bool NeedsBackgroundTick => _fade.Any;
+
 	public override void Reset()
 	{
 		foreach (KeyValuePair<ulong, ExcaliburSword> kv in _swords.ToList())

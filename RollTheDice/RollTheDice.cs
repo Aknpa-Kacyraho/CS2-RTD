@@ -48,6 +48,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	// O(1) lookup by class name and cached draw pools. Both are rebuilt whenever the
 	// module set changes (init/reload) and cleared on destroy.
 	private readonly Dictionary<string, DiceBlueprint> _diceByName = new Dictionary<string, DiceBlueprint>(StringComparer.OrdinalIgnoreCase);
+	private readonly HashSet<string> _knownDicePrefixes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 	private List<DiceBlueprint>? _drawablePool;
 	private List<DiceBlueprint>? _normalPool;
 
@@ -82,7 +83,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.4.1";
+	public override string ModuleVersion => "1.4.2";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -759,82 +760,6 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	}
 
 
-	private void ReloadConfigFromDisk()
-	{
-		try
-		{
-			PluginConfigExtensions.Reload<PluginConfig>(Config);
-			UpdatePlayerConfig();
-			// Deliberately no Update() here: reloading must not write the in-memory copy
-			// back to disk, otherwise a manual edit is overwritten on the next map start.
-		}
-		catch (Exception ex)
-		{
-			string text = ((BasePlugin)this).Localizer["core.error"].Value.Replace("{error}", ex.Message);
-			Console.WriteLine(text);
-			Server.PrintToChatAll(text);
-		}
-	}
-
-	/// <summary>特效表路径：&lt;css&gt;/configs/plugins/RollTheDice/dicefx.json。</summary>
-	private string FxDiceFxPath()
-	{
-		DirectoryInfo pluginDir = new DirectoryInfo(ModuleDirectory);
-		string cssRoot = pluginDir.Parent?.Parent?.FullName ?? Directory.GetCurrentDirectory();
-		return Path.Combine(cssRoot, "configs", "plugins", Path.GetFileName(ModuleDirectory), "dicefx.json");
-	}
-
-	/// <summary>重载 dicefx.json（fail-soft：失败保留上一份内存表）。</summary>
-	private void ReloadFxTable()
-	{
-		try
-		{
-			List<string> known = new List<string>(_dices.Count);
-			foreach (DiceBlueprint dice in _dices)
-			{
-				known.Add(dice.ClassName);
-			}
-			if (DiceFxTable.Reload(FxDiceFxPath(), known))
-			{
-				DiceEffects.ResetPersistent();
-			}
-		}
-		catch (Exception ex)
-		{
-			Console.WriteLine("[DiceFX] reload failed: " + ex.Message);
-		}
-	}
-
-	private void LoadMapConfig(string mapName)
-	{
-		_currentMapConfig = (from mapConfig in Config.MapConfigs
-			where FileSystemName.MatchesSimpleExpression(mapConfig.Key.AsSpan(), mapName.AsSpan())
-			select mapConfig.Value).FirstOrDefault() ?? new MapConfig
-		{
-			Dices = Config.Dices
-		};
-		Console.WriteLine(((BasePlugin)this).Localizer["core.mapconfig"].Value.Replace("{mapName}", mapName));
-	}
-
-	public void OnConfigParsed(PluginConfig config)
-	{
-		Config = config;
-		DiceEffects.Enabled = config.Effects?.Enabled ?? true;
-		DiceEffects.TrailsEnabled = config.Effects?.Trails ?? true;
-		Console.WriteLine(((BasePlugin)this).Localizer["core.config"]);
-	}
-
-	private void UpdatePlayerConfig()
-	{
-		if (_playerConfigs.Count == 0)
-		{
-			_playerConfigs = Config.PlayerConfigs;
-		}
-		else
-		{
-			Config.PlayerConfigs = _playerConfigs;
-		}
-	}
 
 	private static object ConvertJsonElement(object element)
 	{
@@ -1005,7 +930,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		Effects.ClearAll();
 		DiceEffects.ClearAll();
 		GameRules.Reset();
-		_sigilTests.Clear();
+		ClearSigilTests();
 		// 卸载时彻底清掉静态/实例状态，避免 css_reload 后残留（旧实例的 Instance、玩家键集合、buff 域）。
 		Instance = null;
 		_playersThatRolledTheDice.Clear();
@@ -1085,6 +1010,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		if (((uint)num & (flag ? 1u : 0u)) != 0)
 		{
 			_isDuringRound = false;
+			DiceBlueprint.RoundActive = false;
 			return (HookResult)0;
 		}
 		try
@@ -1525,7 +1451,13 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				continue;
 			}
 			RemoveDiceForPlayer(item, DiceRemoveReason.GameLogic);
-			RollTheDiceForPlayer(item);
+			(string? rolled, _) = RollTheDiceForPlayer(item);
+			if (!string.IsNullOrEmpty(rolled))
+			{
+				// Auto-roll replaces the holder's dice; count it as one roll so a manual
+				// !rtd cannot stack a second dice on top of the automatic one.
+				_playersThatRolledTheDice[item] = 1;
+			}
 		}
 	}
 
@@ -1555,6 +1487,26 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			}
 		}
 		_nameRefreshTimers.Clear();
+	}
+
+	private void ClearSigilTests()
+	{
+		foreach ((float End, List<IBeamGroup> Groups, Vector Center) test in _sigilTests)
+		{
+			foreach (IBeamGroup group in test.Groups)
+			{
+				try
+				{
+					group.Remove();
+				}
+				catch
+				{
+				}
+			}
+		}
+		_sigilTests.Clear();
+		// The repeating debug tick has no handle; leave _sigilTimerStarted true so a
+		// second timer is not started. Groups above are removed explicitly.
 	}
 
 	private HookResult OnRoundEnd(EventRoundEnd @event, GameEventInfo info)
@@ -1626,9 +1578,16 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		//IL_0022: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0025: Unknown result type (might be due to invalid IL or missing references)
 		CCSPlayerController disconnected = @event.Userid;
-		RemoveDiceForPlayer(disconnected, DiceRemoveReason.Disconnect);
-		// The controller can already be invalid here (RemoveDiceForPlayer returns early).
-		// Prune every dice list so no stale controller survives until round end.
+		if (disconnected == null || !disconnected.IsValid)
+		{
+			// The controller is already invalid; RemoveDiceForPlayer would return early.
+			RemoveDiceForSteamId(@event.Xuid, DiceRemoveReason.Disconnect);
+		}
+		else
+		{
+			RemoveDiceForPlayer(disconnected, DiceRemoveReason.Disconnect);
+		}
+		// Belt and braces: prune any other stale controller left by a half-finished removal.
 		PruneInvalidDiceHolders();
 		// 控制器可能已失效（RemoveDiceForPlayer 会 early-return），用 xuid 兜底清理特效状态。
 		if (@event.Xuid != 0UL)
@@ -1765,7 +1724,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		DiceEffects.ClearAll();
 		GameRules.Reset();
 		DiceFxTable.ClearPrecached();
-		_sigilTests.Clear();
+		ClearSigilTests();
 		_isDuringRound = false;
 		_playersThatRolledTheDice.Clear();
 		_PlayerCooldown.Clear();
@@ -2054,6 +2013,29 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 	}
 
+	/// <summary>Fallback for a disconnect whose controller is already invalid: remove
+	/// holders by SteamID so dice state cannot survive until round end.</summary>
+	private void RemoveDiceForSteamId(ulong steamId, DiceRemoveReason reason)
+	{
+		if (steamId == 0UL)
+		{
+			return;
+		}
+		foreach (DiceBlueprint dice in _dices)
+		{
+			try
+			{
+				if (dice.HasPlayer(steamId))
+				{
+					dice.RemoveBySteamId(steamId);
+				}
+			}
+			catch
+			{
+			}
+		}
+	}
+
 	private void RefreshCombos(CCSPlayerController trigger)
 	{
 		try
@@ -2252,14 +2234,42 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	}
 
 	/// <summary>剥掉插件自己加的 dice 前缀（`[A] [B] 名字` / `[A]+2 名字`）；剥完为空则保留原名。</summary>
-	private static string StripDiceNameDecoration(string name)
+	private string StripDiceNameDecoration(string name)
 	{
 		if (string.IsNullOrEmpty(name))
 		{
 			return name ?? string.Empty;
 		}
-		string stripped = Regex.Replace(name, "^(?:\\[[^\\[\\]]{1,48}\\](?:\\+\\d+)?[ \\u3000]+)+", string.Empty).Trim();
-		return stripped.Length > 0 ? stripped : name.Trim();
+
+		// Only strip tags this plugin actually adds (dice/combo names). A blanket
+		// "[anything]" regex used to eat real clan tags such as "[CLAN] Name".
+		string result = name.Trim();
+		bool changed = true;
+		while (changed && result.Length > 0)
+		{
+			changed = false;
+			foreach (string known in _knownDicePrefixes)
+			{
+				string tag = "[" + known + "]";
+				if (!result.StartsWith(tag, StringComparison.OrdinalIgnoreCase))
+				{
+					continue;
+				}
+				result = result.Substring(tag.Length).TrimStart();
+				// "[A]+2 Name" compact form.
+				if (result.StartsWith("+"))
+				{
+					int space = result.IndexOf(' ');
+					if (space > 0)
+					{
+						result = result.Substring(space + 1).TrimStart();
+					}
+				}
+				changed = true;
+				break;
+			}
+		}
+		return result.Length > 0 ? result : name.Trim();
 	}
 
 	private void InitializeModules()
@@ -2267,6 +2277,10 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		if (_dices.Count > 0 || !_currentMapConfig.Enabled)
 		{
 			return;
+		}
+		if (_currentMapConfig.Dices == null)
+		{
+			_currentMapConfig.Dices = Config.Dices;
 		}
 		Dictionary<string, Type> dictionary = (from t in typeof(DiceBlueprint).Assembly.GetTypes()
 			where t.IsSubclassOf(typeof(DiceBlueprint)) && !t.IsAbstract
@@ -2320,9 +2334,21 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 		_dices.AddRange(built);
 		_diceByName.Clear();
+		_knownDicePrefixes.Clear();
 		foreach (DiceBlueprint dice in _dices)
 		{
 			_diceByName[dice.ClassName] = dice;
+			_knownDicePrefixes.Add(dice.ClassName);
+			string nameKey = "dice_" + dice.ClassName + "_name";
+			string localizedName = ((BasePlugin)this).Localizer[nameKey];
+			if (localizedName != nameKey)
+			{
+				_knownDicePrefixes.Add(localizedName);
+			}
+		}
+		foreach (var combo in DiceSynergy._combos)
+		{
+			_knownDicePrefixes.Add(combo.ComboName);
 		}
 		_drawablePool = _dices.Where(dice => dice.CanBeDrawn).ToList();
 		_normalPool = _dices.Where(dice => dice.CanBeDrawn && !dice.IsSpecial).ToList();
@@ -2372,6 +2398,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 		_dices.Clear();
 		_diceByName.Clear();
+		_knownDicePrefixes.Clear();
 		_drawablePool = null;
 		_normalPool = null;
 	}
@@ -2567,12 +2594,12 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			return false;
 		}
-		DiceBlueprint diceBlueprint = _dices.FirstOrDefault((DiceBlueprint d) => d.ClassName == diceClassName);
-		if (diceBlueprint == null)
+		if (!_diceByName.TryGetValue(diceClassName, out DiceBlueprint? diceBlueprint))
 		{
 			return false;
 		}
-		if (!diceBlueprint._players.Contains(player))
+		ulong steamId = player.SteamID;
+		if (!diceBlueprint.HasPlayer(steamId))
 		{
 			return false;
 		}
@@ -2591,9 +2618,10 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			return list;
 		}
+		ulong steamId = player.SteamID;
 		foreach (DiceBlueprint dix in _dices)
 		{
-			if (dix._players.Contains(player))
+			if (dix.HasPlayer(steamId))
 			{
 				list.Add(dix.ClassName);
 			}

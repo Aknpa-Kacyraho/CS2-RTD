@@ -21,6 +21,13 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 	/// <summary>No holder → skip this dice's tick/damage callbacks.</summary>
 	public bool HasAnyHolder => _players.Count > 0;
 
+	/// <summary>
+	/// True when a dice must keep ticking after its holders are gone, e.g. while its
+	/// frame-budgeted CBeam teardown queue is draining. Override in dice that own such a
+	/// queue; otherwise the empty-holder shortcut would freeze the queue and leak beams.
+	/// </summary>
+	public virtual bool NeedsBackgroundTick => false;
+
 	// Every timer created by a dice goes through ScopedTimer and is killed on
 	// round end / module destroy. Raw "new Timer" callbacks outlive a reload.
 	private readonly List<Timer> _scopedTimers = new List<Timer>();
@@ -80,7 +87,7 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 
 	public void SafeOnTick()
 	{
-		if (HasAnyHolder)
+		if (HasAnyHolder || NeedsBackgroundTick)
 		{
 			TickHook?.Invoke();
 		}

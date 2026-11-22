@@ -78,6 +78,8 @@ public class Supernova : DiceBlueprint
 		_players.Remove(player);
 	}
 
+	public override bool NeedsBackgroundTick => _fade.Any || _fading.Count > 0;
+
 	public override void Reset()
 	{
 		foreach (CCSPlayerController player in _players.ToList())

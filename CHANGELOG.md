@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.4.2 — 2026-11-22
+
+### Fixed
+
+- **P0 regression from 1.4.0**: empty-holder short-circuit also froze the CBeam
+  teardown queues. FinalJudgment/Excalibur/Supernova now expose `NeedsBackgroundTick`
+  while `_fade`/`_fading` is non-empty, so beams drain after round end and the
+  CopyExistingEntity crash class cannot return.
+- Auto-roll now records one roll; a manual `!rtd` can no longer stack a second dice
+  on top of the automatic one.
+- Map configs are merged as overlays over the global dice config (scalar overrides
+  only); disabling one dice in a map no longer resets the other dice to defaults.
+- TAB-name stripping only removes known dice/combo tags, preserving real `[CLAN]` tags.
+- Warmup branch sets `RoundActive=false`, so delayed damage/revive cannot run in warmup.
+- Disconnect with an already-invalid controller removes holders by SteamID instead of
+  relying on round-end prune.
+- `!rtd status` reads the localized dice description instead of the last notification
+  text.
+- Map end removes test sigil groups as well as clearing the list.
+- Player config writes merge by SteamID instead of replacing the dictionary.
+- Config lifecycle (reload/map overlay/OnConfigParsed/player config) moved to
+  `RollTheDice.Config.cs`; main class is ~2.76k lines.
+
 ## 1.4.1 — 2026-11-22
 
 ### Changed

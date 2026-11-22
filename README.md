@@ -276,6 +276,16 @@
 
 ---
 
+## v1.4.2 稳定性修复
+
+- 修复 v1.4.0 空持有者短路冻结拆除队列的问题：FinalJudgment/Excalibur/Supernova 在淡出队列未清空时继续 Tick。
+- 自动掷骰计入一次抽取，手动 `!rtd` 不能在其上再叠一颗。
+- 地图配置改为标量覆盖合并，禁用一项不会把其余骰子重置为默认值。
+- TAB 名字只剥已知骰子/组合标签，保留真实 `[CLAN]`。
+- 热身阶段 `RoundActive=false`；断线控制器失效时按 SteamID 清理持有者。
+- `!rtd status` 使用本地化描述；换图清理测试法阵实体；玩家配置按 SteamID 合并。
+- 配置重载/地图覆盖/OnConfigParsed 拆到 `RollTheDice.Config.cs`，主类约 2.76k 行。
+
 ## v1.4.1 架构整理
 
 - 主类拆分为 `RollTheDice.Help.cs` 与 `RollTheDice.CheatGuard.cs`，主文件约 2.7k 行。
