@@ -184,6 +184,13 @@ public static class DiceFxTable
 		_profiles = new Dictionary<string, FxProfile>(StringComparer.OrdinalIgnoreCase);
 	}
 
+	/// <summary>Forget the per-map precache set. Call on map end, before the next map's
+	/// OnServerPrecacheResources, so AddResource runs again for the new map.</summary>
+	public static void ClearPrecached()
+	{
+		Precached.Clear();
+	}
+
 	/// <summary>表里实际引用到的全部粒子路径（去重；已规范化为运行期 <c>.vpcf</c>）。</summary>
 	public static IEnumerable<string> AllParticles()
 	{

@@ -64,7 +64,7 @@ public class Bounty : DiceBlueprint
 			"playerName",
 			((CBasePlayerController)player).PlayerName
 		} });
-		Timer item = new Timer(5f, (Action)delegate
+		Timer item = ScopedTimer(5f, (Action)delegate
 		{
 			if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && _players.Contains(player))
 			{

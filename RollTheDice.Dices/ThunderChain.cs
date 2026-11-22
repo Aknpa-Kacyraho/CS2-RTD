@@ -225,7 +225,7 @@ public class ThunderChain : DiceBlueprint
 						});
 						continue;
 					}
-					new Timer(num6, (Action)delegate
+					ScopedTimer(num6, (Action)delegate
 					{
 						applyDamage();
 						try

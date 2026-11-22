@@ -141,7 +141,7 @@ public class Martyrdom : DiceBlueprint
 		Vector expPos = absOrigin;
 		float expRadius = num;
 		int expDamage = explosionDamage;
-		new Timer(0.5f, (Action)delegate
+		ScopedTimer(0.5f, (Action)delegate
 		{
 			//IL_003d: Unknown result type (might be due to invalid IL or missing references)
 			//IL_0060: Unknown result type (might be due to invalid IL or missing references)

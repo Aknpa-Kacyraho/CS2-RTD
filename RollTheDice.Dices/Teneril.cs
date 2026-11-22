@@ -125,7 +125,7 @@ public class Teneril : DiceBlueprint
 		pawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(enemy, 100f);
 		Utilities.SetStateChanged((CBaseEntity)(object)pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		enemy.PrintToCenterAlert($"忒尼尔的诅咒！减速{_config.Dices.Teneril.SlowPercent * 100f:F0}% {seconds:F0}s");
-		new Timer(seconds, (Action)delegate
+		ScopedTimer(seconds, (Action)delegate
 		{
 			RestoreSlow(steamID);
 		}, (TimerFlags?)null);

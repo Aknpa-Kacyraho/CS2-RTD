@@ -69,7 +69,7 @@ public class ImposterSyndrome : DiceBlueprint
 			_decoyGlows[attacker] = list;
 			attacker.PrintToCenterAlert("\ud83d\udc41 击杀揭露！敌人位置已暴露 3s！");
 			CCSPlayerController captured = attacker;
-			new Timer(3f, (Action)delegate
+			ScopedTimer(3f, (Action)delegate
 			{
 				CleanupDecoyGlows(captured);
 			}, (TimerFlags?)null);
@@ -183,7 +183,7 @@ public class ImposterSyndrome : DiceBlueprint
 								val3.PrintToCenterAlert("\ud83d\udc41 诱饵弹暴露了敌人位置!");
 							}
 							CCSPlayerController capturedThrower = val3;
-							new Timer(1f, (Action)delegate
+							ScopedTimer(1f, (Action)delegate
 							{
 								CleanupDecoyGlows(capturedThrower);
 							}, (TimerFlags?)null);

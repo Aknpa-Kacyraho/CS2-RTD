@@ -189,7 +189,7 @@ public class SmokeBomb : DiceBlueprint
 				obj6.PrintToCenterAlert($"\ud83d\udca8 迷雾逃生！隐身{num2:F0}秒！");
 			}
 		});
-		new Timer(num2, (Action)delegate
+		ScopedTimer(num2, (Action)delegate
 		{
 			// ★ 定时器到期时玩家可能已断开/换边 → 先验有效性再读 schema（否则原生崩）。
 			if (capturedVictim == null || !((CEntityInstance)capturedVictim).IsValid)

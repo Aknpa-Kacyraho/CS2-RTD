@@ -534,7 +534,7 @@ public class Fate : DiceBlueprint
 				list2.Add(GlowUtil.CreateGlow((CBaseEntity)(object)value5, Color.Yellow));
 				_compassActiveGlows[sid2] = list2;
 				ulong capSid = sid2;
-				new Timer(compassDuration, (Action)delegate
+				ScopedTimer(compassDuration, (Action)delegate
 				{
 					ClearCompassGlows(capSid);
 				}, (TimerFlags?)null);

@@ -120,7 +120,7 @@ public class NoExplosives : DiceBlueprint
 				string model = cfg.RandomModels[new Random().Next(cfg.RandomModels.Count)];
 				nint inflictorHandle = CreatePhysicsModel(model, cfg.ModelScale, origin, new QAngle(0f, 0f, 0f), new Vector(((CBaseEntity)grenade).Velocity.X, ((CBaseEntity)grenade).Velocity.Y, ((CBaseEntity)grenade).Velocity.Z));
 				_grenadesThrownByPlayers.Add(inflictorHandle, throwerController);
-				new Timer(10f, delegate
+				ScopedTimer(10f, delegate
 				{
 					_grenadesThrownByPlayers.Remove(inflictorHandle);
 				}, (TimerFlags?)null);

@@ -191,7 +191,7 @@ public class HighGravity : DiceBlueprint
 			SpeedBonusManager.Register(enemy, ClassName, -cfg.ShockSlow);
 			enemyPawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(enemy, 100f);
 			Utilities.SetStateChanged(enemyPawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
-			new Timer(cfg.ShockSlowSeconds, (Action)delegate
+			ScopedTimer(cfg.ShockSlowSeconds, (Action)delegate
 			{
 				RestoreSlow(enemyId);
 			}, (TimerFlags?)null);

@@ -165,7 +165,7 @@ public class DecoyDummy : DiceBlueprint
 						{
 							Vector pos = new Vector((float?)((CBaseEntity)val).AbsOrigin.X, (float?)((CBaseEntity)val).AbsOrigin.Y, (float?)(((CBaseEntity)val).AbsOrigin.Z + 72f));
 							CCSPlayerController captured = val3;
-							new Timer(1.5f, (Action)delegate
+							ScopedTimer(1.5f, (Action)delegate
 							{
 								//IL_00a7: Unknown result type (might be due to invalid IL or missing references)
 								//IL_00ca: Unknown result type (might be due to invalid IL or missing references)
@@ -204,14 +204,14 @@ public class DecoyDummy : DiceBlueprint
 												_dummyGlows[captured] = revealGlows;
 												captured.PrintToCenterAlert("\ud83d\udc41 幻影军团：假人暴露了敌人位置!");
 												CCSPlayerController glowOwner = captured;
-												new Timer(1f, (Action)delegate
+												ScopedTimer(1f, (Action)delegate
 												{
 													CleanupGlows(glowOwner);
 												}, (TimerFlags?)null);
 											}
 										}
 										CDynamicProp capturedDummy = val4;
-										new Timer(8f, (Action)delegate
+										ScopedTimer(8f, (Action)delegate
 										{
 											try
 											{

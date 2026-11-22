@@ -15,10 +15,16 @@ public static class DynamicHandlers
 		Type nestedType = typeof(Listeners).GetNestedType(listenerName);
 		if (nestedType == null)
 		{
+			Console.WriteLine($"[DynamicHandlers] {plugin.GetType().Name}: unknown listener '{listenerName}'.");
 			return;
 		}
 		MethodInfo method = plugin.GetType().GetMethod(listenerName);
-		if (!(method == null))
+		if (method == null)
+		{
+			Console.WriteLine($"[DynamicHandlers] {plugin.GetType().Name}: listener '{listenerName}' has no method.");
+			return;
+		}
+		if (true)
 		{
 			Delegate obj;
 			if (listenerName == "OnPlayerTakeDamagePre")
@@ -41,6 +47,23 @@ public static class DynamicHandlers
 					obj = Delegate.CreateDelegate(nestedType, plugin, method);
 				}
 			}
+			else if (listenerName == "OnTick")
+			{
+				// Skip the per-frame callback entirely while nobody holds this dice.
+				try
+				{
+					Action raw = (Action)Delegate.CreateDelegate(typeof(Action), plugin, method);
+					plugin.TickHook = raw;
+					Listeners.OnTick wrapper = new Listeners.OnTick(plugin.SafeOnTick);
+					plugin.TickHookWrapper = wrapper;
+					obj = wrapper;
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("[DynamicHandlers] tick wrap failed for " + plugin.GetType().Name + ": " + ex.Message);
+					obj = Delegate.CreateDelegate(nestedType, plugin, method);
+				}
+			}
 			else
 			{
 				obj = Delegate.CreateDelegate(nestedType, plugin, method);
@@ -60,16 +83,24 @@ public static class DynamicHandlers
 		Type nestedType = typeof(Listeners).GetNestedType(listenerName);
 		if (nestedType == null)
 		{
+			Console.WriteLine($"[DynamicHandlers] {plugin.GetType().Name}: unknown listener '{listenerName}'.");
 			return;
 		}
 		MethodInfo method = plugin.GetType().GetMethod(listenerName);
-		if (!(method == null))
+		if (method == null)
+		{
+			Console.WriteLine($"[DynamicHandlers] {plugin.GetType().Name}: listener '{listenerName}' has no method.");
+			return;
+		}
+		if (true)
 		{
 			// Must remove the same wrapper instance that was registered, otherwise the
 			// listener stays behind after a reload.
 			Delegate obj = listenerName == "OnPlayerTakeDamagePre" && plugin.DamageHookWrapper != null
 				? plugin.DamageHookWrapper
-				: Delegate.CreateDelegate(nestedType, plugin, method);
+				: listenerName == "OnTick" && plugin.TickHookWrapper != null
+					? plugin.TickHookWrapper
+					: Delegate.CreateDelegate(nestedType, plugin, method);
 			MethodInfo methodInfo = typeof(BasePlugin).GetMethods(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault((MethodInfo m) => m.Name == "RemoveListener" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1);
 			if (!(methodInfo == null))
 			{
@@ -81,6 +112,11 @@ public static class DynamicHandlers
 				plugin.DamageHook = null;
 				plugin.DamageHookWrapper = null;
 			}
+			else if (listenerName == "OnTick")
+			{
+				plugin.TickHook = null;
+				plugin.TickHookWrapper = null;
+			}
 		}
 	}
 
@@ -89,10 +125,16 @@ public static class DynamicHandlers
 		Type type = typeof(BasePlugin).Assembly.GetType("CounterStrikeSharp.API.Core." + eventName);
 		if (type == null)
 		{
+			Console.WriteLine($"[DynamicHandlers] {plugin.GetType().Name}: unknown event '{eventName}'.");
 			return;
 		}
 		MethodInfo method = plugin.GetType().GetMethod(eventName);
-		if (!(method == null))
+		if (method == null)
+		{
+			Console.WriteLine($"[DynamicHandlers] {plugin.GetType().Name}: event '{eventName}' has no method.");
+			return;
+		}
+		if (true)
 		{
 			Type type2 = typeof(BasePlugin).GetNestedType("GameEventHandler`1").MakeGenericType(type);
 			Delegate obj = Delegate.CreateDelegate(type2, plugin, method);

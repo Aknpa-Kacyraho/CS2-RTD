@@ -63,7 +63,7 @@ namespace RollTheDice.Dices;
 		{
 			previous.Kill();
 		}
-		_activeBoosts[attacker] = new Timer(duration, (Action)delegate
+		_activeBoosts[attacker] = ScopedTimer(duration, (Action)delegate
 		{
 			// ★ 定时器到期时玩家可能已断开/换边：先验有效性再读 schema（含 SteamID），否则原生崩。
 			if (attacker == null || !((CEntityInstance)attacker).IsValid)
@@ -172,7 +172,7 @@ namespace RollTheDice.Dices;
 		{
 			value2.Kill();
 		}
-		_activeBoosts[attacker] = new Timer(num2, (Action)delegate
+		_activeBoosts[attacker] = ScopedTimer(num2, (Action)delegate
 		{
 			// ★ 同上：先验有效性再读 schema。
 			if (attacker == null || !((CEntityInstance)attacker).IsValid)

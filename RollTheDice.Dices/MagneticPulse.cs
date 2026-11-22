@@ -381,7 +381,7 @@ public class MagneticPulse : DiceBlueprint
 			}
 			BeamFx.Move(val2, new Vector((float?)value, (float?)value2, (float?)(pos.Z + 30f)), new Vector((float?)num4, (float?)num5, (float?)(pos.Z + 30f)));
 			CBeam capturedBeam = val2;
-			new Timer(1f, (Action)delegate
+			ScopedTimer(1f, (Action)delegate
 			{
 				BeamFx.Kill(capturedBeam);
 			}, (TimerFlags?)null);

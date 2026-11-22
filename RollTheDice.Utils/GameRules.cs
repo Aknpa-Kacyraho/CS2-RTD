@@ -15,6 +15,13 @@ public static class GameRules
 
 	private static IEnumerable<CCSTeam>? _teamManager;
 
+	/// <summary>Drop map-scoped entity caches (call on map end / unload).</summary>
+	public static void Reset()
+	{
+		_gameRules = null;
+		_teamManager = null;
+	}
+
 	private static CCSGameRules? GetGameRule(bool forceRefresh = false)
 	{
 		if ((_gameRules == null) | forceRefresh)

@@ -161,7 +161,7 @@ public class Tactician : DiceBlueprint
 		if (list.Count > 0)
 		{
 			_activeGlows[player] = list;
-			new Timer(_config.Dices.Tactician.RevealDuration, (Action)delegate
+			ScopedTimer(_config.Dices.Tactician.RevealDuration, (Action)delegate
 			{
 				RemoveGlowsForPlayer(player);
 				RemoveSelfGlow(player);

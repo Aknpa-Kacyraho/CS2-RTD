@@ -114,7 +114,7 @@ public class Deaf : DiceBlueprint
 		_activeGlows[victim] = (glow.Proxy, glow.Glow, attacker);
 		float seconds = _config.Dices.Deaf.RevealSeconds;
 		victim.PrintToCenterAlert($"👁 透视 {((CBasePlayerController)attacker).PlayerName}！{seconds:F0}s");
-		new Timer(seconds, delegate
+		ScopedTimer(seconds, delegate
 		{
 			RemoveGlowForPlayer(victim);
 		}, (TimerFlags?)null);

@@ -153,7 +153,7 @@ public class ChaosStorm : DiceBlueprint
 				Utilities.SetStateChanged((CBaseEntity)(object)slowedPawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 				slowed.PrintToCenterAlert("\ud83c\udf00 \u65f6\u7a7a\u4e71\u6d41\uff01\u51cf\u901f 50% 1.5\u79d2");
 				CCSPlayerController capturedSlowed = slowed;
-				new Timer(1.5f, (Action)delegate
+				ScopedTimer(1.5f, (Action)delegate
 				{
 					// ★ 1.5s 后触发：玩家可能已断开 → 先验有效性再读 schema（否则原生崩）。
 					if (capturedSlowed == null || !((CEntityInstance)capturedSlowed).IsValid)

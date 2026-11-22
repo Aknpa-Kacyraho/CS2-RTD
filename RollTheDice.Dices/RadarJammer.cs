@@ -134,7 +134,7 @@ public class RadarJammer : DiceBlueprint
 		{
 			oldTimer.Kill();
 		}
-		Timer value2 = new Timer(blackoutDuration, (Action)delegate
+		Timer value2 = ScopedTimer(blackoutDuration, (Action)delegate
 		{
 			// ★ 20s 后才触发：击杀者可能已断开/换边 → 先验有效性再读 TeamNum，否则原生崩。
 			if (captured == null || !((CEntityInstance)captured).IsValid)

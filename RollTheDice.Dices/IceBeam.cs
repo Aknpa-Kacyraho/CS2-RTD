@@ -223,7 +223,7 @@ public class IceBeam : DiceBlueprint
 		MoveLockManager.Lock(userid, "IceBeam");
 		userid.PrintToCenterAlert("❄ 冻结！无法移动和攻击！");
 		CCSPlayerController capturedVictim = userid;
-		_frozenPlayers[userid] = new Timer(DiceSynergy.HasPartner(attacker, "Amber") ? (_config.Dices.IceBeam.FreezeDuration * 2f) : (DiceSynergy.HasPartner(attacker, "PoisonBlade") || DiceSynergy.HasPartner(attacker, "Amber") ? (_config.Dices.IceBeam.FreezeDuration * 1.5f) : _config.Dices.IceBeam.FreezeDuration), (Action)delegate
+		_frozenPlayers[userid] = ScopedTimer(DiceSynergy.HasPartner(attacker, "Amber") ? (_config.Dices.IceBeam.FreezeDuration * 2f) : (DiceSynergy.HasPartner(attacker, "PoisonBlade") || DiceSynergy.HasPartner(attacker, "Amber") ? (_config.Dices.IceBeam.FreezeDuration * 1.5f) : _config.Dices.IceBeam.FreezeDuration), (Action)delegate
 		{
 			// ★ 冻结结束在数秒后：目标可能已断开/换边 → 先验有效性再读 SteamID / pawn（否则原生崩）。
 			if (capturedVictim == null || !((CEntityInstance)capturedVictim).IsValid)

@@ -168,14 +168,14 @@ public class BlackHole : DiceBlueprint
 			{
 				BeamFx.Move(val, deathPos, new Vector((float?)deathPos.X, (float?)deathPos.Y, (float?)(deathPos.Z + 50f)));
 				CBeam capturedBeam = val;
-				new Timer(9.5f, (Action)delegate
+				ScopedTimer(9.5f, (Action)delegate
 				{
 					BeamFx.Kill(capturedBeam);
 				}, (TimerFlags?)null);
 			}
 		});
 		Vector capPos = deathPos;
-		new Timer(10f, (Action)delegate
+		ScopedTimer(10f, (Action)delegate
 		{
 			// Do not detonate into the next round after the collapse timer outlives the round.
 			if (!DiceBlueprint.RoundActive)

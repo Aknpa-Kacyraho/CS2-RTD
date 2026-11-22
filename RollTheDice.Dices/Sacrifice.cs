@@ -176,7 +176,7 @@ public class Sacrifice : DiceBlueprint
 					}
 				});
 			});
-			new Timer(0.5f, (Action)delegate
+			ScopedTimer(0.5f, (Action)delegate
 			{
 				if ((CEntityInstance)(object)holder != (CEntityInstance)null && ((CEntityInstance)holder).IsValid && (CEntityInstance)(object)holder.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)holder.PlayerPawn.Value).IsValid && ((CBaseEntity)holder.PlayerPawn.Value).LifeState == 0 && !holder.IsBot && !((CBasePlayerController)holder).IsHLTV)
 				{

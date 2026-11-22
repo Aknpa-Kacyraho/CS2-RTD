@@ -226,7 +226,7 @@ public class Necromancer : DiceBlueprint
 							if (hasDeathPos)
 							{
 								CCSPlayerPawn pawnToTP = capturedDead.PlayerPawn.Value;
-								new Timer(0.1f, (Action)delegate
+								ScopedTimer(0.1f, (Action)delegate
 								{
 									//IL_0082: Unknown result type (might be due to invalid IL or missing references)
 									//IL_008c: Expected O, but got Unknown
@@ -257,7 +257,7 @@ public class Necromancer : DiceBlueprint
 							capturedDead.RemoveWeapons();
 							capturedDead.GiveNamedItem("weapon_knife");
 							CCSPlayerController capDead2 = capturedDead;
-							new Timer(1f, (Action)delegate
+							ScopedTimer(1f, (Action)delegate
 							{
 								// A revive that completes after round end must not give weapons
 								// or clear render state in the next round.

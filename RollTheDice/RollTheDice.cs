@@ -45,6 +45,12 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private readonly List<DiceBlueprint> _dices;
 
+	// O(1) lookup by class name and cached draw pools. Both are rebuilt whenever the
+	// module set changes (init/reload) and cleared on destroy.
+	private readonly Dictionary<string, DiceBlueprint> _diceByName = new Dictionary<string, DiceBlueprint>(StringComparer.OrdinalIgnoreCase);
+	private List<DiceBlueprint>? _drawablePool;
+	private List<DiceBlueprint>? _normalPool;
+
 	private readonly Dictionary<CCSPlayerController, string> _originalPlayerNames;
 
 	private bool _isDuringRound;
@@ -64,6 +70,10 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	private int _autoRollSeconds;
 	private Timer? _roundReminderTimer;
 
+	// At most one pending TAB-name refresh per SteamID. The old code scheduled a new
+	// timer on every dice change, so frequent rolls stacked callbacks.
+	private readonly Dictionary<ulong, Timer> _nameRefreshTimers = new Dictionary<ulong, Timer>();
+
 	public required PluginConfig Config { get; set; }
 
 	public override string ModuleName => "Roll The Dice";
@@ -72,7 +82,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.3.1";
+	public override string ModuleVersion => "1.4.0";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -754,7 +764,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	public void CommandHealth(CCSPlayerController player, CommandInfo command)
 	{
 		int holders = _dices.Sum(d => d._players.Count);
-		string summary = $"[RTD] v{ModuleVersion} | map={_currentMap} | enabled={Config?.Enabled} | dices={_dices.Count} | holders={holders} | round={_isDuringRound} | effects={(DiceEffects.Enabled ? "on" : "off")}";
+		string timers = $"auto={(_autoRollTimer != null ? 1 : 0)} reminder={(_roundReminderTimer != null ? 1 : 0)} name={_nameRefreshTimers.Count}";
+		string summary = $"[RTD] v{ModuleVersion} | map={_currentMap} | enabled={Config?.Enabled} | dices={_dices.Count} | holders={holders} | round={_isDuringRound} | roundActive={DiceBlueprint.RoundActive} | fx={DiceFxTable.Count} | timers[{timers}] | effects={(DiceEffects.Enabled ? "on" : "off")}";
 		command.ReplyToCommand(summary);
 		Console.WriteLine(summary);
 	}
@@ -765,7 +776,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			PluginConfigExtensions.Reload<PluginConfig>(Config);
 			UpdatePlayerConfig();
-			PluginConfigExtensions.Update<PluginConfig>(Config);
+			// Deliberately no Update() here: reloading must not write the in-memory copy
+			// back to disk, otherwise a manual edit is overwritten on the next map start.
 		}
 		catch (Exception ex)
 		{
@@ -966,6 +978,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			LoadMapConfig(_currentMap);
 			_isDuringRound = true;
 			InitializeModules();
+			DiceBlueprint.RoundActive = _isDuringRound;
 		}
 	}
 
@@ -980,6 +993,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		DiceBlueprint.RoundActive = false;
 		StopAutoRollTimer();
 		StopRoundReminder();
+		StopNameRefreshTimers();
 		DestroyModules();
 		DeregisterCheatGuard();
 		// Never reload/flush config on unload: it writes the in-memory copy back to disk
@@ -1001,6 +1015,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		ChildGuard.ClearAll();
 		Effects.ClearAll();
 		DiceEffects.ClearAll();
+		GameRules.Reset();
+		_sigilTests.Clear();
 		// 卸载时彻底清掉静态/实例状态，避免 css_reload 后残留（旧实例的 Instance、玩家键集合、buff 域）。
 		Instance = null;
 		_playersThatRolledTheDice.Clear();
@@ -1116,6 +1132,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		Goddess.BlessedPlayers.Clear();
 		World.PendingExtraRolls.Clear();
 		Mimic.PendingCopy.Clear();
+		Reincarnation.PendingExtraDice.Clear();
+		Reincarnation.ComboWheelVictims.Clear();
 		Trickster.PendingFakeNames.Clear();
 		Karma.BuffedPlayers.Clear();
 		Plague.InfectedPlayers.Clear();
@@ -1618,6 +1636,21 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		_roundReminderTimer = null;
 	}
 
+	private void StopNameRefreshTimers()
+	{
+		foreach (Timer timer in _nameRefreshTimers.Values)
+		{
+			try
+			{
+				timer.Kill();
+			}
+			catch
+			{
+			}
+		}
+		_nameRefreshTimers.Clear();
+	}
+
 	private HookResult OnRoundEnd(EventRoundEnd @event, GameEventInfo info)
 	{
 		//IL_00c4: Unknown result type (might be due to invalid IL or missing references)
@@ -1695,6 +1728,10 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		if (@event.Xuid != 0UL)
 		{
 			DiceEffects.OnPlayerLeft(@event.Xuid);
+			if (_nameRefreshTimers.Remove(@event.Xuid, out Timer nameTimer))
+			{
+				nameTimer.Kill();
+			}
 		}
 		if (disconnected != null)
 		{
@@ -1807,6 +1844,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		LoadMapConfig(mapName);
 		_currentMap = mapName;
 		InitializeModules();
+		// A hot reload can happen mid-round; delayed effects must see the real state.
+		DiceBlueprint.RoundActive = _isDuringRound;
 	}
 
 	private void OnMapEnd()
@@ -1814,9 +1853,13 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		DiceBlueprint.RoundActive = false;
 		StopAutoRollTimer();
 		StopRoundReminder();
+		StopNameRefreshTimers();
 		DestroyModules();
 		Effects.ClearAll();
 		DiceEffects.ClearAll();
+		GameRules.Reset();
+		DiceFxTable.ClearPrecached();
+		_sigilTests.Clear();
 		_isDuringRound = false;
 		_playersThatRolledTheDice.Clear();
 		_PlayerCooldown.Clear();
@@ -1867,7 +1910,9 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				}
 			}
 			List<DiceBlueprint> list = _dices.Where((DiceBlueprint d) => d.ClassName.Contains(diceName, StringComparison.OrdinalIgnoreCase)).ToList();
-			DiceBlueprint diceBlueprint2 = ((list.Count == 1) ? list.First() : _dices.FirstOrDefault((DiceBlueprint d) => string.Equals(d.ClassName, diceName, StringComparison.OrdinalIgnoreCase)));
+			DiceBlueprint? diceBlueprint2 = list.Count == 1
+				? list[0]
+				: (_diceByName.TryGetValue(diceName!, out DiceBlueprint? exactDice) ? exactDice : null);
 			if (diceBlueprint2 != null)
 			{
 				try
@@ -2086,12 +2131,12 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private List<DiceBlueprint> GetDrawablePool()
 	{
-		return _dices.Where((DiceBlueprint d) => d.CanBeDrawn).ToList();
+		return _drawablePool ??= _dices.Where((DiceBlueprint d) => d.CanBeDrawn).ToList();
 	}
 
 	private List<DiceBlueprint> GetNormalPool()
 	{
-		return _dices.Where((DiceBlueprint d) => d.CanBeDrawn && !d.IsSpecial).ToList();
+		return _normalPool ??= _dices.Where((DiceBlueprint d) => d.CanBeDrawn && !d.IsSpecial).ToList();
 	}
 
 	private void PruneInvalidDiceHolders()
@@ -2178,6 +2223,8 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			try
 			{
+				// Round end: no scoped timer may leak into the next round.
+				dix.KillTimers();
 				dix.Reset();
 			}
 			catch
@@ -2270,14 +2317,21 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			if (scheduleReapply)
 			{
 				CCSPlayerController captured = player;
-				((BasePlugin)this).AddTimer(1f, (Action)delegate
+				ulong timerKey = player.SteamID;
+				if (_nameRefreshTimers.TryGetValue(timerKey, out Timer? previousTimer))
 				{
+					previousTimer.Kill();
+					_nameRefreshTimers.Remove(timerKey);
+				}
+				_nameRefreshTimers[timerKey] = AddTimer(1f, delegate
+				{
+					_nameRefreshTimers.Remove(timerKey);
 					if ((CEntityInstance)(object)captured != (CEntityInstance)null && ((CEntityInstance)captured).IsValid)
 					{
 						// ★ 重算而不是回写 1 秒前那个字符串：跨回合时旧字符串会把上回合的 dice 前缀重新贴回 TAB。
 						RefreshPlayerDiceName(captured, false);
 					}
-				}, (TimerFlags?)null);
+				}, TimerFlags.STOP_ON_MAPCHANGE);
 			}
 		}
 		catch (Exception ex)
@@ -2354,6 +2408,13 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			}
 		}
 		_dices.AddRange(built);
+		_diceByName.Clear();
+		foreach (DiceBlueprint dice in _dices)
+		{
+			_diceByName[dice.ClassName] = dice;
+		}
+		_drawablePool = _dices.Where(dice => dice.CanBeDrawn).ToList();
+		_normalPool = _dices.Where(dice => dice.CanBeDrawn && !dice.IsSpecial).ToList();
 		ReloadFxTable();
 		RegisterListeners();
 		RegisterEventHandlers();
@@ -2388,6 +2449,9 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			try
 			{
+				// Kill scoped timers before the dice instance is dropped, otherwise a
+				// delayed callback can outlive its owner after unload/reload.
+				dix.KillTimers();
 				dix.Destroy();
 			}
 			catch (Exception ex)
@@ -2396,6 +2460,9 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			}
 		}
 		_dices.Clear();
+		_diceByName.Clear();
+		_drawablePool = null;
+		_normalPool = null;
 	}
 
 	private void RegisterListeners()
@@ -2593,7 +2660,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	public bool HasDiceActive(CCSPlayerController player, string diceClassName)
 	{
 		ulong steamId = ((CBasePlayerController)player).SteamID;
-		return _dices.Any((DiceBlueprint d) => string.Equals(d.ClassName, diceClassName, StringComparison.OrdinalIgnoreCase) && d.HasPlayer(steamId));
+		return _diceByName.TryGetValue(diceClassName, out DiceBlueprint? dice) && dice.HasPlayer(steamId);
 	}
 
 	public bool ForceDiceForPlayer(CCSPlayerController player)

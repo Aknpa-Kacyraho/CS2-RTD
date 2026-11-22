@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using CounterStrikeSharp.API.Core;
+using CounterStrikeSharp.API.Modules.Timers;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
@@ -16,6 +17,44 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 	public readonly IStringLocalizer _localizer = Localizer;
 
 	public readonly List<CCSPlayerController> _players = new List<CCSPlayerController>();
+
+	/// <summary>No holder → skip this dice's tick/damage callbacks.</summary>
+	public bool HasAnyHolder => _players.Count > 0;
+
+	// Every timer created by a dice goes through ScopedTimer and is killed on
+	// round end / module destroy. Raw "new Timer" callbacks outlive a reload.
+	private readonly List<Timer> _scopedTimers = new List<Timer>();
+
+	protected Timer ScopedTimer(float delay, Action callback, TimerFlags? flags = null)
+	{
+		Timer? timer = null;
+		timer = global::RollTheDice.RollTheDice.Instance!.AddTimer(delay, () =>
+		{
+			if (timer != null)
+			{
+				_scopedTimers.Remove(timer);
+			}
+			callback();
+		}, flags);
+		_scopedTimers.Add(timer);
+		return timer;
+	}
+
+	/// <summary>Kill every timer owned by this dice. Called on round end and unload.</summary>
+	public void KillTimers()
+	{
+		foreach (Timer timer in _scopedTimers)
+		{
+			try
+			{
+				timer.Kill();
+			}
+			catch
+			{
+			}
+		}
+		_scopedTimers.Clear();
+	}
 
 	/// <summary>
 	/// False between round end and the next round start. Delayed callbacks that would
@@ -33,8 +72,27 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 	/// <summary>The delegate instance actually registered with BasePlugin (needed for removal).</summary>
 	public Delegate? DamageHookWrapper { get; set; }
 
+	/// <summary>Original dice OnTick, invoked only while at least one player holds this dice.</summary>
+	public Action? TickHook { get; set; }
+
+	/// <summary>The wrapper registered with BasePlugin (needed for removal).</summary>
+	public Delegate? TickHookWrapper { get; set; }
+
+	public void SafeOnTick()
+	{
+		if (HasAnyHolder)
+		{
+			TickHook?.Invoke();
+		}
+	}
+
 	public HookResult SafeOnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
+		// A dice nobody holds must not pay for entity resolution on every hit.
+		if (!HasAnyHolder)
+		{
+			return HookResult.Continue;
+		}
 		if (info == null || PlayerResolver.FromEntity(entity) == null)
 		{
 			return HookResult.Continue;

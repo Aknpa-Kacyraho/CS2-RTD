@@ -143,7 +143,7 @@ public class BoneMaggot : DiceBlueprint
 		// （原来硬编码 particles/critters/chicken/chicken_impact_burst_zombie.vpcf，未预缓存且用全局 Timer）。
 		Effects.Play(((CBaseEntity)pawn).AbsOrigin, ParticlePaths.PoisonSpores, 1.5f);
 		victim.PrintToCenterAlert("🐛 你被标记了！");
-		new Timer(duration, delegate
+		ScopedTimer(duration, delegate
 		{
 			if (glow.Proxy != null && glow.Proxy.IsValid)
 			{

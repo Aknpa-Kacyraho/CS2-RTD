@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.4.0 — 2026-11-22
+
+Architecture/stability release: every dice timer and callback now has an owner.
+
+### Fixed
+
+- Dice timers: added `ScopedTimer`/`KillTimers`; replaced 33 `new Timer` call sites
+  (ThunderChain's two static 0.5s cleanup timers stay raw). `DestroyModules` and round
+  end kill every scoped timer, so delayed callbacks cannot outlive a reload/round.
+- `SafeOnPlayerTakeDamagePre` returns immediately when the dice has no holder.
+- `DynamicHandlers` wraps `OnTick`; a dice without a holder no longer enters its tick.
+- TAB-name refresh keeps at most one pending timer per SteamID instead of stacking one
+  per dice change.
+- `ReloadConfigFromDisk` no longer writes the in-memory config back to disk; map start
+  and reload cannot overwrite a manual edit.
+- `RoundActive` is initialized on Load/OnMapStart for mid-round hot reloads.
+- Map end clears `GameRules` entity caches, `_sigilTests`, and the fx precache set;
+  round start clears Reincarnation pending state.
+
+### Performance
+
+- `_diceByName` index + cached drawable/normal pools; `HasDiceActive` is O(1).
+- `GetDrawablePool`/`GetNormalPool` no longer allocate on every roll.
+- `rtd_health` now reports roundActive, fx profile count, and auto/reminder/TAB timers.
+
+### Diagnostics
+
+- `DynamicHandlers` logs unknown listener/event names and missing methods instead of
+  silently disabling a dice feature.
+
 ## 1.3.1 — 2026-11-22
 
 ### Added

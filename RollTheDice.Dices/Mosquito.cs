@@ -129,7 +129,7 @@ public class Mosquito : DiceBlueprint
 		victimPawn.VelocityModifier = 1f + SpeedBonusManager.GetEffective(victim, 100f);
 		Utilities.SetStateChanged(victimPawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		attacker.PrintToCenterAlert("蚊子叮咬！敌人被减速");
-		new Timer(cfg.SlowSeconds, delegate
+		ScopedTimer(cfg.SlowSeconds, delegate
 		{
 			RestoreSlow(id);
 		}, (TimerFlags?)null);

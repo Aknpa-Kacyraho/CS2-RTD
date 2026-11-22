@@ -101,7 +101,7 @@ public class LongerFlashes : DiceBlueprint
 			Utilities.SetStateChanged(pawn, "CCSPlayerPawn", "m_flVelocityModifier", 0);
 		}
 		ulong id = player.SteamID;
-		new Timer(seconds, delegate
+		ScopedTimer(seconds, delegate
 		{
 			SpeedBonusManager.UnregisterBySteamId(id, ClassName);
 			CCSPlayerController target = Utilities.GetPlayers().FirstOrDefault((CCSPlayerController p) => p != null && p.IsValid && ((CBasePlayerController)p).SteamID == id);

@@ -89,7 +89,7 @@ public class Traitor : DiceBlueprint
 			{
 				CCSPlayerController target = list[_random.Next(list.Count)];
 				string enemyName = ((CBasePlayerController)target).PlayerName;
-				new Timer(delay, (Action)delegate
+				ScopedTimer(delay, (Action)delegate
 				{
 					if (!((CEntityInstance)(object)target == (CEntityInstance)null) && ((CEntityInstance)target).IsValid && !((CEntityInstance)(object)target.PlayerPawn?.Value == (CEntityInstance)null) && ((CEntityInstance)target.PlayerPawn.Value).IsValid && ((CBaseEntity)target.PlayerPawn.Value).LifeState == 0)
 					{

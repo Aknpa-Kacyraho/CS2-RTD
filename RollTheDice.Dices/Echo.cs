@@ -55,7 +55,7 @@ public class Echo : DiceBlueprint
 			return (HookResult)0;
 		}
 		ulong victimId = ((CBasePlayerController)victim).SteamID;
-		new Timer(_config.Dices.Echo.DelaySeconds, (Action)delegate
+		ScopedTimer(_config.Dices.Echo.DelaySeconds, (Action)delegate
 		{
 			ApplyEcho(victimId, echo);
 		}, (TimerFlags?)null);
