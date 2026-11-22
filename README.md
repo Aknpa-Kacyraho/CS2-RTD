@@ -276,12 +276,22 @@
 
 ---
 
+## v1.2.0 稳定性修复
+
+- 管理命令 `!rollthedice` 现在需要 `@rollthedice/admin`（此前任意玩家可执行）。
+- 中央伤害钩子改用实体句柄解析玩家，非玩家实体不再被强转成 `CCSPlayerPawn`。
+- “每 X 秒自动掷骰”改为单条可取消定时器，不再随回合数叠加。
+- 玩家断线后骰子持有者按 SteamID 清理；同一骰子不再重复持有同一玩家。
+- `!rollthedice reload` 与换图会重建骰子，per-dice 配置与地图覆盖真正生效。
+- 卸载插件不再重载/写回配置，避免覆盖手工修改。
+- 新增 `!rtd_health` 管理员自检命令。
+
 ## 安装指南
 
 ### 前提条件
 
-- CS2 1.41.9.3（2026-10-28 更新）
-- [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp) **1.0.379**（net10.0 运行时）
+- CS2 1.41.9.7（2026-11-16 更新）
+- [CounterStrikeSharp](https://github.com/roflmuffin/CounterStrikeSharp) **1.0.380**（net10.0 运行时）
 - [Metamod:Source](https://www.sourcemm.net/) **2.0.0-dev+1483**（dev 构建）
 
 ### 安装步骤

@@ -142,22 +142,9 @@ public class Prophet : DiceBlueprint
 		return (HookResult)1;
 	}
 
-	private static CCSPlayerController ResolvePlayerController(CBaseEntity entity)
+	private static CCSPlayerController? ResolvePlayerController(CBaseEntity entity)
 	{
-		if ((CEntityInstance)(object)entity == (CEntityInstance)null)
-		{
-			return null;
-		}
-		CCSPlayerPawn pawn = ((NativeObject)entity).As<CCSPlayerPawn>();
-		if ((CEntityInstance)(object)pawn == (CEntityInstance)null)
-		{
-			return null;
-		}
-		CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)pawn).Controller;
-		if (controller == null || controller.Value == null)
-		{
-			return null;
-		}
-		return ((NativeObject)controller.Value).As<CCSPlayerController>();
+		// Never cast an arbitrary damage-hook entity to CCSPlayerPawn; see PlayerResolver.
+		return PlayerResolver.FromEntity(entity);
 	}
 }

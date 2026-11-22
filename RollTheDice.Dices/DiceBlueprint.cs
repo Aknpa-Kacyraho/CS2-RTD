@@ -76,6 +76,11 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 	{
 		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)((CBasePlayerController)player).Pawn?.Value == (CEntityInstance)null) && ((CEntityInstance)((CBasePlayerController)player).Pawn.Value).IsValid)
 		{
+			// A player may roll/give the same dice again; never stack duplicate holders.
+			if (HasPlayer(player.SteamID))
+			{
+				return;
+			}
 			_players.Add(player);
 			NotifyPlayers(player, ClassName, new Dictionary<string, string> { 
 			{
@@ -85,9 +90,36 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 		}
 	}
 
+	/// <summary>True when this dice is held by the given SteamID (survives controller recreation).</summary>
+	public bool HasPlayer(ulong steamId)
+	{
+		foreach (CCSPlayerController p in _players)
+		{
+			if (p != null && p.IsValid && p.SteamID == steamId)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/// <summary>Remove every holder with the given SteamID (including stale controller instances).</summary>
+	public void RemoveBySteamId(ulong steamId)
+	{
+		_players.RemoveAll(p => p == null || !p.IsValid || p.SteamID == steamId);
+	}
+
+	/// <summary>Drop controllers that are no longer valid. Returns the number removed.</summary>
+	public int PruneInvalid()
+	{
+		return _players.RemoveAll(p => p == null || !p.IsValid);
+	}
+
 	public virtual void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
-		_players.Remove(player);
+		bool valid = player != null && ((CEntityInstance)player).IsValid;
+		ulong steamId = valid ? player.SteamID : 0UL;
+		_players.RemoveAll(p => p == null || !p.IsValid || (steamId != 0UL && p.SteamID == steamId));
 	}
 
 	public virtual void Reset()

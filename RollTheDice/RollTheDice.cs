@@ -57,6 +57,12 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private bool _sigilTimerStarted;
 
+	// One repeating timer owns the "roll every X seconds" feature. The old implementation
+	// scheduled a new timer from inside its own callback and another one every round, so
+	// N rounds produced N overlapping chains.
+	private Timer? _autoRollTimer;
+	private int _autoRollSeconds;
+
 	public required PluginConfig Config { get; set; }
 
 	public override string ModuleName => "Roll The Dice";
@@ -65,7 +71,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "26.05.1";
+	public override string ModuleVersion => "1.2.0";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -645,6 +651,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	}
 
 	[ConsoleCommand("rollthedice", "RollTheDice admin commands")]
+	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
 	[CommandHelper(1, "<reload|disable|enable|createmapconfig|deletemapconfig>")]
 	public void CommandAdmin(CCSPlayerController player, CommandInfo command)
 	{
@@ -653,7 +660,11 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 		case "reload":
 			PluginConfigExtensions.Reload<PluginConfig>(Config);
+			// Dice capture Config/MapConfig in their constructor. Without rebuilding them,
+			// "reload" only changed the JSON on disk and per-dice values stayed stale.
+			DestroyModules();
 			LoadMapConfig(_currentMap);
+			InitializeModules();
 			ReloadFxTable();
 			command.ReplyToCommand((string?)((BasePlugin)this).Localizer["admin.reload"]);
 			break;
@@ -696,6 +707,17 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			return;
 		}
 		command.ReplyToCommand("rtdfx <reload>");
+	}
+
+	[ConsoleCommand("rtd_health", "RollTheDice runtime health summary")]
+	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
+	[CommandHelper(0, "")]
+	public void CommandHealth(CCSPlayerController player, CommandInfo command)
+	{
+		int holders = _dices.Sum(d => d._players.Count);
+		string summary = $"[RTD] v{ModuleVersion} | map={_currentMap} | enabled={Config?.Enabled} | dices={_dices.Count} | holders={holders} | round={_isDuringRound} | effects={(DiceEffects.Enabled ? "on" : "off")}";
+		command.ReplyToCommand(summary);
+		Console.WriteLine(summary);
 	}
 
 	private void ReloadConfigFromDisk()
@@ -916,9 +938,11 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		//IL_0098: Expected O, but got Unknown
 		//IL_00a1: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00ab: Expected O, but got Unknown
+		StopAutoRollTimer();
 		DestroyModules();
 		DeregisterCheatGuard();
-		ReloadConfigFromDisk();
+		// Never reload/flush config on unload: it writes the in-memory copy back to disk
+		// and silently overwrites edits made while the plugin was running.
 		((BasePlugin)this).DeregisterEventHandler<EventRoundStart>((GameEventHandler<EventRoundStart>)OnRoundStart, (HookMode)1);
 		((BasePlugin)this).DeregisterEventHandler<EventRoundFreezeEnd>((GameEventHandler<EventRoundFreezeEnd>)OnRoundFreezeEnd, (HookMode)1);
 		((BasePlugin)this).DeregisterEventHandler<EventRoundEnd>((GameEventHandler<EventRoundEnd>)OnRoundEnd, (HookMode)1);
@@ -1039,6 +1063,11 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		//IL_031c: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0320: Unknown result type (might be due to invalid IL or missing references)
 		//IL_0173: Unknown result type (might be due to invalid IL or missing references)
+		if (Config == null || !Config.Enabled || _currentMapConfig == null || !_currentMapConfig.Enabled || _dices.Count == 0)
+		{
+			_isDuringRound = false;
+			return HookResult.Continue;
+		}
 		Server.ExecuteCommand("host_timescale 1.0");
 		_playersThatRolledTheDice.Clear();
 		Goddess.ActiveThisRound = false;
@@ -1118,6 +1147,10 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		//IL_0059: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00a9: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00a6: Unknown result type (might be due to invalid IL or missing references)
+		if (Config == null || !Config.Enabled || _currentMapConfig == null || !_currentMapConfig.Enabled || _dices.Count == 0)
+		{
+			return HookResult.Continue;
+		}
 		object obj = GameRules.Get("WarmupPeriod");
 		bool flag = default(bool);
 		int num;
@@ -1466,41 +1499,47 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private void RollTheDiceEveryXSeconds(int seconds)
 	{
-		((BasePlugin)this).AddTimer((float)seconds, (Action)delegate
+		if (seconds <= 0)
 		{
-			if (_isDuringRound)
+			StopAutoRollTimer();
+			return;
+		}
+		if (_autoRollTimer != null && _autoRollSeconds == seconds)
+		{
+			return;
+		}
+		StopAutoRollTimer();
+		_autoRollSeconds = seconds;
+		_autoRollTimer = AddTimer(seconds, AutoRollTick, TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE);
+	}
+
+	private void AutoRollTick()
+	{
+		if (!_isDuringRound)
+		{
+			return;
+		}
+		foreach (CCSPlayerController item in Utilities.GetPlayers())
+		{
+			if (item == null || !item.IsValid || item.IsBot || item.IsHLTV)
 			{
-				foreach (CCSPlayerController item in Utilities.GetPlayers().Where(delegate(CCSPlayerController p)
-				{
-					int result;
-					if (!((CBasePlayerController)p).IsHLTV && !p.IsBot)
-					{
-						CHandle<CBasePlayerPawn> pawn = ((CBasePlayerController)p).Pawn;
-						byte? obj;
-						if (pawn == null)
-						{
-							obj = null;
-						}
-						else
-						{
-							CBasePlayerPawn value = pawn.Value;
-							obj = ((value != null) ? new byte?(((CBaseEntity)value).LifeState) : ((byte?)null));
-						}
-						result = ((obj == 0) ? 1 : 0);
-					}
-					else
-					{
-						result = 0;
-					}
-					return (byte)result != 0;
-				}))
-				{
-					RemoveDiceForPlayer(item, DiceRemoveReason.GameLogic);
-					RollTheDiceForPlayer(item);
-				}
-				RollTheDiceEveryXSeconds(seconds);
+				continue;
 			}
-		}, (TimerFlags?)null);
+			CBasePlayerPawn? pawn = item.Pawn?.Value;
+			if (pawn == null || !pawn.IsValid || pawn.LifeState != 0)
+			{
+				continue;
+			}
+			RemoveDiceForPlayer(item, DiceRemoveReason.GameLogic);
+			RollTheDiceForPlayer(item);
+		}
+	}
+
+	private void StopAutoRollTimer()
+	{
+		_autoRollTimer?.Kill();
+		_autoRollTimer = null;
+		_autoRollSeconds = 0;
 	}
 
 	private HookResult OnRoundEnd(EventRoundEnd @event, GameEventInfo info)
@@ -1509,6 +1548,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		//IL_00c8: Unknown result type (might be due to invalid IL or missing references)
 		Server.ExecuteCommand("host_timescale 1.0");
 		_isDuringRound = false;
+		StopAutoRollTimer();
 		// 移除 dice 之前播放"回合结束"特效。
 		DiceEffects.OnRoundEnd();
 		try
@@ -1570,6 +1610,9 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		//IL_0025: Unknown result type (might be due to invalid IL or missing references)
 		CCSPlayerController disconnected = @event.Userid;
 		RemoveDiceForPlayer(disconnected, DiceRemoveReason.Disconnect);
+		// The controller can already be invalid here (RemoveDiceForPlayer returns early).
+		// Prune every dice list so no stale controller survives until round end.
+		PruneInvalidDiceHolders();
 		// 控制器可能已失效（RemoveDiceForPlayer 会 early-return），用 xuid 兜底清理特效状态。
 		if (@event.Xuid != 0UL)
 		{
@@ -1626,21 +1669,10 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private static CCSPlayerController? ResolvePlayerController(CBaseEntity? entity)
 	{
-		if ((CEntityInstance)(object)entity == (CEntityInstance)null)
-		{
-			return null;
-		}
-		CCSPlayerPawn pawn = ((NativeObject)entity).As<CCSPlayerPawn>();
-		if (pawn == null)
-		{
-			return null;
-		}
-		CHandle<CBasePlayerController> controller = ((CBasePlayerPawn)pawn).Controller;
-		if (controller == null || controller.Value == null)
-		{
-			return null;
-		}
-		return ((NativeObject)controller.Value).As<CCSPlayerController>();
+		// Damage hooks fire for every entity (props, the world, grenades). Casting an
+		// arbitrary entity to CCSPlayerPawn reads pawn-schema offsets from the wrong object
+		// and can crash the server. PlayerResolver compares handles instead.
+		return PlayerResolver.FromEntity(entity);
 	}
 
 	/// <summary>
@@ -1691,13 +1723,17 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	private void OnMapStart(string mapName)
 	{
 		ReloadConfigFromDisk();
+		// Rebuild for the new map even if a previous map left modules behind (hot reload
+		// or a same-name changelevel). Map-level overrides are captured at construction.
+		DestroyModules();
 		LoadMapConfig(mapName);
-		InitializeModules();
 		_currentMap = mapName;
+		InitializeModules();
 	}
 
 	private void OnMapEnd()
 	{
+		StopAutoRollTimer();
 		DestroyModules();
 		Effects.ClearAll();
 		DiceEffects.ClearAll();
@@ -1732,7 +1768,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				try
 				{
 					LogDebug($"{DateTime.Now:HH:mm:ss} ➜ Adding {diceBlueprint.ClassName} to {((CBasePlayerController)player).PlayerName}\n");
-					if (diceBlueprint._players.Contains(player))
+					if (diceBlueprint.HasPlayer(player.SteamID))
 					{
 						diceBlueprint.Remove(player, DiceRemoveReason.NewDice);
 					}
@@ -1757,7 +1793,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				try
 				{
 					LogDebug($"{DateTime.Now:HH:mm:ss} ➜ Adding {diceName} to {((CBasePlayerController)player).PlayerName}\n");
-					if (diceBlueprint2._players.Contains(player))
+					if (diceBlueprint2.HasPlayer(player.SteamID))
 					{
 						diceBlueprint2.Remove(player, DiceRemoveReason.NewDice);
 					}
@@ -1958,6 +1994,20 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		return _dices.Where((DiceBlueprint d) => d.CanBeDrawn && !d.IsSpecial).ToList();
 	}
 
+	private void PruneInvalidDiceHolders()
+	{
+		foreach (DiceBlueprint dice in _dices)
+		{
+			try
+			{
+				dice.PruneInvalid();
+			}
+			catch
+			{
+			}
+		}
+	}
+
 	private void RemoveDiceForPlayer(CCSPlayerController? player, DiceRemoveReason reason)
 	{
 		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid || reason == DiceRemoveReason.NewDice)
@@ -1965,9 +2015,10 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			return;
 		}
 		bool flag = false;
+		ulong steamId = player.SteamID;
 		foreach (DiceBlueprint dix in _dices)
 		{
-			if (dix._players.Contains(player))
+			if (dix.HasPlayer(steamId))
 			{
 				try
 				{
@@ -2074,9 +2125,10 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				text = value;
 			}
 			HashSet<string> hashSet = new HashSet<string>();
+			ulong refreshSteamId = player.SteamID;
 			foreach (DiceBlueprint dix in _dices)
 			{
-				if (dix._players.Contains(player))
+				if (dix.HasPlayer(refreshSteamId))
 				{
 					string item = ((dix.ClassName == "Trickster" && Trickster.PendingFakeNames.TryGetValue(((CBasePlayerController)player).SteamID, out string value2)) ? value2 : dix.ClassName);
 					hashSet.Add(item);
@@ -2144,6 +2196,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			select t).ToDictionary((Type t) => t.Name, (Type t) => t);
 		PropertyInfo[] properties = typeof(DicesConfig).GetProperties();
 		bool flag = default(bool);
+		List<DiceBlueprint> built = new List<DiceBlueprint>();
 		foreach (PropertyInfo propertyInfo in properties)
 		{
 			if (!dictionary.TryGetValue(propertyInfo.Name, out var value))
@@ -2176,14 +2229,24 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			}
 			if (((uint)num2 & (flag ? 1u : 0u)) != 0)
 			{
-				DiceBlueprint item = (DiceBlueprint)Activator.CreateInstance(value, Config, _currentMapConfig, ((BasePlugin)this).Localizer);
-				_dices.Add(item);
+				try
+				{
+					DiceBlueprint item = (DiceBlueprint)Activator.CreateInstance(value, Config, _currentMapConfig, ((BasePlugin)this).Localizer);
+					built.Add(item);
+				}
+				catch (Exception ex)
+				{
+					// One broken dice must not leave the plugin permanently half-initialized.
+					Console.WriteLine("[RollTheDice] Failed to create dice " + propertyInfo.Name + ": " + ex.Message);
+				}
 			}
 		}
+		_dices.AddRange(built);
 		ReloadFxTable();
 		RegisterListeners();
 		RegisterEventHandlers();
 		RegisterUserMessageHooks();
+		Console.WriteLine($"[RTD] v{ModuleVersion} ready: map={_currentMap} dices={_dices.Count} effects={(DiceEffects.Enabled ? "on" : "off")}");
 	}
 
 	private void DestroyModules()
@@ -2331,7 +2394,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	public bool HasDiceActive(CCSPlayerController player, string diceClassName)
 	{
 		ulong steamId = ((CBasePlayerController)player).SteamID;
-		return _dices.Any((DiceBlueprint d) => string.Equals(d.ClassName, diceClassName, StringComparison.OrdinalIgnoreCase) && d._players.Any((CCSPlayerController p) => ((CBasePlayerController)p).SteamID == steamId));
+		return _dices.Any((DiceBlueprint d) => string.Equals(d.ClassName, diceClassName, StringComparison.OrdinalIgnoreCase) && d.HasPlayer(steamId));
 	}
 
 	public bool ForceDiceForPlayer(CCSPlayerController player)
