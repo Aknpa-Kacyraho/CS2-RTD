@@ -62,6 +62,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	// N rounds produced N overlapping chains.
 	private Timer? _autoRollTimer;
 	private int _autoRollSeconds;
+	private Timer? _roundReminderTimer;
 
 	public required PluginConfig Config { get; set; }
 
@@ -71,7 +72,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.2.2";
+	public override string ModuleVersion => "1.3.0";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -557,7 +558,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	{
 		if (player == null || !((CEntityInstance)player).IsValid)
 		{
-			command.ReplyToCommand("This command must be run by a player.");
+			command.ReplyToCommand("该命令只能由玩家执行。");
 			return;
 		}
 		if (!Config.Enabled || !_currentMapConfig.Enabled || _dices.Count == 0)
@@ -565,7 +566,21 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			command.ReplyToCommand((string?)((BasePlugin)this).Localizer["core.disabled"]);
 			return;
 		}
-		if (command.GetArg(1) == "auto")
+		string arg = (command.GetArg(1) ?? string.Empty).Trim();
+		if (arg.Equals("help", StringComparison.OrdinalIgnoreCase) ||
+		    arg.Equals("?", StringComparison.OrdinalIgnoreCase) ||
+		    arg.Equals("h", StringComparison.OrdinalIgnoreCase))
+		{
+			PrintRollHelp(player, command);
+			return;
+		}
+		if (arg.Equals("status", StringComparison.OrdinalIgnoreCase) ||
+		    arg.Equals("info", StringComparison.OrdinalIgnoreCase))
+		{
+			PrintRollStatus(player, command);
+			return;
+		}
+		if (arg.Equals("auto", StringComparison.OrdinalIgnoreCase))
 		{
 			if (!_playerConfigs.TryGetValue(((CBasePlayerController)player).SteamID, out PlayerConfig value))
 			{
@@ -573,7 +588,17 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				_playerConfigs.Add(((CBasePlayerController)player).SteamID, value);
 			}
 			value.RtdOnSpawn = !value.RtdOnSpawn;
+			// Persist the toggle so it survives a reconnect/reload.
+			UpdatePlayerConfig();
+			PluginConfigExtensions.Update<PluginConfig>(Config);
 			command.ReplyToCommand((string?)((BasePlugin)this).Localizer[value.RtdOnSpawn ? "command.rollthedice.rtdonspawn.enabled" : "command.rollthedice.rtdonspawn.disabled"]);
+			return;
+		}
+		if (arg.Length > 0)
+		{
+			// An unknown subcommand must not silently roll a dice.
+			command.ReplyToCommand(((BasePlugin)this).Localizer["command.rtd.help.unknown"].Value.Replace("{arg}", arg));
+			PrintRollHelp(player, command);
 			return;
 		}
 		if (!Config.AllowRtdDuringWarmup && GameRules.Get("WarmupPeriod") is bool warmup && warmup)
@@ -940,6 +965,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		//IL_00ab: Expected O, but got Unknown
 		DiceBlueprint.RoundActive = false;
 		StopAutoRollTimer();
+		StopRoundReminder();
 		DestroyModules();
 		DeregisterCheatGuard();
 		// Never reload/flush config on unload: it writes the in-memory copy back to disk
@@ -1126,7 +1152,33 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		try
 		{
 			CreateRoundBackup();
-			Server.PrintToChatAll((string?)((BasePlugin)this).Localizer["core.announcement"]);
+			// Late, private reminder instead of a global every-round announcement. Only
+			// players who have not rolled and are alive get it, once.
+			StopRoundReminder();
+			_roundReminderTimer = AddTimer(20f, () =>
+			{
+				if (!_isDuringRound)
+				{
+					return;
+				}
+				foreach (CCSPlayerController p in Utilities.GetPlayers())
+				{
+					if (p == null || !p.IsValid || p.IsBot || p.IsHLTV)
+					{
+						continue;
+					}
+					if (GetDiceRollCount(p) > 0)
+					{
+						continue;
+					}
+					CCSPlayerPawn? pawn = p.PlayerPawn?.Value;
+					if (pawn == null || !pawn.IsValid || pawn.LifeState != 0)
+					{
+						continue;
+					}
+					p.PrintToChat(((BasePlugin)this).Localizer["core.announcement"].Value);
+				}
+			}, TimerFlags.STOP_ON_MAPCHANGE);
 			LogDebug($"{DateTime.Now:HH:mm:ss} OnRoundStart: TriggerEvent={Config.DiceTrigger.TriggerEvent}, Force={Config.DiceTrigger.ForceAllPlayers}, dices={_dices.Count}\n");
 			if (Config.DiceTrigger.TriggerEvent == DiceTriggerEvent.RoundStart)
 			{
@@ -1512,6 +1564,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			return;
 		}
 		StopAutoRollTimer();
+		StopRoundReminder();
 		_autoRollSeconds = seconds;
 		_autoRollTimer = AddTimer(seconds, AutoRollTick, TimerFlags.REPEAT | TimerFlags.STOP_ON_MAPCHANGE);
 	}
@@ -1545,6 +1598,12 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		_autoRollSeconds = 0;
 	}
 
+	private void StopRoundReminder()
+	{
+		_roundReminderTimer?.Kill();
+		_roundReminderTimer = null;
+	}
+
 	private HookResult OnRoundEnd(EventRoundEnd @event, GameEventInfo info)
 	{
 		//IL_00c4: Unknown result type (might be due to invalid IL or missing references)
@@ -1553,6 +1612,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		_isDuringRound = false;
 		DiceBlueprint.RoundActive = false;
 		StopAutoRollTimer();
+		StopRoundReminder();
 		// 移除 dice 之前播放"回合结束"特效。
 		DiceEffects.OnRoundEnd();
 		try
@@ -1739,6 +1799,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	{
 		DiceBlueprint.RoundActive = false;
 		StopAutoRollTimer();
+		StopRoundReminder();
 		DestroyModules();
 		Effects.ClearAll();
 		DiceEffects.ClearAll();
@@ -1905,6 +1966,45 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		return "common";
 	}
 
+	/// <summary>All dice currently held by a player (by SteamID).</summary>
+	private List<DiceBlueprint> GetDiceOf(CCSPlayerController player)
+	{
+		ulong steamId = player.SteamID;
+		List<DiceBlueprint> held = new List<DiceBlueprint>();
+		foreach (DiceBlueprint dice in _dices)
+		{
+			if (dice.HasPlayer(steamId))
+			{
+				held.Add(dice);
+			}
+		}
+		return held;
+	}
+
+	private static string TierLabel(string tier)
+	{
+		return tier switch
+		{
+			"rare" => "稀有",
+			"epic" => "史诗",
+			"legendary" => "传说",
+			"combo" => "组合",
+			_ => "普通"
+		};
+	}
+
+	private static string TierColor(string tier)
+	{
+		return tier switch
+		{
+			"rare" => "\u0004",
+			"epic" => "\u0003",
+			"legendary" => "\u0009",
+			"combo" => "\u0002",
+			_ => "\u0001"
+		};
+	}
+
 	private void AnnounceDiceRarity(CCSPlayerController player, DiceBlueprint dice)
 	{
 		try
@@ -1916,42 +2016,23 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			{
 				localized = dice.ClassName;
 			}
-			string label;
-			string color;
-			switch (tier)
-			{
-			case "rare":
-				label = "稀有";
-				color = "\u0004";
-				break;
-			case "epic":
-				label = "史诗";
-				color = "\u0003";
-				break;
-			case "legendary":
-				label = "传说";
-				color = "\u0009";
-				break;
-			case "combo":
-				label = "传说";
-				color = "\u0002";
-				break;
-			default:
-				label = "普通";
-				color = "\u0001";
-				break;
-			}
+			string label = TierLabel(tier);
+			string color = TierColor(tier);
 			string prefix = ((BasePlugin)this).Localizer["command.prefix"].Value;
-			player.PrintToChat($" {prefix}{color}🎲 你抽到了 [{label}] {localized}");
+			player.PrintToChat($" {prefix}{color}🎲 你抽到了 [{label}] {localized} {((BasePlugin)this).Localizer["command.rtd.hint.status"].Value}");
 			if (Config?.Effects?.Hud ?? true)
 			{
 				string effects = DiceEffects.DescribeEffects(dice.ClassName);
 				string effectLine = string.IsNullOrEmpty(effects) ? "" : $"<br/><span style=\"font-size:16px;color:#9ad\">特效：{effects}</span>";
-				player.PrintToCenterHtml($"<div style=\"font-size:22px\"><b>🎲 {localized}</b><br/><span style=\"font-size:16px;color:#fd6\">[{label}]</span>{effectLine}</div>", 4);
+				string description = Regex.Replace(dice.Description ?? "", "\\{[^}]*\\}", "").Trim();
+				string descriptionLine = string.IsNullOrEmpty(description) || description == "Unknown"
+					? ""
+					: $"<br/><span style=\"font-size:16px;color:#ddd\">{description}</span>";
+				player.PrintToCenterHtml($"<div style=\"font-size:22px\"><b>🎲 {localized}</b><br/><span style=\"font-size:16px;color:#fd6\">[{label}]</span>{descriptionLine}{effectLine}</div>", 5);
 			}
 			if ((tier == "legendary" || tier == "combo") && (CurrentRarity?.BroadcastLegendary ?? true))
 			{
-				Server.PrintToChatAll($" {prefix}{color}🌟 传说骰子降临！{((CBasePlayerController)player).PlayerName} 抽到了【{localized}】！");
+				Server.PrintToChatAll($" {prefix}{color}🌟 {label}骰子降临！{((CBasePlayerController)player).PlayerName} 抽到了【{localized}】！");
 			}
 			if ((tier == "legendary" || tier == "combo") && Config?.Sounds?.LegendarySounds != null && Config.Sounds.LegendarySounds.TryGetValue(dice.ClassName, out string legendarySound) && !string.IsNullOrEmpty(legendarySound))
 			{
@@ -2363,6 +2444,87 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 	}
 
+	private void PrintRollHelp(CCSPlayerController player, CommandInfo command)
+	{
+		foreach (string key in new[]
+		{
+			"command.rtd.help.title",
+			"command.rtd.help.roll",
+			"command.rtd.help.auto",
+			"command.rtd.help.status",
+			"command.rtd.help.skins"
+		})
+		{
+			command.ReplyToCommand((string?)((BasePlugin)this).Localizer[key]);
+		}
+
+		try
+		{
+			if (AdminManager.PlayerHasPermissions(player, new[] { "@rollthedice/admin" }))
+			{
+				command.ReplyToCommand((string?)((BasePlugin)this).Localizer["command.rtd.help.admin"]);
+			}
+		}
+		catch
+		{
+			// Permission lookup is best-effort; the player help must still print.
+		}
+	}
+
+	private void PrintRollStatus(CCSPlayerController player, CommandInfo command)
+	{
+		List<DiceBlueprint> held = GetDiceOf(player);
+		if (held.Count == 0)
+		{
+			command.ReplyToCommand(((BasePlugin)this).Localizer["command.rtd.status.none"].Value);
+		}
+		else
+		{
+			command.ReplyToCommand(((BasePlugin)this).Localizer["command.rtd.status.title"].Value);
+			foreach (DiceBlueprint dice in held)
+			{
+				string nameKey = "dice_" + dice.ClassName + "_name";
+				string name = ((BasePlugin)this).Localizer[nameKey];
+				if (name == nameKey)
+				{
+					name = dice.ClassName;
+				}
+				string description = Regex.Replace(dice.Description ?? string.Empty, "\\{[^}]*\\}", string.Empty).Trim();
+				string tier = GetDiceTier(dice);
+				command.ReplyToCommand($"  {TierColor(tier)}●\u0001 {name} [{TierLabel(tier)}] — {description}");
+			}
+		}
+
+		bool autoRoll = _playerConfigs.TryGetValue(player.SteamID, out PlayerConfig playerConfig) && playerConfig.RtdOnSpawn;
+		command.ReplyToCommand(((BasePlugin)this).Localizer[autoRoll
+			? "command.rtd.status.auto.on"
+			: "command.rtd.status.auto.off"].Value);
+
+		string cooldown = ((BasePlugin)this).Localizer["command.rtd.status.ready"].Value;
+		if (_PlayerCooldown.TryGetValue(player, out int cooldownValue))
+		{
+			if (Config.CooldownRounds > 0 && cooldownValue > 0)
+			{
+				cooldown = ((BasePlugin)this).Localizer["command.rtd.status.cooldown.rounds"].Value
+					.Replace("{rounds}", cooldownValue.ToString());
+			}
+			else if (Config.CooldownSeconds > 0)
+			{
+				int remain = cooldownValue - (int)Server.CurrentTime;
+				if (remain > 0)
+				{
+					cooldown = ((BasePlugin)this).Localizer["command.rtd.status.cooldown.seconds"].Value
+						.Replace("{seconds}", remain.ToString());
+				}
+			}
+		}
+		command.ReplyToCommand(cooldown);
+		command.ReplyToCommand(((BasePlugin)this).Localizer["command.rtd.status.rolls"].Value
+			.Replace("{count}", GetDiceRollCount(player).ToString())
+			.Replace("{max}", GetMaxDiceCount(player).ToString()));
+		command.ReplyToCommand(((BasePlugin)this).Localizer["command.rtd.status.next"].Value);
+	}
+
 	private void PlayDiceSoundForPlayer(CCSPlayerController? player, string rolledDice, bool command = false)
 	{
 		//IL_0062: Unknown result type (might be due to invalid IL or missing references)
@@ -2539,14 +2701,17 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private string GetLastDiceDescription(CCSPlayerController player)
 	{
-		foreach (DiceBlueprint dix in _dices)
+		List<DiceBlueprint> held = GetDiceOf(player);
+		if (held.Count == 0)
 		{
-			if (dix._players.Contains(player))
-			{
-				return dix.Description;
-			}
+			return "无";
 		}
-		return "Unknown";
+		return string.Join("、", held.Select(dice =>
+		{
+			string key = "dice_" + dice.ClassName + "_name";
+			string name = ((BasePlugin)this).Localizer[key];
+			return name == key ? dice.ClassName : name;
+		}));
 	}
 
 	private void CreateRoundBackup()

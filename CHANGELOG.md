@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.3.0 — 2026-11-22
+
+### Added
+
+- `!rtd help` (`!rtd ?`) player help card: roll, auto-roll, status, WeaponPaints entry,
+  and an admin-only line when the player has `@rollthedice/admin`.
+- `!rtd status` (`!rtd info`): every held dice with tier and description, auto-roll
+  state, cooldown (rounds/seconds), and rolls used this round.
+- The roll HUD now includes the dice description and stays 5 seconds.
+
+### Changed
+
+- Unknown `!rtd <arg>` no longer silently rolls a dice; it prints the help card.
+- `!rtd auto` is persisted to the plugin config, so it survives reconnect/reload.
+- `combo` dice are labelled **组合** instead of **传说**; the global broadcast uses the
+  same label.
+- The old every-round global announcement is now a private reminder sent 20 seconds
+  after round start, only to alive players who have not rolled.
+- “Already rolled” lists every held dice name, not only the first one.
+- Player-facing English error replaced with Chinese.
+
 ## 1.2.2 — 2026-11-22
 
 ### Fixed
