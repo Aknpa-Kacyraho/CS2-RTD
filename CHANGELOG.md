@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.1 — 2026-11-22
+
+### Added
+
+- `!rtd tab`: toggle the dice prefix in the TAB name. Persisted per SteamID in
+  `player_configs`, default on. `!rtd status` shows the current switch.
+- `!rtd help` lists the new command.
+
 ## 1.3.0 — 2026-11-22
 
 ### Added

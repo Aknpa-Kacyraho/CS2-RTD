@@ -72,7 +72,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.3.0";
+	public override string ModuleVersion => "1.3.1";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -578,6 +578,20 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		    arg.Equals("info", StringComparison.OrdinalIgnoreCase))
 		{
 			PrintRollStatus(player, command);
+			return;
+		}
+		if (arg.Equals("tab", StringComparison.OrdinalIgnoreCase))
+		{
+			if (!_playerConfigs.TryGetValue(((CBasePlayerController)player).SteamID, out PlayerConfig tabConfig))
+			{
+				tabConfig = new PlayerConfig();
+				_playerConfigs.Add(((CBasePlayerController)player).SteamID, tabConfig);
+			}
+			tabConfig.ShowDiceInTab = !tabConfig.ShowDiceInTab;
+			UpdatePlayerConfig();
+			PluginConfigExtensions.Update<PluginConfig>(Config);
+			RefreshPlayerDiceName(player);
+			command.ReplyToCommand((string?)((BasePlugin)this).Localizer[tabConfig.ShowDiceInTab ? "command.rtd.tab.on" : "command.rtd.tab.off"]);
 			return;
 		}
 		if (arg.Equals("auto", StringComparison.OrdinalIgnoreCase))
@@ -2197,6 +2211,18 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 		try
 		{
+			ulong tabSteamId = player.SteamID;
+			if (_playerConfigs.TryGetValue(tabSteamId, out PlayerConfig tabConfig) && !tabConfig.ShowDiceInTab)
+			{
+				string trueName = _originalPlayerNames.TryGetValue(player, out string cachedName)
+					? cachedName
+					: StripDiceNameDecoration(player.PlayerName);
+				_originalPlayerNames[player] = trueName;
+				player.PlayerName = trueName;
+				Utilities.SetStateChanged((CBaseEntity)(object)player, "CBasePlayerController", "m_iszPlayerName", 0);
+				return;
+			}
+
 			string text = ((CBasePlayerController)player).PlayerName;
 			if (!_originalPlayerNames.TryGetValue(player, out string value))
 			{
@@ -2452,6 +2478,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			"command.rtd.help.roll",
 			"command.rtd.help.auto",
 			"command.rtd.help.status",
+			"command.rtd.help.tab",
 			"command.rtd.help.skins"
 		})
 		{
@@ -2495,10 +2522,15 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			}
 		}
 
-		bool autoRoll = _playerConfigs.TryGetValue(player.SteamID, out PlayerConfig playerConfig) && playerConfig.RtdOnSpawn;
+		bool hasConfig = _playerConfigs.TryGetValue(player.SteamID, out PlayerConfig playerConfig);
+		bool autoRoll = hasConfig && playerConfig.RtdOnSpawn;
+		bool showTab = !hasConfig || playerConfig.ShowDiceInTab;
 		command.ReplyToCommand(((BasePlugin)this).Localizer[autoRoll
 			? "command.rtd.status.auto.on"
 			: "command.rtd.status.auto.off"].Value);
+		command.ReplyToCommand(((BasePlugin)this).Localizer[showTab
+			? "command.rtd.status.tab.on"
+			: "command.rtd.status.tab.off"].Value);
 
 		string cooldown = ((BasePlugin)this).Localizer["command.rtd.status.ready"].Value;
 		if (_PlayerCooldown.TryGetValue(player, out int cooldownValue))
