@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.1 — 2026-11-22
+
+### Changed
+
+- Split `RollTheDice.cs` into partial `RollTheDice.Help.cs` and
+  `RollTheDice.CheatGuard.cs`; main class is now ~2.7k lines (from ~2.9k).
+- `RefreshCombos` only calls `OnDiceSetChanged` for dice held by a player in the
+  affected team; empty dice are skipped.
+- TAB-name combo resolution uses `_diceByName` instead of scanning all 171 dice for
+  each combo entry.
+
+### Added
+
+- `scripts/check-rtd-architecture.ps1`: fails on new raw `new Timer(` in dice classes
+  or main class growth past 2900 lines; reports pawn casts and empty catches.
+
 ## 1.4.0 — 2026-11-22
 
 Architecture/stability release: every dice timer and callback now has an owner.

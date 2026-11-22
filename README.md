@@ -276,6 +276,13 @@
 
 ---
 
+## v1.4.1 架构整理
+
+- 主类拆分为 `RollTheDice.Help.cs` 与 `RollTheDice.CheatGuard.cs`，主文件约 2.7k 行。
+- `RefreshCombos` 只对“受影响队伍持有”的骰子调用 `OnDiceSetChanged`；空骰子跳过。
+- TAB 名字的组合解析改用 `_diceByName`，不再对每条组合扫描 171 个骰子。
+- 新增 `scripts/check-rtd-architecture.ps1`：新增裸 `new Timer` 或主类超过 2900 行时失败。
+
 ## v1.4.0 架构与稳定性
 
 - 骰子定时器统一走 `ScopedTimer`，回合结束/换图/卸载时 `KillTimers`，避免旧回调跨回合。

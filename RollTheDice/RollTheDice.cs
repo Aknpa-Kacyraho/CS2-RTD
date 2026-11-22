@@ -25,7 +25,7 @@ using RollTheDice.Utils;
 
 namespace RollTheDice;
 
-public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
+public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 {
 	private MapConfig _currentMapConfig = new MapConfig();
 
@@ -82,7 +82,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.4.0";
+	public override string ModuleVersion => "1.4.1";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -758,17 +758,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		command.ReplyToCommand("rtdfx <reload>");
 	}
 
-	[ConsoleCommand("rtd_health", "RollTheDice runtime health summary")]
-	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
-	[CommandHelper(0, "")]
-	public void CommandHealth(CCSPlayerController player, CommandInfo command)
-	{
-		int holders = _dices.Sum(d => d._players.Count);
-		string timers = $"auto={(_autoRollTimer != null ? 1 : 0)} reminder={(_roundReminderTimer != null ? 1 : 0)} name={_nameRefreshTimers.Count}";
-		string summary = $"[RTD] v{ModuleVersion} | map={_currentMap} | enabled={Config?.Enabled} | dices={_dices.Count} | holders={holders} | round={_isDuringRound} | roundActive={DiceBlueprint.RoundActive} | fx={DiceFxTable.Count} | timers[{timers}] | effects={(DiceEffects.Enabled ? "on" : "off")}";
-		command.ReplyToCommand(summary);
-		Console.WriteLine(summary);
-	}
 
 	private void ReloadConfigFromDisk()
 	{
@@ -1031,89 +1020,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		Console.WriteLine(((BasePlugin)this).Localizer["core.unload"]);
 	}
 
-	/// <summary>
-	/// CheatGuard 的每条被拦指令需要<em>各自独立</em>的委托实例。
-	/// 原因：<c>BasePlugin.AddCommandListener</c> 内部用 <c>Dictionary&lt;Delegate,...&gt;</c> 以委托为键，
-	/// 若所有被拦指令共用同一个 <c>OnCheatGuardCommand</c> 方法组委托，键会互相覆盖 →
-	/// <c>RemoveCommandListener</c> 只能摘掉最后一个，其余原生钩子在卸载/热重载后泄漏并叠加。
-	/// 每条指令包一个 <see cref="CheatGuardHook"/> 实例（Target 不同 → 委托不等）即可对称摘除。
-	/// </summary>
-	private sealed class CheatGuardHook
-	{
-		private readonly RollTheDice _plugin;
-
-		public CheatGuardHook(RollTheDice plugin)
-		{
-			_plugin = plugin;
-		}
-
-		public HookResult Handle(CCSPlayerController? player, CommandInfo info)
-		{
-			return _plugin.OnCheatGuardCommand(player, info);
-		}
-	}
-
-	private readonly List<(string Command, CommandInfo.CommandListenerCallback Handler)> _cheatGuardHooks = new List<(string, CommandInfo.CommandListenerCallback)>();
-
-	private void RegisterCheatGuard()
-	{
-		CheatGuardConfig guard = Config?.CheatGuard;
-		if (guard == null || !guard.Enabled || guard.BlockedCommands == null)
-		{
-			return;
-		}
-		foreach (string command in guard.BlockedCommands)
-		{
-			if (!string.IsNullOrWhiteSpace(command))
-			{
-				string name = command.Trim().ToLowerInvariant();
-				CommandInfo.CommandListenerCallback handler = new CheatGuardHook(this).Handle;
-				_cheatGuardHooks.Add((name, handler));
-				((BasePlugin)this).AddCommandListener(name, handler, HookMode.Pre);
-			}
-		}
-		LogDebug($"{DateTime.Now:HH:mm:ss} CheatGuard: blocked {guard.BlockedCommands.Count} commands (bypass={guard.BypassPermission})\n");
-	}
-
-	private void DeregisterCheatGuard()
-	{
-		foreach ((string command, CommandInfo.CommandListenerCallback handler) in _cheatGuardHooks)
-		{
-			((BasePlugin)this).RemoveCommandListener(command, handler, HookMode.Pre);
-		}
-		_cheatGuardHooks.Clear();
-	}
-
-	private HookResult OnCheatGuardCommand(CCSPlayerController? player, CommandInfo info)
-	{
-		if (player == null || !((CEntityInstance)player).IsValid || player.IsBot || ((CBasePlayerController)player).IsHLTV)
-		{
-			return (HookResult)0;
-		}
-		CheatGuardConfig guard = Config?.CheatGuard;
-		if (guard == null || !guard.Enabled)
-		{
-			return (HookResult)0;
-		}
-		if (!string.IsNullOrWhiteSpace(guard.BypassPermission) && AdminManager.PlayerHasPermissions(player, guard.BypassPermission))
-		{
-			return (HookResult)0;
-		}
-		int humanCount = Utilities.GetPlayers().Count((CCSPlayerController p) => p != null && ((CEntityInstance)p).IsValid && !p.IsBot && !((CBasePlayerController)p).IsHLTV);
-		if (humanCount <= 1)
-		{
-			return (HookResult)0;
-		}
-		LogDebug($"{DateTime.Now:HH:mm:ss} CheatGuard blocked '{info.GetCommandString}' from {((CBasePlayerController)player).PlayerName}\n");
-		try
-		{
-			player.PrintToChat($" {((BasePlugin)this).Localizer["command.prefix"].Value}⛔ 该作弊指令已被禁用（仅房主可用）。");
-		}
-		catch
-		{
-		}
-		return (HookResult)3;
-	}
 
 	private HookResult OnRoundStart(EventRoundStart @event, GameEventInfo info)
 	{
@@ -2025,44 +1931,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		return "common";
 	}
 
-	/// <summary>All dice currently held by a player (by SteamID).</summary>
-	private List<DiceBlueprint> GetDiceOf(CCSPlayerController player)
-	{
-		ulong steamId = player.SteamID;
-		List<DiceBlueprint> held = new List<DiceBlueprint>();
-		foreach (DiceBlueprint dice in _dices)
-		{
-			if (dice.HasPlayer(steamId))
-			{
-				held.Add(dice);
-			}
-		}
-		return held;
-	}
-
-	private static string TierLabel(string tier)
-	{
-		return tier switch
-		{
-			"rare" => "稀有",
-			"epic" => "史诗",
-			"legendary" => "传说",
-			"combo" => "组合",
-			_ => "普通"
-		};
-	}
-
-	private static string TierColor(string tier)
-	{
-		return tier switch
-		{
-			"rare" => "\u0004",
-			"epic" => "\u0003",
-			"legendary" => "\u0009",
-			"combo" => "\u0002",
-			_ => "\u0001"
-		};
-	}
 
 	private void AnnounceDiceRarity(CCSPlayerController player, DiceBlueprint dice)
 	{
@@ -2193,8 +2061,27 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			List<CCSPlayerController> affected = Utilities.GetPlayers()
 				.Where((CCSPlayerController p) => p != null && p.IsValid && !p.IsHLTV && (trigger == null || (CEntityInstance)p == (CEntityInstance)trigger || p.TeamNum == trigger.TeamNum))
 				.ToList();
+			HashSet<ulong> affectedIds = new HashSet<ulong>(affected.Select(p => p.SteamID));
 			foreach (DiceBlueprint dice in _dices)
 			{
+				if (dice._players.Count == 0)
+				{
+					continue;
+				}
+				// Only dice held by a player in the affected team can change their combo state.
+				bool relevant = false;
+				foreach (CCSPlayerController holder in dice._players)
+				{
+					if (holder != null && holder.IsValid && affectedIds.Contains(holder.SteamID))
+					{
+						relevant = true;
+						break;
+					}
+				}
+				if (!relevant)
+				{
+					continue;
+				}
 				foreach (CCSPlayerController p in affected)
 				{
 					try
@@ -2293,14 +2180,38 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					hashSet.Add(item);
 				}
 			}
+			bool HasTeammateHolding(string className)
+			{
+				if (!_diceByName.TryGetValue(className, out DiceBlueprint? partnerDice))
+				{
+					return false;
+				}
+				foreach (CCSPlayerController teammate in partnerDice._players)
+				{
+					if (teammate == null || !teammate.IsValid || teammate.IsHLTV)
+					{
+						continue;
+					}
+					if ((CEntityInstance)teammate == (CEntityInstance)player)
+					{
+						continue;
+					}
+					if (teammate.TeamNum == player.TeamNum)
+					{
+						return true;
+					}
+				}
+				return false;
+			}
+
 			foreach (var combo in DiceSynergy._combos)
 			{
 				var (diceA, diceB, _) = combo;
-				if (hashSet.Contains(diceA) && !hashSet.Contains(diceB) && _dices.Any((DiceBlueprint d) => d.ClassName == diceB && d._players.Any((CCSPlayerController p) => (CEntityInstance)(object)p != (CEntityInstance)(object)player && ((CBaseEntity)p).TeamNum == ((CBaseEntity)player).TeamNum && ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV)))
+				if (hashSet.Contains(diceA) && !hashSet.Contains(diceB) && HasTeammateHolding(diceB))
 				{
 					hashSet.Add(diceB);
 				}
-				if (hashSet.Contains(diceB) && !hashSet.Contains(diceA) && _dices.Any((DiceBlueprint d) => d.ClassName == diceA && d._players.Any((CCSPlayerController p) => (CEntityInstance)(object)p != (CEntityInstance)(object)player && ((CBaseEntity)p).TeamNum == ((CBaseEntity)player).TeamNum && ((CEntityInstance)p).IsValid && !((CBasePlayerController)p).IsHLTV)))
+				if (hashSet.Contains(diceB) && !hashSet.Contains(diceA) && HasTeammateHolding(diceA))
 				{
 					hashSet.Add(diceA);
 				}
@@ -2537,92 +2448,6 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 	}
 
-	private void PrintRollHelp(CCSPlayerController player, CommandInfo command)
-	{
-		foreach (string key in new[]
-		{
-			"command.rtd.help.title",
-			"command.rtd.help.roll",
-			"command.rtd.help.auto",
-			"command.rtd.help.status",
-			"command.rtd.help.tab",
-			"command.rtd.help.skins"
-		})
-		{
-			command.ReplyToCommand((string?)((BasePlugin)this).Localizer[key]);
-		}
-
-		try
-		{
-			if (AdminManager.PlayerHasPermissions(player, new[] { "@rollthedice/admin" }))
-			{
-				command.ReplyToCommand((string?)((BasePlugin)this).Localizer["command.rtd.help.admin"]);
-			}
-		}
-		catch
-		{
-			// Permission lookup is best-effort; the player help must still print.
-		}
-	}
-
-	private void PrintRollStatus(CCSPlayerController player, CommandInfo command)
-	{
-		List<DiceBlueprint> held = GetDiceOf(player);
-		if (held.Count == 0)
-		{
-			command.ReplyToCommand(((BasePlugin)this).Localizer["command.rtd.status.none"].Value);
-		}
-		else
-		{
-			command.ReplyToCommand(((BasePlugin)this).Localizer["command.rtd.status.title"].Value);
-			foreach (DiceBlueprint dice in held)
-			{
-				string nameKey = "dice_" + dice.ClassName + "_name";
-				string name = ((BasePlugin)this).Localizer[nameKey];
-				if (name == nameKey)
-				{
-					name = dice.ClassName;
-				}
-				string description = Regex.Replace(dice.Description ?? string.Empty, "\\{[^}]*\\}", string.Empty).Trim();
-				string tier = GetDiceTier(dice);
-				command.ReplyToCommand($"  {TierColor(tier)}●\u0001 {name} [{TierLabel(tier)}] — {description}");
-			}
-		}
-
-		bool hasConfig = _playerConfigs.TryGetValue(player.SteamID, out PlayerConfig playerConfig);
-		bool autoRoll = hasConfig && playerConfig.RtdOnSpawn;
-		bool showTab = !hasConfig || playerConfig.ShowDiceInTab;
-		command.ReplyToCommand(((BasePlugin)this).Localizer[autoRoll
-			? "command.rtd.status.auto.on"
-			: "command.rtd.status.auto.off"].Value);
-		command.ReplyToCommand(((BasePlugin)this).Localizer[showTab
-			? "command.rtd.status.tab.on"
-			: "command.rtd.status.tab.off"].Value);
-
-		string cooldown = ((BasePlugin)this).Localizer["command.rtd.status.ready"].Value;
-		if (_PlayerCooldown.TryGetValue(player, out int cooldownValue))
-		{
-			if (Config.CooldownRounds > 0 && cooldownValue > 0)
-			{
-				cooldown = ((BasePlugin)this).Localizer["command.rtd.status.cooldown.rounds"].Value
-					.Replace("{rounds}", cooldownValue.ToString());
-			}
-			else if (Config.CooldownSeconds > 0)
-			{
-				int remain = cooldownValue - (int)Server.CurrentTime;
-				if (remain > 0)
-				{
-					cooldown = ((BasePlugin)this).Localizer["command.rtd.status.cooldown.seconds"].Value
-						.Replace("{seconds}", remain.ToString());
-				}
-			}
-		}
-		command.ReplyToCommand(cooldown);
-		command.ReplyToCommand(((BasePlugin)this).Localizer["command.rtd.status.rolls"].Value
-			.Replace("{count}", GetDiceRollCount(player).ToString())
-			.Replace("{max}", GetMaxDiceCount(player).ToString()));
-		command.ReplyToCommand(((BasePlugin)this).Localizer["command.rtd.status.next"].Value);
-	}
 
 	private void PlayDiceSoundForPlayer(CCSPlayerController? player, string rolledDice, bool command = false)
 	{
