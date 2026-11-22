@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.2.1 — 2026-11-22
+
+### Fixed
+
+- Unload/map-end no longer synchronously flushes thousands of CBeams. That one-frame
+  teardown is the known `CopyExistingEntity: missing client entity` crash path.
+  Residual beams are left for the engine to clear on changelevel.
+- `Supernova.Reset` (round end) no longer calls `Flush`; it uses the frame-budgeted
+  teardown queue driven by `OnTick`.
+- Every dice damage hook is wrapped by `DynamicHandlers`. Non-player victim or attacker
+  entities are rejected before any dice can cast them to `CCSPlayerPawn`. This is a
+  coverage fix on top of the v1.2.0 central-hook change.
+
 ## 1.2.0 — 2026-11-22
 
 Stability and lifecycle release. Target: CS2 1.41.9.7 / CounterStrikeSharp 1.0.380.

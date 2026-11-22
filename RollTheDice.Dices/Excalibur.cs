@@ -119,9 +119,9 @@ public class Excalibur : DiceBlueprint
 
 	public override void Destroy()
 	{
-		// 卸载 / 换图：没有下一 tick 了，必须立刻拆干净。
+		// 卸载 / 换图：不要同帧 Flush 全部剑段/光带。残留实体由换图时引擎清理，
+		// 同步批量删除会触发 CopyExistingEntity 致命错误。
 		Reset();
-		_fade.Flush();
 	}
 
 	public override float GetCooldownRemaining(CCSPlayerController player)

@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using CounterStrikeSharp.API.Core;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
+using RollTheDice.Utils;
 
 namespace RollTheDice.Dices;
 
@@ -14,6 +16,29 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 	public readonly IStringLocalizer _localizer = Localizer;
 
 	public readonly List<CCSPlayerController> _players = new List<CCSPlayerController>();
+
+	/// <summary>
+	/// Damage hooks registered by DynamicHandlers for this dice. The raw delegate is wrapped
+	/// so non-player entities never reach a dice that would cast them to CCSPlayerPawn.
+	/// </summary>
+	public Func<CBaseEntity, CTakeDamageInfo, HookResult>? DamageHook { get; set; }
+
+	/// <summary>The delegate instance actually registered with BasePlugin (needed for removal).</summary>
+	public Delegate? DamageHookWrapper { get; set; }
+
+	public HookResult SafeOnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
+	{
+		if (info == null || PlayerResolver.FromEntity(entity) == null)
+		{
+			return HookResult.Continue;
+		}
+		CBaseEntity? attackerEntity = info.Attacker?.Value;
+		if (attackerEntity != null && PlayerResolver.FromEntity(attackerEntity) == null)
+		{
+			return HookResult.Continue;
+		}
+		return DamageHook?.Invoke(entity, info) ?? HookResult.Continue;
+	}
 
 	public virtual string Description { get; private set; } = "Unknown Dice";
 

@@ -100,8 +100,8 @@ public class Supernova : DiceBlueprint
 		_cooldownEnd.Clear();
 		_hitNext.Clear();
 		_damageCarry.Clear();
-		// 回合结束：不再等分帧队列，直接清干净（下一次开火会重建）。
-		_fade.Flush();
+		// 回合结束也走分帧队列（OnTick 里的 _fade.Tick）；同帧 Flush 上千根 CBeam
+		// 会触发 CopyExistingEntity 致命错误。
 	}
 
 	public override void Destroy()

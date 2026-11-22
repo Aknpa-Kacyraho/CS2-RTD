@@ -20,7 +20,32 @@ public static class DynamicHandlers
 		MethodInfo method = plugin.GetType().GetMethod(listenerName);
 		if (!(method == null))
 		{
-			Delegate obj = Delegate.CreateDelegate(nestedType, plugin, method);
+			Delegate obj;
+			if (listenerName == "OnPlayerTakeDamagePre")
+			{
+				// Damage hooks fire for props/world/grenades too. Wrap every dice hook so a
+				// non-player entity never reaches code that casts it to CCSPlayerPawn.
+				try
+				{
+					Func<CBaseEntity, CTakeDamageInfo, HookResult> raw =
+						(Func<CBaseEntity, CTakeDamageInfo, HookResult>)Delegate.CreateDelegate(
+							typeof(Func<CBaseEntity, CTakeDamageInfo, HookResult>), plugin, method);
+					plugin.DamageHook = raw;
+					Listeners.OnPlayerTakeDamagePre wrapper = new Listeners.OnPlayerTakeDamagePre(plugin.SafeOnPlayerTakeDamagePre);
+					plugin.DamageHookWrapper = wrapper;
+					obj = wrapper;
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine("[DynamicHandlers] damage-hook wrap failed for " + plugin.GetType().Name + ": " + ex.Message);
+					obj = Delegate.CreateDelegate(nestedType, plugin, method);
+				}
+			}
+			else
+			{
+				obj = Delegate.CreateDelegate(nestedType, plugin, method);
+			}
+
 			MethodInfo methodInfo = typeof(BasePlugin).GetMethods(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault((MethodInfo m) => m.Name == "RegisterListener" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1);
 			if (!(methodInfo == null))
 			{
@@ -40,12 +65,21 @@ public static class DynamicHandlers
 		MethodInfo method = plugin.GetType().GetMethod(listenerName);
 		if (!(method == null))
 		{
-			Delegate obj = Delegate.CreateDelegate(nestedType, plugin, method);
+			// Must remove the same wrapper instance that was registered, otherwise the
+			// listener stays behind after a reload.
+			Delegate obj = listenerName == "OnPlayerTakeDamagePre" && plugin.DamageHookWrapper != null
+				? plugin.DamageHookWrapper
+				: Delegate.CreateDelegate(nestedType, plugin, method);
 			MethodInfo methodInfo = typeof(BasePlugin).GetMethods(BindingFlags.Instance | BindingFlags.Public).FirstOrDefault((MethodInfo m) => m.Name == "RemoveListener" && m.IsGenericMethodDefinition && m.GetParameters().Length == 1);
 			if (!(methodInfo == null))
 			{
 				MethodInfo methodInfo2 = methodInfo.MakeGenericMethod(nestedType);
 				methodInfo2.Invoke(basePlugin, new object[1] { obj });
+			}
+			if (listenerName == "OnPlayerTakeDamagePre")
+			{
+				plugin.DamageHook = null;
+				plugin.DamageHookWrapper = null;
 			}
 		}
 	}

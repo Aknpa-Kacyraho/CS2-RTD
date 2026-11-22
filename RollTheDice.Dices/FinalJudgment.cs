@@ -108,9 +108,10 @@ public class FinalJudgment : DiceBlueprint
 
 	public override void Destroy()
 	{
-		// 卸载 / 换图：没有下一 tick 了，必须立刻拆干净。
+		// 卸载 / 换图：绝不同帧 Flush 上千根 CBeam——这是已知的
+		// CopyExistingEntity: missing client entity 崩溃路径。把组交给拆除队列后
+		// 放弃引用；换图由引擎清实体，热重载的残留会在下次换图消失。
 		Reset();
-		_fade.Flush();
 	}
 
 	public override float GetCooldownRemaining(CCSPlayerController player)
