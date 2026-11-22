@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.2 — 2026-11-22
+
+### Fixed
+
+- Added `DiceBlueprint.RoundActive`, set false on round end/map end/unload and true on
+  round start. Delayed callbacks that can damage or revive (BlackHole's 10s collapse,
+  Necromancer's 1s weapon restore) no longer leak into the next round.
+
+### Performance
+
+- `PlayerResolver.FromEntity` now caches pawn-handle → controller for the current
+  `Server.TickCount`. Damage hooks do O(1) lookups instead of scanning every player
+  twice per dice per hit.
+
 ## 1.2.1 — 2026-11-22
 
 ### Fixed

@@ -71,7 +71,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.2.1";
+	public override string ModuleVersion => "1.2.2";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -938,6 +938,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		//IL_0098: Expected O, but got Unknown
 		//IL_00a1: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00ab: Expected O, but got Unknown
+		DiceBlueprint.RoundActive = false;
 		StopAutoRollTimer();
 		DestroyModules();
 		DeregisterCheatGuard();
@@ -1066,6 +1067,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		if (Config == null || !Config.Enabled || _currentMapConfig == null || !_currentMapConfig.Enabled || _dices.Count == 0)
 		{
 			_isDuringRound = false;
+			DiceBlueprint.RoundActive = false;
 			return HookResult.Continue;
 		}
 		Server.ExecuteCommand("host_timescale 1.0");
@@ -1082,6 +1084,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		StackingHealth.ClearAll();
 		MoveLockManager.ClearAll();
 		_isDuringRound = true;
+		DiceBlueprint.RoundActive = true;
 		try
 		{
 			RemoveDicesForPlayers();
@@ -1548,6 +1551,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		//IL_00c8: Unknown result type (might be due to invalid IL or missing references)
 		Server.ExecuteCommand("host_timescale 1.0");
 		_isDuringRound = false;
+		DiceBlueprint.RoundActive = false;
 		StopAutoRollTimer();
 		// 移除 dice 之前播放"回合结束"特效。
 		DiceEffects.OnRoundEnd();
@@ -1733,6 +1737,7 @@ public class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private void OnMapEnd()
 	{
+		DiceBlueprint.RoundActive = false;
 		StopAutoRollTimer();
 		DestroyModules();
 		Effects.ClearAll();

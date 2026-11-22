@@ -18,6 +18,13 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 	public readonly List<CCSPlayerController> _players = new List<CCSPlayerController>();
 
 	/// <summary>
+	/// False between round end and the next round start. Delayed callbacks that would
+	/// damage/spawn/revive (e.g. a 10s black-hole explosion) check this so they cannot
+	/// leak into the next round.
+	/// </summary>
+	public static bool RoundActive { get; set; }
+
+	/// <summary>
 	/// Damage hooks registered by DynamicHandlers for this dice. The raw delegate is wrapped
 	/// so non-player entities never reach a dice that would cast them to CCSPlayerPawn.
 	/// </summary>

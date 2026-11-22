@@ -259,6 +259,13 @@ public class Necromancer : DiceBlueprint
 							CCSPlayerController capDead2 = capturedDead;
 							new Timer(1f, (Action)delegate
 							{
+								// A revive that completes after round end must not give weapons
+								// or clear render state in the next round.
+								if (!DiceBlueprint.RoundActive)
+								{
+									_invincibilityEndTime.Remove(revivedID);
+									return;
+								}
 								CCSPlayerController obj5 = capDead2;
 								if ((CEntityInstance)(object)((obj5 == null) ? null : obj5.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)capDead2.PlayerPawn.Value).IsValid)
 								{

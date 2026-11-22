@@ -177,6 +177,11 @@ public class BlackHole : DiceBlueprint
 		Vector capPos = deathPos;
 		new Timer(10f, (Action)delegate
 		{
+			// Do not detonate into the next round after the collapse timer outlives the round.
+			if (!DiceBlueprint.RoundActive)
+			{
+				return;
+			}
 			//IL_004b: Unknown result type (might be due to invalid IL or missing references)
 			//IL_006e: Unknown result type (might be due to invalid IL or missing references)
 			//IL_0078: Expected O, but got Unknown

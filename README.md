@@ -276,8 +276,10 @@
 
 ---
 
-## v1.2.1 稳定性修复
+## v1.2.2 稳定性修复
 
+- 回合结束/地图结束/卸载时关闭 `RoundActive`：黑洞 10s 坍缩爆炸、死灵法师 1s 复苏等延迟回调不再跨回合生效。
+- `PlayerResolver` 按 tick 缓存 pawn→controller，伤害高峰时每次伤害只做 O(1) 查询。
 - 卸载/换图不再同帧删除上千根 CBeam，避免 `CopyExistingEntity` 崩溃；残留光束由换图时引擎清理。
 - 所有骰子的伤害钩子统一包装：非玩家实体（道具/世界/手雷）不会进入 `CCSPlayerPawn` 强转。
 - 管理命令 `!rollthedice` 现在需要 `@rollthedice/admin`（此前任意玩家可执行）。
