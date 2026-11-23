@@ -48,11 +48,10 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	// O(1) lookup by class name and cached draw pools. Both are rebuilt whenever the
 	// module set changes (init/reload) and cleared on destroy.
 	private readonly Dictionary<string, DiceBlueprint> _diceByName = new Dictionary<string, DiceBlueprint>(StringComparer.OrdinalIgnoreCase);
-	private readonly HashSet<string> _knownDicePrefixes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 	private List<DiceBlueprint>? _drawablePool;
 	private List<DiceBlueprint>? _normalPool;
 
-	private readonly Dictionary<CCSPlayerController, string> _originalPlayerNames;
+	private readonly PlayerNameService _playerNames = new PlayerNameService();
 
 	private bool _isDuringRound;
 
@@ -71,10 +70,6 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	private int _autoRollSeconds;
 	private Timer? _roundReminderTimer;
 
-	// At most one pending TAB-name refresh per SteamID. The old code scheduled a new
-	// timer on every dice change, so frequent rolls stacked callbacks.
-	private readonly Dictionary<ulong, Timer> _nameRefreshTimers = new Dictionary<ulong, Timer>();
-
 	public required PluginConfig Config { get; set; }
 
 	public override string ModuleName => "Roll The Dice";
@@ -83,7 +78,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.4.3";
+	public override string ModuleVersion => "1.4.4";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -486,11 +481,11 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		bool denied = DeathKnightComplete.IsDeniedThisRound(sid);
 		List<string> active = GetAllDiceForPlayer(target);
 		string shown = target.PlayerName;
-		string trueName = _originalPlayerNames.TryGetValue(target, out string cached) ? cached : StripDiceNameDecoration(shown);
+		string trueName = _playerNames.GetTrueName(target);
 		command.ReplyToCommand($"[rtdinfo] {shown} (sid {sid})");
 		command.ReplyToCommand($"[rtdinfo] 本轮已抽 {rolled}/上限 {max} ← 基础1｜转世+{pendingReincarnation}｜世界+{pendingWorld}｜女神{(blessed ? "+1" : "+0")}｜黑骑禁抽{(denied ? "是" : "否")}");
 		command.ReplyToCommand($"[rtdinfo] 生效 dice({active.Count}): {(active.Count == 0 ? "-" : string.Join(", ", active))}");
-		command.ReplyToCommand($"[rtdinfo] 名字：真名缓存={trueName}｜缓存中{(_originalPlayerNames.ContainsKey(target) ? "有" : "无")}（TAB 前缀是显示用，含队友 combo 的 dice 名）");
+		command.ReplyToCommand($"[rtdinfo] 名字：真名缓存={trueName}｜缓存中{(_playerNames.HasCachedName(target) ? "有" : "无")}（TAB 前缀是显示用，含队友 combo 的 dice 名）");
 	}
 
 	private void EnsureSigilTimer()
@@ -613,7 +608,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			tabConfig.ShowDiceInTab = !tabConfig.ShowDiceInTab;
 			UpdatePlayerConfig();
 			PluginConfigExtensions.Update<PluginConfig>(Config);
-			RefreshPlayerDiceName(player);
+			_playerNames.Refresh(player);
 			command.ReplyToCommand((string?)((BasePlugin)this).Localizer[tabConfig.ShowDiceInTab ? "command.rtd.tab.on" : "command.rtd.tab.off"]);
 			return;
 		}
@@ -924,7 +919,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		DiceBlueprint.RoundActive = false;
 		StopAutoRollTimer();
 		StopRoundReminder();
-		StopNameRefreshTimers();
+		_playerNames.StopRefreshTimers();
 		DestroyModules();
 		DeregisterCheatGuard();
 		// Never reload/flush config on unload: it writes the in-memory copy back to disk
@@ -952,7 +947,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		Instance = null;
 		_playersThatRolledTheDice.Clear();
 		_PlayerCooldown.Clear();
-		_originalPlayerNames.Clear();
+		_playerNames.ClearNames();
 		Invulnerability.ClearAll();
 		MoveLockManager.ClearAll();
 		StackingHealth.ClearAll();
@@ -1499,21 +1494,6 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		_roundReminderTimer = null;
 	}
 
-	private void StopNameRefreshTimers()
-	{
-		foreach (Timer timer in _nameRefreshTimers.Values)
-		{
-			try
-			{
-				timer.Kill();
-			}
-			catch
-			{
-			}
-		}
-		_nameRefreshTimers.Clear();
-	}
-
 	private void ClearSigilTests()
 	{
 		foreach ((float End, List<IBeamGroup> Groups, Vector Center) test in _sigilTests)
@@ -1634,16 +1614,13 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			MoveLockManager.Clear(cleanupSteamId);
 			StackingHealth.Clear(cleanupSteamId);
 			StackingBonusManager.ClearPlayer(cleanupSteamId);
-			if (_nameRefreshTimers.Remove(cleanupSteamId, out Timer nameTimer))
-			{
-				nameTimer.Kill();
-			}
+			_playerNames.StopRefreshTimer(cleanupSteamId);
 		}
 		if (disconnected != null)
 		{
 			// 控制器句柄可能被新加入的玩家复用，必须清掉所有以 controller 为键的状态，否则新玩家会继承
 			// "已掷骰 / 冷却中" 的旧记录。
-			_originalPlayerNames.Remove(disconnected);
+			_playerNames.Forget(disconnected);
 			_playersThatRolledTheDice.Remove(disconnected);
 			_PlayerCooldown.Remove(disconnected);
 		}
@@ -1684,7 +1661,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			string text2 = ((BasePlugin)this).Localizer[text];
 			list.Add((text2 == text) ? item : text2);
 		}
-		attacker.PrintToChat($" {((BasePlugin)this).Localizer["command.prefix"].Value}\ud83c\udfaf {(_originalPlayerNames.TryGetValue(userid, out string value2) ? value2 : ((CBasePlayerController)userid).PlayerName)}的骰子：{string.Join(" + ", list)}");
+		attacker.PrintToChat($" {((BasePlugin)this).Localizer["command.prefix"].Value}\ud83c\udfaf {_playerNames.GetCachedOrCurrentName(userid)}的骰子：{string.Join(" + ", list)}");
 		return (HookResult)0;
 	}
 
@@ -1764,7 +1741,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		DiceBlueprint.RoundActive = false;
 		StopAutoRollTimer();
 		StopRoundReminder();
-		StopNameRefreshTimers();
+		_playerNames.StopRefreshTimers();
 		DestroyModules();
 		Effects.ClearAll();
 		DiceEffects.ClearAll();
@@ -1774,7 +1751,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		_isDuringRound = false;
 		_playersThatRolledTheDice.Clear();
 		_PlayerCooldown.Clear();
-		_originalPlayerNames.Clear();
+		_playerNames.ClearNames();
 		// 地图结束做一次完整清理，避免状态带到下一张图。
 		Invulnerability.ClearAll();
 		MoveLockManager.ClearAll();
@@ -1808,7 +1785,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					}
 					diceBlueprint.Add(player);
 					DiceEffects.OnDiceAdded(player, diceBlueprint.ClassName);
-					RefreshPlayerDiceName(player);
+					_playerNames.Refresh(player);
 					LogDebug($"{DateTime.Now:HH:mm:ss} ✓ {((CBasePlayerController)player).PlayerName} ← {diceBlueprint.ClassName}\n");
 					RefreshCombos(player);
 					AnnounceDiceRarity(player, diceBlueprint);
@@ -1835,7 +1812,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					}
 					diceBlueprint2.Add(player);
 					DiceEffects.OnDiceAdded(player, diceBlueprint2.ClassName);
-					RefreshPlayerDiceName(player);
+					_playerNames.Refresh(player);
 					LogDebug($"{DateTime.Now:HH:mm:ss} ✓ {((CBasePlayerController)player).PlayerName} ← {diceName}\n");
 					RefreshCombos(player);
 					AnnounceDiceRarity(player, diceBlueprint2);
@@ -2051,7 +2028,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 		if (flag)
 		{
-			RefreshPlayerDiceName(player);
+			_playerNames.Refresh(player);
 		}
 		if (Config.AllowDiceAfterRespawn)
 		{
@@ -2124,7 +2101,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			foreach (CCSPlayerController p in affected)
 			{
 				// combo 伙伴的 dice 变了 → 队里其他人的 TAB 名字前缀也要重算（否则会残留上一轮的搭档 dice 名）。
-				RefreshPlayerDiceName(p, false);
+				_playerNames.Refresh(p, false);
 			}
 		}
 		catch
@@ -2146,176 +2123,13 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			{
 			}
 		}
-		foreach (KeyValuePair<CCSPlayerController, string> item in _originalPlayerNames.ToList())
-		{
-			if ((CEntityInstance)(object)item.Key != (CEntityInstance)null && ((CEntityInstance)item.Key).IsValid)
-			{
-				// ★ 直接用缓存里的"真名"（item.Value），别再解析当前名：
-				// `[A]+2 名字` 这种格式解析不出来，会把装饰名原样写回去 → 跨回合残留。
-				((CBasePlayerController)item.Key).PlayerName = item.Value;
-				Utilities.SetStateChanged((CBaseEntity)(object)item.Key, "CBasePlayerController", "m_iszPlayerName", 0);
-			}
-		}
-		_originalPlayerNames.Clear();
+		_playerNames.RestoreAll();
 		Invulnerability.ClearAll();
 		// 注意：这里不能 Effects.ClearAll()——回合结束的 RoundEnd 特效与本函数里 dice 移除时的
 		// Remove 特效都是刚生成的实体，会被立刻清掉导致完全不显示。遗留粒子靠自身生命周期到期，
 		// 以及 OnRoundStart / OnMapEnd / Unload 的 Effects.ClearAll() 清理。
 		DiceEffects.ClearAll();
 		RefreshCombos(null);
-	}
-
-	private void RefreshPlayerDiceName(CCSPlayerController player, bool scheduleReapply = true)
-	{
-		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid)
-		{
-			return;
-		}
-		try
-		{
-			ulong tabSteamId = player.SteamID;
-			if (_playerConfigs.TryGetValue(tabSteamId, out PlayerConfig tabConfig) && !tabConfig.ShowDiceInTab)
-			{
-				string trueName = _originalPlayerNames.TryGetValue(player, out string cachedName)
-					? cachedName
-					: StripDiceNameDecoration(player.PlayerName);
-				_originalPlayerNames[player] = trueName;
-				player.PlayerName = trueName;
-				Utilities.SetStateChanged((CBaseEntity)(object)player, "CBasePlayerController", "m_iszPlayerName", 0);
-				return;
-			}
-
-			string text = ((CBasePlayerController)player).PlayerName;
-			if (!_originalPlayerNames.TryGetValue(player, out string value))
-			{
-				// ★ 用正则剥掉**插件自己加的** dice 前缀（`[A] [B] 名字` / `[A]+2 名字`）。
-				// 旧写法只认 "] "：遇到 `[A]+2 名字` 剥不掉 → 把装饰名当成"真名"缓存，
-				// 于是 TAB 上的 dice 前缀跨回合残留、还越滚越长（就是"下回合还显示那么多 dice"）。
-				text = StripDiceNameDecoration(text);
-				_originalPlayerNames[player] = text;
-			}
-			else
-			{
-				text = value;
-			}
-			HashSet<string> hashSet = new HashSet<string>();
-			ulong refreshSteamId = player.SteamID;
-			foreach (DiceBlueprint dix in _dices)
-			{
-				if (dix.HasPlayer(refreshSteamId))
-				{
-					string item = ((dix.ClassName == "Trickster" && Trickster.PendingFakeNames.TryGetValue(((CBasePlayerController)player).SteamID, out string value2)) ? value2 : dix.ClassName);
-					hashSet.Add(item);
-				}
-			}
-			bool HasTeammateHolding(string className)
-			{
-				if (!_diceByName.TryGetValue(className, out DiceBlueprint? partnerDice))
-				{
-					return false;
-				}
-				foreach (CCSPlayerController teammate in partnerDice._players)
-				{
-					if (teammate == null || !teammate.IsValid || teammate.IsHLTV)
-					{
-						continue;
-					}
-					if ((CEntityInstance)teammate == (CEntityInstance)player)
-					{
-						continue;
-					}
-					if (teammate.TeamNum == player.TeamNum)
-					{
-						return true;
-					}
-				}
-				return false;
-			}
-
-			foreach (var combo in DiceSynergy._combos)
-			{
-				var (diceA, diceB, _) = combo;
-				if (hashSet.Contains(diceA) && !hashSet.Contains(diceB) && HasTeammateHolding(diceB))
-				{
-					hashSet.Add(diceB);
-				}
-				if (hashSet.Contains(diceB) && !hashSet.Contains(diceA) && HasTeammateHolding(diceA))
-				{
-					hashSet.Add(diceA);
-				}
-			}
-			List<string> list = DiceSynergy.ResolveComboNames(hashSet).Select(delegate(string cn)
-			{
-				string text4 = "dice_" + cn + "_name";
-				string text5 = ((BasePlugin)this).Localizer[text4];
-				return (text5 == text4) ? cn : text5;
-			}).ToList();
-			string text3 = ((list.Count > 2) ? ($"[{list[0]}]+{list.Count - 1} " + text) : ((list.Count <= 0) ? text : (string.Join(" ", list.Select((string n) => "[" + n + "]")) + " " + text)));
-			((CBasePlayerController)player).PlayerName = text3;
-			Utilities.SetStateChanged((CBaseEntity)(object)player, "CBasePlayerController", "m_iszPlayerName", 0);
-			if (scheduleReapply)
-			{
-				CCSPlayerController captured = player;
-				ulong timerKey = player.SteamID;
-				if (_nameRefreshTimers.TryGetValue(timerKey, out Timer? previousTimer))
-				{
-					previousTimer.Kill();
-					_nameRefreshTimers.Remove(timerKey);
-				}
-				_nameRefreshTimers[timerKey] = AddTimer(1f, delegate
-				{
-					_nameRefreshTimers.Remove(timerKey);
-					if ((CEntityInstance)(object)captured != (CEntityInstance)null && ((CEntityInstance)captured).IsValid)
-					{
-						// ★ 重算而不是回写 1 秒前那个字符串：跨回合时旧字符串会把上回合的 dice 前缀重新贴回 TAB。
-						RefreshPlayerDiceName(captured, false);
-					}
-				}, TimerFlags.STOP_ON_MAPCHANGE);
-			}
-		}
-		catch (Exception ex)
-		{
-			LogErr($"{DateTime.Now:HH:mm:ss} RefreshPlayerDiceName error for {((CBasePlayerController)player).PlayerName}: {ex.Message}\n");
-		}
-	}
-
-	/// <summary>剥掉插件自己加的 dice 前缀（`[A] [B] 名字` / `[A]+2 名字`）；剥完为空则保留原名。</summary>
-	private string StripDiceNameDecoration(string name)
-	{
-		if (string.IsNullOrEmpty(name))
-		{
-			return name ?? string.Empty;
-		}
-
-		// Only strip tags this plugin actually adds (dice/combo names). A blanket
-		// "[anything]" regex used to eat real clan tags such as "[CLAN] Name".
-		string result = name.Trim();
-		bool changed = true;
-		while (changed && result.Length > 0)
-		{
-			changed = false;
-			foreach (string known in _knownDicePrefixes)
-			{
-				string tag = "[" + known + "]";
-				if (!result.StartsWith(tag, StringComparison.OrdinalIgnoreCase))
-				{
-					continue;
-				}
-				result = result.Substring(tag.Length).TrimStart();
-				// "[A]+2 Name" compact form.
-				if (result.StartsWith("+"))
-				{
-					int space = result.IndexOf(' ');
-					if (space > 0)
-					{
-						result = result.Substring(space + 1).TrimStart();
-					}
-				}
-				changed = true;
-				break;
-			}
-		}
-		return result.Length > 0 ? result : name.Trim();
 	}
 
 	private void InitializeModules()
@@ -2380,22 +2194,21 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 		_dices.AddRange(built);
 		_diceByName.Clear();
-		_knownDicePrefixes.Clear();
 		foreach (DiceBlueprint dice in _dices)
 		{
 			_diceByName[dice.ClassName] = dice;
-			_knownDicePrefixes.Add(dice.ClassName);
-			string nameKey = "dice_" + dice.ClassName + "_name";
-			string localizedName = ((BasePlugin)this).Localizer[nameKey];
-			if (localizedName != nameKey)
-			{
-				_knownDicePrefixes.Add(localizedName);
-			}
 		}
-		foreach (var combo in DiceSynergy._combos)
-		{
-			_knownDicePrefixes.Add(combo.ComboName);
-		}
+		_playerNames.Configure(
+			() => _dices,
+			className => _diceByName.TryGetValue(className, out DiceBlueprint? found) ? found : null,
+			steamId => _playerConfigs.TryGetValue(steamId, out PlayerConfig? playerConfig) ? playerConfig : null,
+			((BasePlugin)this).Localizer,
+			(delay, callback, flags) => AddTimer(delay, callback, flags),
+			LogErr);
+		_playerNames.RebuildKnownPrefixes(
+			_dices,
+			((BasePlugin)this).Localizer,
+			DiceSynergy._combos.Select(combo => combo.ComboName));
 		_drawablePool = _dices.Where(dice => dice.CanBeDrawn).ToList();
 		_normalPool = _dices.Where(dice => dice.CanBeDrawn && !dice.IsSpecial).ToList();
 		ReloadFxTable();
@@ -2444,7 +2257,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 		_dices.Clear();
 		_diceByName.Clear();
-		_knownDicePrefixes.Clear();
+		_playerNames.ClearKnownPrefixes();
 		_drawablePool = null;
 		_normalPool = null;
 	}
@@ -2694,7 +2507,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		diceBlueprint.Remove(player);
 		DiceEffects.OnDiceRemoved(player, diceClassName);
 		_playersThatRolledTheDice.Remove(player);
-		RefreshPlayerDiceName(player);
+		_playerNames.Refresh(player);
 		RefreshCombos(player);
 		return true;
 	}
@@ -2854,7 +2667,6 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		_playersThatRolledTheDice = new Dictionary<CCSPlayerController, int>();
 		_PlayerCooldown = new Dictionary<CCSPlayerController, int>();
 		_dices = new List<DiceBlueprint>();
-		_originalPlayerNames = new Dictionary<CCSPlayerController, string>();
 		_random = new Random(Guid.NewGuid().GetHashCode());
 	}
 

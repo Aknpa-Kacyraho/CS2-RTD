@@ -19,7 +19,7 @@ public partial class RollTheDice
 	public void CommandHealth(CCSPlayerController player, CommandInfo command)
 	{
 		int holders = _dices.Sum(d => d._players.Count);
-		string timers = $"auto={(_autoRollTimer != null ? 1 : 0)} reminder={(_roundReminderTimer != null ? 1 : 0)} name={_nameRefreshTimers.Count}";
+		string timers = $"auto={(_autoRollTimer != null ? 1 : 0)} reminder={(_roundReminderTimer != null ? 1 : 0)} name={_playerNames.RefreshTimerCount}";
 		string summary = $"[RTD] v{ModuleVersion} | map={_currentMap} | enabled={Config?.Enabled} | dices={_dices.Count} | holders={holders} | round={_isDuringRound} | roundActive={DiceBlueprint.RoundActive} | fx={DiceFxTable.Count} | timers[{timers}] | effects={(DiceEffects.Enabled ? "on" : "off")}";
 		command.ReplyToCommand(summary);
 		Console.WriteLine(summary);

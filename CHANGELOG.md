@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.4.4 — 2026-11-23
+
+### Changed
+
+- Extracted `PlayerNameService` from `RollTheDice`: original names, TAB refresh timers and known dice/combo prefixes now have a single owner. Main class dropped from ~2851 to ~2668 lines.
+- Name/TAB behavior is intentionally unchanged: same 1-second reapply, same `ShowDiceInTab`, same combo/tag stripping, same round-end restore.
+
+### Fixed
+
+- No new player-visible behavior changes in this release; this is an architecture/maintenance release built on v1.4.3.
+
 ## 1.4.3 — 2026-11-23
 
 ### Fixed

@@ -274,6 +274,12 @@
 
 ---
 
+## v1.4.4 架构优化
+
+- 抽取 `PlayerNameService`：真名缓存、TAB 刷新 Timer、已知 dice/combo 前缀拥有独立所有者。
+- 主类从 ~2851 行降至 ~2668 行；名称/TAB 行为保持不变。
+- 未改 Dice 概率、冷却、伤害、命令、配置格式或玩家可见文案。
+
 ## v1.4.3 稳定性修复
 
 - 断线兜底清理玩家级 Invulnerability/MoveLock/StackingHealth/StackingBonus；13/14 个生命值 Dice 增加按 SteamID 清理（Phoenix 因翅膀/光效实体延后）。
