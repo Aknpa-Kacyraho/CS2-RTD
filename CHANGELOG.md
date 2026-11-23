@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.4.18 — 2026-11-23
+
+### Fixed
+
+- Entity-owning dice now clean up on disconnect/prune:
+  - Fate: `CleanupFate` (compass glows, per-SteamID state, FateDawn scope).
+  - Excalibur: `Cancel` + `FinishBeam` + shock/cooldown cleanup; sword teardown stays on the frame-budgeted fade queue.
+  - FinalJudgment: `ClearPending` plus per-caster shock removal and cooldown cleanup.
+  - MagneticPulse: `CleanupPlayer` plus slow unregister.
+  - Necromancer: invincibility/death-position/revived maps.
+  - ReverseCausality: delayed-damage/double-damage maps plus damage-bonus unregister.
+
+### Changed
+
+- `AnnounceDiceRarity` and `BroadcastDiceSound` moved to `RollTheDice.Announce.cs`; main class 2730 → 2659 lines. Behavior unchanged.
+- `FinalJudgment.ClearPending` now also removes the caster's shock ring.
+
+### Added
+
+- Entity-dice cleanup override assertion; standard 74, real config 75.
+
+### Not done
+
+- Performance indexing still needs live profiling.
+- Other entity maps still require dice-specific cleanup.
+- In-game regression still pending.
+
 ## 1.4.17 — 2026-11-23
 
 ### Fixed

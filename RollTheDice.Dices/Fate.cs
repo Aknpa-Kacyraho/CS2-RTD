@@ -286,6 +286,12 @@ public class Fate : DiceBlueprint
 		Reset();
 	}
 
+	/// <summary>Disconnect/prune: clear per-SteamID Fate state, compass glows and the dawn scope.</summary>
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		CleanupFate(steamId);
+	}
+
 	private void RerollFate(CCSPlayerController player)
 	{
 		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid)

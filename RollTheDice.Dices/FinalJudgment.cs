@@ -116,6 +116,13 @@ public class FinalJudgment : DiceBlueprint
 		Reset();
 	}
 
+	/// <summary>Disconnect/prune: clear the caster's sigils and pending sweep.</summary>
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		ClearPending(steamId);
+		_cooldownEnd.Remove(steamId);
+	}
+
 	public override float GetCooldownRemaining(CCSPlayerController player)
 	{
 		if (player == null || !player.IsValid)
@@ -501,6 +508,10 @@ public class FinalJudgment : DiceBlueprint
 		if (_beam.Remove(sid, out ExpandingBeamColumn? beam))
 		{
 			beam.Remove();
+		}
+		if (_shock.Remove(sid, out ShockRingFx? shock))
+		{
+			shock.Remove();
 		}
 		_burnStamp.Remove(sid);
 	}

@@ -177,6 +177,15 @@ internal static class Program
 	{
 		Check("amber cleanup override", typeof(Amber).GetMethod("OnHolderRemoved")?.DeclaringType == typeof(Amber));
 		Check("phoenix cleanup override", typeof(Phoenix).GetMethod("OnHolderRemoved")?.DeclaringType == typeof(Phoenix));
+		Check("entity dice cleanup overrides", new[]
+		{
+			typeof(Fate),
+			typeof(Excalibur),
+			typeof(FinalJudgment),
+			typeof(MagneticPulse),
+			typeof(Necromancer),
+			typeof(ReverseCausality)
+		}.All(type => type.GetMethod("OnHolderRemoved")?.DeclaringType == type));
 		Check("shared cleanup api", typeof(DiceBlueprint).GetMethod("CleanupHolderState") != null);
 
 		MethodInfo? scanner = typeof(DiceBlueprint).GetMethod(
@@ -364,7 +373,7 @@ internal static class Program
 			&& !description.Contains('}')
 			&& description != "dice_" + sample.ClassName + "_player", description);
 
-		string? path = FindRepoFile(Path.Combine("RollTheDice", "RollTheDice.cs"));
+		string? path = FindRepoFile(Path.Combine("RollTheDice", "RollTheDice.Announce.cs"));
 		if (path == null)
 		{
 			Check("broadcast source", false, "file not found");
@@ -374,7 +383,10 @@ internal static class Program
 		Check("broadcast source guards", source.Contains("DiceUi.DiceDescription", StringComparison.Ordinal)
 			&& source.Contains("DiceUi.HtmlEncode", StringComparison.Ordinal)
 			&& source.Contains("GetTruePlayerName(player)", StringComparison.Ordinal));
-		Check("broadcast add suppression", source.Contains("AddWithoutHolderNotification", StringComparison.Ordinal)
+
+		string? mainPath = FindRepoFile(Path.Combine("RollTheDice", "RollTheDice.cs"));
+		Check("broadcast add suppression", mainPath != null
+			&& File.ReadAllText(mainPath).Contains("AddWithoutHolderNotification", StringComparison.Ordinal)
 			&& !DiceBlueprint.HolderNotificationsSuppressed);
 
 		string? blueprintPath = FindRepoFile(Path.Combine("RollTheDice.Dices", "DiceBlueprint.cs"));

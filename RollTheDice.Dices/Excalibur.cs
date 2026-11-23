@@ -126,6 +126,18 @@ public class Excalibur : DiceBlueprint
 		Reset();
 	}
 
+	/// <summary>Disconnect/prune: retire the sword/beam/shock/glow owned by this SteamID.</summary>
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		Cancel(steamId);
+		FinishBeam(steamId);
+		_cooldownEnd.Remove(steamId);
+		if (_shocks.Remove(steamId, out ShockRingFx shock))
+		{
+			shock.Remove();
+		}
+	}
+
 	public override float GetCooldownRemaining(CCSPlayerController player)
 	{
 		if (player == null || !player.IsValid)

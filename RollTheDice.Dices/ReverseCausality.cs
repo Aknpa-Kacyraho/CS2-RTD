@@ -103,6 +103,13 @@ public class ReverseCausality : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		_delayedDamage.Remove(steamId);
+		_doubleDamageUntil.Remove(steamId);
+		DamageBonusManager.UnregisterBySteamId(steamId, "ReverseCausality");
+	}
+
 	private void ApplyAllPending(ulong steamId)
 	{
 		if (!_delayedDamage.TryGetValue(steamId, out List<PendingDamage> value) || value.Count == 0)

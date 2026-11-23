@@ -274,6 +274,13 @@
 
 ---
 
+## v1.4.18 二次收尾
+
+- Fate/Excalibur/FinalJudgment/MagneticPulse/Necromancer/ReverseCausality 增加专用断线清理，覆盖实体所有权 map。
+- Excalibur 光剑仍走分帧拆除队列；FinalJudgment 清理穹顶/天空/光柱/冲击环。
+- `AnnounceDiceRarity`/`BroadcastDiceSound` 拆到 `RollTheDice.Announce.cs`，主类 2730→2659。
+- 不做性能索引/其余实体 map 通用清理/实机验证，原因见指南。
+
 ## v1.4.17 收尾清理
 
 - TOML 配置也走原子重载；JSON/TOML 失败都会回滚。

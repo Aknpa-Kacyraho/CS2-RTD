@@ -89,6 +89,13 @@ public class Necromancer : DiceBlueprint
 		_revivedThisRound.Clear();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		_invincibilityEndTime.Remove(steamId);
+		_deathPositions.Remove(steamId);
+		_revivedThisRound.Remove(steamId);
+	}
+
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
 		//IL_001b: Unknown result type (might be due to invalid IL or missing references)

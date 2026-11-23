@@ -106,6 +106,12 @@ public class MagneticPulse : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		CleanupPlayer(steamId);
+		SpeedBonusManager.UnregisterBySteamId(steamId, "MagneticPulse");
+	}
+
 	private void CleanupPlayer(ulong steamID)
 	{
 		_windowDamage.Remove(steamID);
