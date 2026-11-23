@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.4.12 — 2026-11-23
+
+### Fixed
+
+- Config pre-validation now uses CounterStrikeSharp's exact `JsonSerializerOptions` (priority) with a same-value fallback outside a CSS host. Comments stay valid; trailing commas are rejected, matching CSS.
+- Config reload and map-overlay reads now use `Config.GetConfigPath()` instead of a hand-built path, so plugin-directory renames cannot make validation read a different file than `PluginConfigExtensions.Reload`.
+- JSON pre-validation is skipped for `.toml` configs; CSS keeps owning TOML reload.
+
+### Documentation
+
+- Corrected the previous assumption: CSS `Reload` fully deserializes before copying writable properties, so type errors already keep the old config. The remaining partial-update window is a property setter throwing mid-copy.
+
+### Tests
+
+- Added trailing-comma rejection; standard suite 46, real deployed config 47.
+
+### Unchanged
+
+- Config keys, defaults, dice values, commands, movement scopes and lifecycle cleanup.
+
 ## 1.4.11 — 2026-11-23
 
 ### Changed

@@ -1,23 +1,47 @@
 using System;
 using System.Text.Json;
+using CounterStrikeSharp.API.Modules.Extensions;
 
 namespace RollTheDice;
 
 /// <summary>
-/// Typed pre-validation for RollTheDice.json. JSON syntax alone is not enough:
-/// CSS's Reload mutates the live config object, so a string where a bool is
-/// expected can leave a half-applied config. Deserialize a throwaway copy first
-/// with the same permissive shape CSS accepts (comments, trailing commas,
-/// case-insensitive names) and only then let CSS reload.
+/// Typed pre-validation for RollTheDice.json. It deliberately uses the exact
+/// serializer options CSS uses for PluginConfigExtensions.Reload, so validation
+/// cannot accept a file that CSS will reject (or reject one CSS accepts).
+/// CSS deserializes the whole file before copying properties, so the remaining
+/// partial-update window is only a property setter throwing mid-copy.
 /// </summary>
 public static class ConfigFileValidator
 {
-	private static readonly JsonSerializerOptions Options = new JsonSerializerOptions
+	private static JsonSerializerOptions? _options;
+
+	/// <summary>
+	/// Prefer CSS's exact options. Outside a CSS host (tests/CI) ConfigManager's
+	/// static initializer can fail, so fall back to the same values CSS uses today.
+	/// </summary>
+	private static JsonSerializerOptions Options
 	{
-		PropertyNameCaseInsensitive = true,
-		ReadCommentHandling = JsonCommentHandling.Skip,
-		AllowTrailingCommas = true
-	};
+		get
+		{
+			if (_options != null)
+			{
+				return _options;
+			}
+			try
+			{
+				_options = PluginConfigExtensions.JsonSerializerOptions;
+			}
+			catch
+			{
+				_options = new JsonSerializerOptions
+				{
+					WriteIndented = true,
+					ReadCommentHandling = JsonCommentHandling.Skip
+				};
+			}
+			return _options;
+		}
+	}
 
 	public static bool TryDeserialize(string json, out PluginConfig? config, out string error)
 	{

@@ -214,7 +214,9 @@ internal static class Program
 	{
 		Check("config validator accepts object", ConfigFileValidator.TryDeserialize("{}", out _, out _));
 		Check("config validator accepts comments", ConfigFileValidator.TryDeserialize(
-			"{\n  // comment\n  \"enabled\": true,\n}", out _, out _));
+			"{\n  // comment\n  \"enabled\": true\n}", out _, out _));
+		Check("config validator rejects trailing comma", !ConfigFileValidator.TryDeserialize(
+			"{\"enabled\":true,}", out _, out string commaError) && commaError.Length > 0, commaError);
 		Check("config validator rejects type", !ConfigFileValidator.TryDeserialize(
 			"{\"enabled\":\"yes\"}", out _, out string typeError) && typeError.Length > 0, typeError);
 		Check("config validator ignores unknown", ConfigFileValidator.TryDeserialize(

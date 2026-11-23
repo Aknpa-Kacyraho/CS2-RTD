@@ -274,6 +274,14 @@
 
 ---
 
+## v1.4.12 配置预检查对齐
+
+- 预检查改用 CSS 同款 JSON 选项：注释可用、尾逗号拒绝、与 Reload 规则一致。
+- 预检查与地图 overlay 改用 `Config.GetConfigPath()`，不再手拼插件目录路径。
+- `.toml` 配置跳过 JSON 预检查，仍由 CSS 负责。
+- 纠正认知：CSS Reload 先完整反序列化再复制属性，类型错误不会部分更新。
+- 不改配置 Key、Dice 数值、命令或移动状态。
+
 ## v1.4.11 移动作用域进化
 
 - `MoveLockManager` 升级为命名作用域栈：最后激活者优先，最后一个作用域结束时恢复进入前的 `MoveType` + `ActualMoveType`。

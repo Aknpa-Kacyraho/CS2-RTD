@@ -20,11 +20,11 @@ public partial class RollTheDice
 	{
 		try
 		{
-			// Validate JSON syntax and types before CSS applies the reload: a broken
-			// file must keep the previous in-memory config instead of leaving a
-			// partial update. JsonDocument alone catches syntax but not "true" vs 1.
-			string path = PluginConfigPath();
-			if (File.Exists(path))
+			// Validate the exact file CSS will reload, with CSS's own JSON options.
+			// CSS deserializes the whole file before copying properties, so type
+			// errors keep the old config; this pre-check gives the same error earlier.
+			string path = Config.GetConfigPath();
+			if (File.Exists(path) && path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
 			{
 				string json = File.ReadAllText(path);
 				if (!ConfigFileValidator.TryDeserialize(json, out _, out string configError))
@@ -189,14 +189,6 @@ public partial class RollTheDice
 		Console.WriteLine(((BasePlugin)this).Localizer["core.mapconfig"].Value.Replace("{mapName}", mapName));
 	}
 
-	/// <summary>Path of the plugin's own JSON config (same directory as dicefx.json).</summary>
-	private string PluginConfigPath()
-	{
-		DirectoryInfo pluginDir = new DirectoryInfo(ModuleDirectory);
-		string cssRoot = pluginDir.Parent?.Parent?.FullName ?? Directory.GetCurrentDirectory();
-		return Path.Combine(cssRoot, "configs", "plugins", Path.GetFileName(ModuleDirectory), "RollTheDice.json");
-	}
-
 	/// <summary>
 	/// Reads maps.&lt;pattern&gt;.dices from the on-disk JSON. Returns null on any
 	/// failure or when the map has no dice block; the caller then falls back to the
@@ -206,8 +198,8 @@ public partial class RollTheDice
 	{
 		try
 		{
-			string path = PluginConfigPath();
-			if (!File.Exists(path))
+			string path = Config.GetConfigPath();
+			if (!path.EndsWith(".json", StringComparison.OrdinalIgnoreCase) || !File.Exists(path))
 			{
 				return null;
 			}
