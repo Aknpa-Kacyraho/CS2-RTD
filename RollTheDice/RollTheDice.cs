@@ -79,7 +79,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.4.6";
+	public override string ModuleVersion => "1.4.7";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -599,6 +599,11 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		    arg.Equals("info", StringComparison.OrdinalIgnoreCase))
 		{
 			PrintRollStatus(player, command);
+			return;
+		}
+		if (arg.Equals("list", StringComparison.OrdinalIgnoreCase))
+		{
+			PrintDiceList(player, command, (command.GetArg(2) ?? string.Empty).Trim());
 			return;
 		}
 		if (arg.Equals("tab", StringComparison.OrdinalIgnoreCase))

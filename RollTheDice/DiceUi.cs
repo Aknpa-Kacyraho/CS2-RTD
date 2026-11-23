@@ -53,6 +53,35 @@ public static class DiceUi
 		};
 	}
 
+	/// <summary>Accept Chinese and English rarity names; null means "not a tier filter".</summary>
+	public static string? NormalizeTier(string filter)
+	{
+		if (string.IsNullOrWhiteSpace(filter))
+		{
+			return null;
+		}
+		return filter.Trim().ToLowerInvariant() switch
+		{
+			"传说" or "legendary" or "legend" or "leg" => "legendary",
+			"组合" or "combo" => "combo",
+			"史诗" or "epic" => "epic",
+			"稀有" or "rare" => "rare",
+			"普通" or "common" => "common",
+			_ => null
+		};
+	}
+
+	public static bool MatchesFilter(DiceBlueprint dice, IStringLocalizer localizer, string filter)
+	{
+		if (string.IsNullOrWhiteSpace(filter))
+		{
+			return true;
+		}
+		string query = filter.Trim();
+		return DiceName(dice, localizer).Contains(query, StringComparison.OrdinalIgnoreCase)
+			|| dice.ClassName.Contains(query, StringComparison.OrdinalIgnoreCase);
+	}
+
 	public static string DiceName(DiceBlueprint dice, IStringLocalizer localizer)
 	{
 		string key = "dice_" + dice.ClassName + "_name";
@@ -91,6 +120,13 @@ public static class DiceUi
 		string color = TierColor(tier).ToString();
 		string head = $"  {color}●{ChatColors.Default} {name} [{label}]";
 		return description.Length == 0 ? head : head + " — " + description;
+	}
+
+	/// <summary>Name plus a green check when the player currently holds the dice.</summary>
+	public static string DiceNameMarked(DiceBlueprint dice, IStringLocalizer localizer, bool held)
+	{
+		string name = DiceName(dice, localizer);
+		return held ? name + ChatColors.Green + "✓" + ChatColors.Default : name;
 	}
 
 	/// <summary>Pack items into chat lines of at most <paramref name="columns"/> entries.</summary>

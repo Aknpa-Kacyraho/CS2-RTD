@@ -5,6 +5,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Localization;
+using CounterStrikeSharp.API.Core.Translations;
 using RollTheDice;
 using RollTheDice.Dices;
 using RollTheDice.Utils;
@@ -80,7 +81,7 @@ internal static class Program
 		Check("no registry errors", registry.ErrorCount == 0, Describe(registry, "error"));
 		Check("no unknown warnings", registry.WarningCount == KnownDuplicateComboWarnings(registry), Describe(registry, "warning"));
 
-		UiChecks(built, localizer);
+		UiChecks(built, localizer, names);
 
 		Console.WriteLine("--------------------------------");
 		Console.WriteLine($"{_passed} passed, {_failed} failed");
@@ -100,7 +101,7 @@ internal static class Program
 			issue.Message.Contains(" is used by 2 combos", StringComparison.Ordinal));
 	}
 
-	private static void UiChecks(IReadOnlyList<DiceBlueprint> built, IStringLocalizer localizer)
+	private static void UiChecks(IReadOnlyList<DiceBlueprint> built, IStringLocalizer localizer, Dictionary<string, string> strings)
 	{
 		Check("tier labels", DiceUi.TierLabel("rare") == "稀有"
 			&& DiceUi.TierLabel("epic") == "史诗"
@@ -138,6 +139,29 @@ internal static class Program
 			&& line.Contains(name, StringComparison.Ordinal), line);
 		string listLabel = DiceUi.DiceListLabel(sample, localizer);
 		Check("admin list label", listLabel.Contains("(" + sample.ClassName + ")", StringComparison.Ordinal), listLabel);
+
+		Check("tier aliases", DiceUi.NormalizeTier("传说") == "legendary"
+			&& DiceUi.NormalizeTier("LEG") == "legendary"
+			&& DiceUi.NormalizeTier("组合") == "combo"
+			&& DiceUi.NormalizeTier("epic") == "epic"
+			&& DiceUi.NormalizeTier("稀有") == "rare"
+			&& DiceUi.NormalizeTier("common") == "common"
+			&& DiceUi.NormalizeTier("unknown") == null);
+		Check("keyword match", DiceUi.MatchesFilter(sample, localizer, name.Substring(0, 1))
+			&& DiceUi.MatchesFilter(sample, localizer, sample.ClassName.Substring(0, 4))
+			&& !DiceUi.MatchesFilter(sample, localizer, "zzzz"));
+		string heldLabel = DiceUi.DiceNameMarked(sample, localizer, true);
+		string plainLabel = DiceUi.DiceNameMarked(sample, localizer, false);
+		Check("held marker", heldLabel.Contains("✓", StringComparison.Ordinal)
+			&& !plainLabel.Contains("✓", StringComparison.Ordinal), heldLabel);
+		string tiers = strings["command.rtd.list.tiers"]
+			.Replace("{legendary}", "12")
+			.Replace("{combo}", "6")
+			.Replace("{epic}", "26")
+			.Replace("{rare}", "59")
+			.Replace("{common}", "68")
+			.ReplaceColorTags();
+		Check("list color tags", !tiers.Contains('{') && !tiers.Contains('}'), tiers);
 	}
 
 	private static string Describe(DiceRegistry registry, string severity)

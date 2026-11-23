@@ -64,6 +64,7 @@ public partial class RollTheDice
 			"command.rtd.help.roll",
 			"command.rtd.help.auto",
 			"command.rtd.help.status",
+			"command.rtd.help.list",
 			"command.rtd.help.tab",
 			"command.rtd.help.skins",
 			"command.rtd.help.tip"
@@ -138,5 +139,88 @@ public partial class RollTheDice
 			.Replace("{count}", GetDiceRollCount(player).ToString())
 			.Replace("{max}", GetMaxDiceCount(player).ToString()));
 		command.ReplyToCommand(((BasePlugin)this).Localizer["command.rtd.status.next"].Value);
+	}
+
+	/// <summary>
+	/// Read-only dice catalog. Three modes: overview, tier listing and keyword search.
+	/// It never rolls, changes cooldowns or touches holder state.
+	/// </summary>
+	private void PrintDiceList(CCSPlayerController player, CommandInfo command, string filter)
+	{
+		var localizer = ((BasePlugin)this).Localizer;
+		string? tierFilter = DiceUi.NormalizeTier(filter);
+		if (string.IsNullOrWhiteSpace(filter))
+		{
+			Dictionary<string, int> counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+			foreach (DiceBlueprint dice in _dices)
+			{
+				string tier = GetDiceTier(dice);
+				counts.TryGetValue(tier, out int count);
+				counts[tier] = count + 1;
+			}
+			command.ReplyToCommand(localizer["command.rtd.list.title"].Value
+				.Replace("{count}", _dices.Count.ToString()));
+			command.ReplyToCommand(localizer["command.rtd.list.tiers"].Value
+				.Replace("{legendary}", TierCount(counts, "legendary").ToString())
+				.Replace("{combo}", TierCount(counts, "combo").ToString())
+				.Replace("{epic}", TierCount(counts, "epic").ToString())
+				.Replace("{rare}", TierCount(counts, "rare").ToString())
+				.Replace("{common}", TierCount(counts, "common").ToString()));
+			command.ReplyToCommand(localizer["command.rtd.list.usage"].Value);
+			return;
+		}
+
+		if (tierFilter != null)
+		{
+			List<DiceBlueprint> tierDice = _dices
+				.Where(dice => GetDiceTier(dice) == tierFilter)
+				.OrderBy(dice => DiceUi.DiceName(dice, localizer), StringComparer.OrdinalIgnoreCase)
+				.ToList();
+			command.ReplyToCommand(localizer["command.rtd.list.tier"].Value
+				.Replace("{tier}", DiceUi.TierLabel(tierFilter))
+				.Replace("{count}", tierDice.Count.ToString()));
+			const int maxNames = 24;
+			IEnumerable<string> names = tierDice
+				.Take(maxNames)
+				.Select(dice => DiceUi.DiceNameMarked(dice, localizer, dice.HasPlayer(player.SteamID)));
+			foreach (string line in DiceUi.Columns(names, 4))
+			{
+				command.ReplyToCommand(line);
+			}
+			if (tierDice.Count > maxNames)
+			{
+				command.ReplyToCommand(localizer["command.rtd.list.truncated"].Value
+					.Replace("{shown}", maxNames.ToString())
+					.Replace("{more}", (tierDice.Count - maxNames).ToString()));
+			}
+			return;
+		}
+
+		List<DiceBlueprint> matches = _dices
+			.Where(dice => DiceUi.MatchesFilter(dice, localizer, filter))
+			.OrderByDescending(dice => DiceUi.TierRank(GetDiceTier(dice)))
+			.ThenBy(dice => DiceUi.DiceName(dice, localizer), StringComparer.OrdinalIgnoreCase)
+			.ToList();
+		if (matches.Count == 0)
+		{
+			command.ReplyToCommand(localizer["command.rtd.list.none"].Value.Replace("{query}", filter));
+			return;
+		}
+		const int maxDetail = 8;
+		foreach (DiceBlueprint dice in matches.Take(maxDetail))
+		{
+			command.ReplyToCommand(DiceUi.DiceLine(dice, localizer, GetDiceTier(dice)));
+		}
+		if (matches.Count > maxDetail)
+		{
+			command.ReplyToCommand(localizer["command.rtd.list.truncated"].Value
+				.Replace("{shown}", maxDetail.ToString())
+				.Replace("{more}", (matches.Count - maxDetail).ToString()));
+		}
+	}
+
+	private static int TierCount(IReadOnlyDictionary<string, int> counts, string tier)
+	{
+		return counts.TryGetValue(tier, out int count) ? count : 0;
 	}
 }

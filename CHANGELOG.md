@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.7 — 2026-11-23
+
+### Added
+
+- `!rtd list`: read-only dice catalog with three modes:
+  - no filter: total count and legendary/combo/epic/rare/common distribution plus usage;
+  - tier filter (Chinese or English alias): names in four columns, held dice marked `✓`, at most 24 names;
+  - keyword filter: matches localized name or `ClassName`, up to 8 detailed lines.
+- `!rtd help` lists the new subcommand.
+- 7 new localization keys; all color tags verified by tests.
+
+### Changed
+
+- None to draw probabilities, cooldowns, damage, durations, dice effects, existing commands, config keys or TAB/combo rules.
+- Registry/UI tests extended to 20 assertions (tier aliases, keyword matching, held marker, color-tag substitution).
+
 ## 1.4.6 — 2026-11-23
 
 ### Changed
