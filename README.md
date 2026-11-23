@@ -71,7 +71,7 @@
 | `Amber` | 琥珀 | 受击概率冻结攻击者 |
 | `Disarm` | 缴械 | 攻击能打掉敌人武器 |
 | `Martyrdom` | 殉道者 | 死亡时原地爆炸 |
-| `DeadHand` | 死手 | 开枪自伤 15HP，命中回复 15HP |
+| `DeadHand` | 死手 | 开枪自伤 15HP，命中恢复 30HP；命中 bot 直接击杀 |
 | `RouletteGambler` | 轮盘赌徒 | 开枪 2% 概率死亡，否则叠加速度/伤害 |
 | `Overheat` | 红温 | 每 5s 叠加速度/伤害，击杀降层 |
 | `SwordSaint` | 剑仙 | 持刀时免疫子弹伤害 |
@@ -163,7 +163,6 @@
 | `Twilight` | 黄昏之时 | 全部玩家出生点随机互换 |
 | `Synced` | 心有灵犀 | 全员换弹同步 |
 | `Lottery` | 彩票 | 全员随机获得 0~5000 元 |
-| `DeadHand` | 死手 | 全玩家效果：开枪自伤 + 命中回血 |
 
 ### 💰 经济系统
 
@@ -183,7 +182,7 @@
 |------|--------|---------|
 | `Pope` | 教皇 | 所有队友 +100% HP |
 | `Priest` | 牧师 | 攻击队友治疗他们 |
-| `Knight` | 骑士 | 队友每 10s 吸取 50HP，持有者 300HP |
+| `Knight` | 骑士 | 持有者 300HP；队友每 10s 从持有者吸取 50HP（团队血库） |
 | `Goddess` | 女神 | 随机 2 队友额外获得骰子 |
 | `Bugle` | 冲锋号 | 开局 60s 全队 +100% 速度 +20% 伤害 |
 | `Paladin` | 圣骑士 | 200 额外护甲，受击叠加速度/HP |
@@ -245,7 +244,6 @@
 | `DeathKnight` | 死亡骑士 | 每失 1HP 获得 1% 减伤，持刀回血 |
 | `Frostmourne` | 霜之哀伤 | 持刀 60% 减伤 + 回血 |
 | `God` | 上帝 | 90s 试炼：3× 移速 / 3× 伤害、+500 护甲、60% 减伤；击杀回 150HP 并短暂无敌 |
-| `Knight` | 骑士 | 300HP，队友定期吸取 50HP |
 | `Prayer` | 祈愿 | 每 20s 祈祷，成功 3 次全灭敌方 |
 | `Wolf` | 狼 | 每只狼给所有狼 +30HP +30 甲 +10% 伤害 +10% 速度 |
 | `WolfKing` | 狼王 | 300HP +40% 伤害 +40% 速度，队友必定得狼 |
@@ -355,8 +353,13 @@
 
 | 命令 | 说明 |
 |------|------|
-| `!rtd` / `!dice` / `!rollthedice` | 掷骰子 |
-| `!dice auto` | 开启/关闭自动掷骰（每回合自动掷） |
+| `!rtd` / `!dice` | 掷骰子 |
+| `!rtd auto` | 开启/关闭自动掷骰（每回合自动掷） |
+| `!rtd status` | 查看当前持有的骰子 |
+| `!rtd tab` | 开关 TAB 名字上的骰子前缀 |
+| `!rtd help` | 显示帮助 |
+
+> `!rollthedice` **不是**玩家抽骰命令，它是管理员命令（见下表）。
 
 **绑定按键掷骰**（在控制台输入）：
 ```
@@ -371,9 +374,14 @@ bind o rtd
 | `!givedice PlayerName` | 给指定玩家随机掷骰 |
 | `!givedice * DiceName` | 给所有玩家发指定骰子 |
 | `!givedice PlayerName DiceName` | 给指定玩家发指定骰子 |
+| `!rollthedice <reload\|enable\|disable\|createmapconfig\|deletemapconfig>` | 重载配置 / 启停插件 / 地图配置管理 |
+| `!rtd_health` | 打印运行时状态摘要（回合、定时器、特效数） |
+| `!rtdfx reload` | 重载 `dicefx.json` |
 | `!rtdeffect <particles/....vpcf> [self\|crosshair\|near] [秒]` | 播放指定粒子（排查 / 预览特效用） |
+| `!rtdsigil`、`!rtddome`、`!rtdsky`、`!rtdex`、`!rtdpillar` | 特效调试预览 |
+| `!rtdinfo [name]` | 打印玩家内部骰子状态 |
 
-> 骰子名大小写不敏感，对应 `src/dices/` 目录中的类名（如 `Glow`、`IncreaseSpeed`）。
+> 骰子名大小写不敏感，对应 `RollTheDice.Dices/` 目录中的类名（如 `Glow`、`IncreaseSpeed`）。
 > `rtdeffect` 的粒子路径可带 `.vpcf` 或 `.vpcf_c`（会自动归一化）。
 
 ### 服务器控制台命令
@@ -404,17 +412,15 @@ bind o rtd
   "trigger": {
     "event": "RoundStart",        // 自动掷骰触发时机: "RoundStart" 或 "RoundFreezeEnd"
     "force_all_players": false,   // true = 强制所有玩家自动掷骰
-    "allow_player_auto_rtd": true, // 允许玩家使用 !dice auto 自动掷骰
+    "allow_player_auto_rtd": true, // 允许玩家使用 !rtd auto 自动掷骰
     "roll_the_dice_every_x_seconds": 0 // 每隔 X 秒自动掷骰，0 = 禁用
   },
   "cooldown_rounds": 0,           // 掷骰冷却回合数（与 cooldown_seconds 二选一）
   "cooldown_seconds": 0,          // 掷骰冷却秒数（与 cooldown_rounds 二选一）
   "price_to_dice": 0,             // 掷骰花费（$），0 = 免费
   "allow_dice_after_respawn": false, // 复活后是否允许再次掷骰
-  "notify_other_players_about_dices_rolled": true,  // 是否广播掷骰结果
   "notify_player_via_chatmsg": true,   // 通过聊天消息通知
-  "notify_player_via_centermsg": true, // 通过屏幕中央消息通知
-  "max_dice_count": 2,            // 每玩家最多同时持有骰子数（默认 2）
+  "notify_player_via_centermsg": true  // 通过屏幕中央消息通知
 ```
 
 ### 骰子配置
@@ -462,7 +468,7 @@ bind o rtd
 }
 ```
 
-在 `maps` 下添加地图名（如 `de_dust2`、`de_inferno`），覆盖全局骰子配置。也可以用 `rollthedice createmapconfig` 命令自动生成模板。
+在 `maps` 下添加地图名（如 `de_dust2`、`de_inferno`），只覆盖**显式写出**的标量字段，其余沿用全局配置；`rarity` 与嵌套块不参与覆盖。也可以用 `rollthedice createmapconfig` 命令自动生成模板。
 
 ### 音效配置
 
@@ -491,7 +497,7 @@ bind o rtd
 }
 ```
 
-每个骰子用哪种粒子写在源码 `src/RollTheDice.Utils/DiceEffects.cs` 的设计表里（一行一个骰子），
+每个骰子用哪种粒子写在源码 `RollTheDice.Utils/DiceEffects.cs` 的设计表里（一行一个骰子），
 不需要、也不要改各个骰子文件。特效按类别组织，**稀有度越高覆盖的类别越多**：
 
 | 类别 | 字段 | 时机 | 例子 |
@@ -631,11 +637,17 @@ dice 的「无扩散」「时间」类效果需要服务器 `sv_cheats 1`，为�
 }
 ```
 
-#### 4. 限制多骰子上限
+#### 4. 多骰子来源
 
-```json
-"max_dice_count": 1   // 每玩家最多 1 个骰子（关闭多骰子系统）
-```
+每玩家基础只持有 **1** 颗骰子，代码里**没有** `max_dice_count` 配置项。额外骰子只来自特定骰子：
+
+| 来源 | 加成 |
+|---|---|
+| `World` | `dices.world.extra_dice_count`（默认 3） |
+| `Reincarnation` | 待发额外骰 `PendingExtraDice` +N |
+| `Goddess` | 被祝福的队友 +1 |
+
+要降低叠加强度，应禁用或调弱上述骰子，而不是寻找上限配置。
 
 #### 5. 设置冷却
 
@@ -692,7 +704,7 @@ dice 的「无扩散」「时间」类效果需要服务器 `sv_cheats 1`，为�
 |------|---------|
 | 某些骰子出现太频繁 | 在 `dices.xxx.enabled = false` 禁用 |
 | 游戏节奏太快 | 增加 `cooldown_rounds` 或设置 `price_to_dice` |
-| 多骰子太强 | 降低 `max_dice_count` 到 1 |
+| 多骰子太强 | 禁用或调弱 `World` / `Reincarnation` / `Goddess`（多骰子的唯一来源） |
 | 热身时间不想让玩家掷骰 | `allow_rtd_during_warmup: false` |
 | 只想手动掷骰 | `trigger.force_all_players: false` 且 `trigger.allow_player_auto_rtd: false` |
 | 管理员测试用 | `!givedice PlayerName DiceName` 强制发骰 |
@@ -709,22 +721,26 @@ dice 的「无扩散」「时间」类效果需要服务器 `sv_cheats 1`，为�
 
 ### 编译步骤
 
-```bash
-# 克隆仓库
-git clone https://github.com/你的用户名/cs2-roll-the-dice.git
-cd cs2-roll-the-dice
+在仓库根目录（含 `RollTheDice.csproj`）执行：
 
-# 还原依赖
-dotnet restore
-
-# Debug 编译
-dotnet build
-
-# Release 发布
-dotnet publish
+```powershell
+dotnet restore RollTheDice.csproj
+dotnet build RollTheDice.csproj -c Release
 ```
 
-编译产物在 `src/bin/Debug/net10.0/` 或 `src/bin/Release/net10.0/publish/`。
+产物在 `bin/Release/RollTheDice.dll`（csproj 设置了 `AppendTargetFrameworkToOutputPath=false`，所以没有 `net10.0/` 子目录）。`lang/` 会按 `PreserveNewest` 一并复制到输出目录。
+
+### 部署
+
+把以下内容放进 `addons/counterstrikesharp/plugins/RollTheDice/`：
+
+```
+RollTheDice.dll
+RollTheDice.deps.json
+lang/
+```
+
+插件目录名必须与 dll 名一致；**不要**复制 `CounterStrikeSharp.API.dll` 等宿主 dll，也不要只覆盖 dll 而漏掉 `deps.json` 和 `lang/`。
 
 ---
 
