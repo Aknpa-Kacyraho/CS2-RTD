@@ -274,6 +274,14 @@
 
 ---
 
+## v1.4.8 新老 Dice 生命周期对齐
+
+- 断线与 `PruneInvalid` 统一清理：先执行 Dice 自己的 `OnHolderRemoved`，再兜底移除残留的 controller 键字典/集合。
+- `Phoenix` 增加断线清理：光翼、光晕、最大生命值与 9 个玩家状态字典；光晕拆除不再依赖有效 Pawn。
+- `Amber` 移除 Dice 时立即解除冻结与移动锁。
+- `Amber`/`Phoenix` 改用 `MoveLockManager`，不再直接写 `MoveType`；冻结/漂浮表现不变。
+- 不改概率、伤害、持续时间、奖励、命令或配置 Key。
+
 ## v1.4.7 只读骰子目录
 
 - 新增 `!rtd list`：总览各稀有度数量；`!rtd list 传说` 按稀有度浏览；`!rtd list <关键词>` 按中文名/类名搜索。

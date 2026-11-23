@@ -65,11 +65,36 @@ public class Amber : DiceBlueprint
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
-		_players.Remove(player);
+		if (player != null && player.IsValid)
+		{
+			_frozenUntil.Remove(player.SteamID);
+			MoveLockManager.Unlock(player, "Amber");
+		}
+		base.Remove(player, reason);
+	}
+
+	/// <summary>Drop the freeze timer and any shared movement lock on disconnect.</summary>
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		_frozenUntil.Remove(steamId);
+		MoveLockManager.Clear(steamId);
 	}
 
 	public override void Reset()
 	{
+		foreach (ulong steamId in _frozenUntil.Keys.ToList())
+		{
+			CCSPlayerController player = Utilities.GetPlayers().FirstOrDefault(p =>
+				p != null && p.IsValid && p.SteamID == steamId);
+			if (player != null)
+			{
+				MoveLockManager.Unlock(player, "Amber");
+			}
+			else
+			{
+				MoveLockManager.Clear(steamId);
+			}
+		}
 		_players.Clear();
 		_frozenUntil.Clear();
 	}
@@ -194,22 +219,24 @@ public class Amber : DiceBlueprint
 				_frozenUntil.Remove(steamId);
 				CCSPlayerController val = Utilities.GetPlayers().FirstOrDefault((CCSPlayerController x) => ((CBasePlayerController)x).SteamID == steamId);
 				CCSPlayerPawn val2 = ((val == null) ? null : val.PlayerPawn?.Value);
-				if (val2 != null && ((CEntityInstance)val2).IsValid)
+				if (val != null && val.IsValid && val2 != null && ((CEntityInstance)val2).IsValid)
 				{
-					((CBaseEntity)val2).MoveType = (MoveType_t)2;
-					Schema.SetSchemaValue<int>(((NativeEntity)val2).Handle, "CBaseEntity", "m_nActualMoveType", 2);
+					MoveLockManager.Unlock(val, "Amber");
 					((CBaseModelEntity)val2).Render = Color.FromArgb(255, 255, 255, 255);
 					Utilities.SetStateChanged((CBaseEntity)(object)val2, "CBaseModelEntity", "m_clrRender", 0);
+				}
+				else
+				{
+					MoveLockManager.Clear(steamId);
 				}
 			}
 			else
 			{
 				CCSPlayerController val3 = Utilities.GetPlayers().FirstOrDefault((CCSPlayerController x) => ((CBasePlayerController)x).SteamID == steamId);
 				CCSPlayerPawn val4 = ((val3 == null) ? null : val3.PlayerPawn?.Value);
-				if (val4 != null && ((CEntityInstance)val4).IsValid)
+				if (val3 != null && val3.IsValid && val4 != null && ((CEntityInstance)val4).IsValid)
 				{
-					((CBaseEntity)val4).MoveType = (MoveType_t)0;
-					Schema.SetSchemaValue<int>(((NativeEntity)val4).Handle, "CBaseEntity", "m_nActualMoveType", 0);
+					MoveLockManager.Lock(val3, "Amber");
 					((CBaseModelEntity)val4).Render = Color.FromArgb(255, 255, 200, 50);
 					Utilities.SetStateChanged((CBaseEntity)(object)val4, "CBaseModelEntity", "m_clrRender", 0);
 				}

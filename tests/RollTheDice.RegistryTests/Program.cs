@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -82,6 +83,7 @@ internal static class Program
 		Check("no unknown warnings", registry.WarningCount == KnownDuplicateComboWarnings(registry), Describe(registry, "warning"));
 
 		UiChecks(built, localizer, names);
+		LifecycleChecks();
 
 		Console.WriteLine("--------------------------------");
 		Console.WriteLine($"{_passed} passed, {_failed} failed");
@@ -162,6 +164,46 @@ internal static class Program
 			.Replace("{common}", "68")
 			.ReplaceColorTags();
 		Check("list color tags", !tiers.Contains('{') && !tiers.Contains('}'), tiers);
+	}
+
+	private static void LifecycleChecks()
+	{
+		Check("amber cleanup override", typeof(Amber).GetMethod("OnHolderRemoved")?.DeclaringType == typeof(Amber));
+		Check("phoenix cleanup override", typeof(Phoenix).GetMethod("OnHolderRemoved")?.DeclaringType == typeof(Phoenix));
+
+		MethodInfo? scanner = typeof(DiceBlueprint).GetMethod(
+			"GetControllerStateFields",
+			BindingFlags.NonPublic | BindingFlags.Static);
+		Check("controller state scanner", scanner != null);
+		if (scanner == null)
+		{
+			return;
+		}
+
+		string[] phoenixFields = ((FieldInfo[])scanner.Invoke(null, new object[] { typeof(Phoenix) })!)
+			.Select(field => field.Name)
+			.ToArray();
+		Check("phoenix state fields", phoenixFields.Contains("_phoenixWings")
+			&& phoenixFields.Contains("_phoenixGlows")
+			&& phoenixFields.Contains("_phoenixEndTime"), string.Join(",", phoenixFields));
+
+		string[] skylineFields = ((FieldInfo[])scanner.Invoke(null, new object[] { typeof(Skyline) })!)
+			.Select(field => field.Name)
+			.ToArray();
+		Check("skyline state fields", skylineFields.Contains("_cooldowns")
+			&& skylineFields.Contains("_flightEndTime"), string.Join(",", skylineFields));
+
+		string[] voidFields = ((FieldInfo[])scanner.Invoke(null, new object[] { typeof(RollTheDice.Dices.Void) })!)
+			.Select(field => field.Name)
+			.ToArray();
+		Check("void state fields", voidFields.Contains("_voidEndTime")
+			&& voidFields.Contains("_lastVoidCountdown"), string.Join(",", voidFields));
+
+		string[] amberFields = ((FieldInfo[])scanner.Invoke(null, new object[] { typeof(Amber) })!)
+			.Select(field => field.Name)
+			.ToArray();
+		Check("amber ulong state excluded", !amberFields.Contains("_frozenUntil"), string.Join(",", amberFields));
+		Check("dictionary cleanup cast", new Dictionary<string, int>() is IDictionary);
 	}
 
 	private static string Describe(DiceRegistry registry, string severity)

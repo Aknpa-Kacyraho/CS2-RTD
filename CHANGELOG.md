@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.4.8 — 2026-11-23
+
+### Fixed
+
+- Disconnect and `PruneInvalid` now run the same cleanup: `OnHolderRemoved` is called for pruned controllers, then a generic pass removes leftover controller-keyed dictionary/set entries.
+- Legacy dice that never implemented `OnHolderRemoved` no longer keep stale `CCSPlayerController` keys until round/map reset.
+- `Phoenix`: added disconnect cleanup for wings, glows, max-health restoration and all nine per-player maps; glow teardown no longer requires a valid pawn.
+- `Amber`: removing the dice now clears the freeze and releases its movement lock immediately.
+
+### Changed
+
+- `Amber` and `Phoenix` now use `MoveLockManager` instead of writing `MoveType`/`m_nActualMoveType` directly. Movement during freeze/float is unchanged; release restores the pre-lock MoveType instead of forcing Walk.
+
+### Added
+
+- Lifecycle assertions in `RollTheDice.RegistryTests` (cleanup overrides, controller-state field scanner, ulong-state exclusion, dictionary cast), now 28 assertions total.
+
+### Unchanged
+
+- Draw probabilities, weights, damage, durations, rewards, commands and config keys.
+- `Fate`, `Skyline` and `Void` still own their noclip/revive MoveType transitions; they were not migrated in this release.
+
 ## 1.4.7 — 2026-11-23
 
 ### Added

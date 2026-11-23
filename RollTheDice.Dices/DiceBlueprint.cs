@@ -1,5 +1,8 @@
 using System;
+using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Reflection;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Timers;
 using Microsoft.Extensions.Localization;
@@ -243,7 +246,17 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 	public virtual void RemoveBySteamId(ulong steamId, DiceRemoveReason reason)
 	{
 		RemoveBySteamId(steamId);
-		OnHolderRemoved(steamId, reason);
+		try
+		{
+			OnHolderRemoved(steamId, reason);
+		}
+		catch
+		{
+		}
+		// Last pass: remove leftover controller-keyed entries from older dice that
+		// never implemented OnHolderRemoved. Special cleanup above runs first so it
+		// can still see the dictionaries it needs (e.g. Phoenix wings/glows).
+		CleanControllerState(steamId);
 	}
 
 	/// <summary>
@@ -281,10 +294,147 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 		}
 	}
 
+	// Cached per dice type: dictionaries/sets keyed by controller are the common
+	// legacy pattern. Scanning them here fixes old dice that never added an
+	// OnHolderRemoved override without touching their gameplay code.
+	private static readonly ConcurrentDictionary<Type, FieldInfo[]> ControllerStateFields = new ConcurrentDictionary<Type, FieldInfo[]>();
+
+	private static FieldInfo[] GetControllerStateFields(Type type)
+	{
+		return ControllerStateFields.GetOrAdd(type, static diceType =>
+		{
+			List<FieldInfo> fields = new List<FieldInfo>();
+			foreach (FieldInfo field in diceType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+			{
+				Type fieldType = field.FieldType;
+				if (!fieldType.IsGenericType)
+				{
+					continue;
+				}
+				Type definition = fieldType.GetGenericTypeDefinition();
+				Type[] arguments = fieldType.GetGenericArguments();
+				if (arguments.Length == 0 || arguments[0] != typeof(CCSPlayerController))
+				{
+					continue;
+				}
+				if (definition == typeof(Dictionary<,>) || definition == typeof(HashSet<>))
+				{
+					fields.Add(field);
+				}
+			}
+			return fields.ToArray();
+		});
+	}
+
+	private void CleanControllerState(ulong steamId)
+	{
+		foreach (FieldInfo field in GetControllerStateFields(GetType()))
+		{
+			object? value;
+			try
+			{
+				value = field.GetValue(this);
+			}
+			catch
+			{
+				continue;
+			}
+			if (value == null)
+			{
+				continue;
+			}
+			try
+			{
+				if (value is IDictionary dictionary)
+				{
+					List<object> keys = new List<object>();
+					foreach (object key in dictionary.Keys)
+					{
+						if (key is CCSPlayerController controller && ShouldRemoveController(controller, steamId))
+						{
+							keys.Add(key);
+						}
+					}
+					foreach (object key in keys)
+					{
+						dictionary.Remove(key);
+					}
+				}
+				else if (value is ISet<CCSPlayerController> set)
+				{
+					List<CCSPlayerController> stale = new List<CCSPlayerController>();
+					foreach (CCSPlayerController controller in set)
+					{
+						if (ShouldRemoveController(controller, steamId))
+						{
+							stale.Add(controller);
+						}
+					}
+					foreach (CCSPlayerController controller in stale)
+					{
+						set.Remove(controller);
+					}
+				}
+			}
+			catch
+			{
+			}
+		}
+	}
+
+	private static bool ShouldRemoveController(CCSPlayerController controller, ulong steamId)
+	{
+		if (controller == null || !controller.IsValid)
+		{
+			return true;
+		}
+		try
+		{
+			return controller.SteamID == steamId;
+		}
+		catch
+		{
+			return false;
+		}
+	}
+
 	/// <summary>Drop controllers that are no longer valid. Returns the number removed.</summary>
 	public int PruneInvalid()
 	{
-		return _players.RemoveAll(p => p == null || !p.IsValid);
+		List<CCSPlayerController> stale = new List<CCSPlayerController>();
+		foreach (CCSPlayerController player in _players)
+		{
+			if (player == null || !player.IsValid)
+			{
+				stale.Add(player);
+			}
+		}
+		foreach (CCSPlayerController player in stale)
+		{
+			_players.Remove(player);
+			ulong steamId = 0UL;
+			if (player != null)
+			{
+				try
+				{
+					steamId = player.SteamID;
+				}
+				catch
+				{
+				}
+			}
+			// Prune used to only drop _players, so per-player maps stayed behind and
+			// a later disconnect cleanup could no longer find them.
+			try
+			{
+				OnHolderRemoved(steamId, DiceRemoveReason.Disconnect);
+			}
+			catch
+			{
+			}
+			CleanControllerState(steamId);
+		}
+		return stale.Count;
 	}
 
 	public virtual void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)

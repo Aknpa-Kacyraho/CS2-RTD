@@ -81,6 +81,75 @@ public class Phoenix : DiceBlueprint
 		DeactivatePhoenix(player);
 		RestoreMaxHealth(player);
 		_players.Remove(player);
+		RemoveState(player);
+	}
+
+	/// <summary>
+	/// Disconnect/prune cleanup. The controller may already be invalid, so match by
+	/// SteamID and tear down wings/glows before dropping the controller-keyed maps.
+	/// </summary>
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		HashSet<CCSPlayerController> keys = new HashSet<CCSPlayerController>();
+		AddKeys(keys, _phoenixEndTime);
+		AddKeys(keys, _phoenixGlows);
+		AddKeys(keys, _phoenixExploded);
+		AddKeys(keys, _cooldownEnd);
+		AddKeys(keys, _floatAnchor);
+		AddKeys(keys, _floatStart);
+		AddKeys(keys, _originalMaxHealth);
+		AddKeys(keys, _phoenixWings);
+		AddKeys(keys, _emberNext);
+		foreach (CCSPlayerController player in _players)
+		{
+			keys.Add(player);
+		}
+		foreach (CCSPlayerController player in keys)
+		{
+			if (player == null)
+			{
+				continue;
+			}
+			ulong playerSteamId = 0UL;
+			try
+			{
+				playerSteamId = player.SteamID;
+			}
+			catch
+			{
+			}
+			if (!player.IsValid || playerSteamId == steamId)
+			{
+				try
+				{
+					DeactivatePhoenix(player);
+					RestoreMaxHealth(player);
+					RemoveState(player);
+				}
+				catch
+				{
+					RemoveState(player);
+				}
+			}
+		}
+		_players.RemoveAll(p => p == null || !p.IsValid || p.SteamID == steamId);
+		MoveLockManager.Clear(steamId);
+	}
+
+	private static void AddKeys<T>(HashSet<CCSPlayerController> keys, Dictionary<CCSPlayerController, T> map)
+	{
+		foreach (CCSPlayerController player in map.Keys)
+		{
+			keys.Add(player);
+		}
+	}
+
+	private void RemoveState(CCSPlayerController player)
+	{
+		if (player == null)
+		{
+			return;
+		}
 		_phoenixEndTime.Remove(player);
 		_phoenixGlows.Remove(player);
 		_phoenixExploded.Remove(player);
@@ -140,28 +209,31 @@ public class Phoenix : DiceBlueprint
 
 	private void DeactivatePhoenix(CCSPlayerController player)
 	{
-		// 光翼即使控制器已失效也要先拆，避免 CBeam 残留。
+		if (player == null)
+		{
+			return;
+		}
+		// 光翼/光晕即使控制器已失效也要先拆，避免 CBeam/实体残留。
 		if (_phoenixWings.TryGetValue(player, out WingFx phoenixWing))
 		{
 			phoenixWing.Remove();
 			_phoenixWings.Remove(player);
 		}
+		if (_phoenixGlows.TryGetValue(player, out (CDynamicProp, CDynamicProp) glow))
+		{
+			GlowUtil.RemoveGlow((CBaseEntity?)(object)glow.Item1, (CBaseEntity?)(object)glow.Item2);
+			_phoenixGlows.Remove(player);
+		}
 		_emberNext.Remove(player);
-		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid)
+		if (!((CEntityInstance)player).IsValid)
 		{
 			return;
 		}
 		CCSPlayerPawn val = player.PlayerPawn?.Value;
 		if (val != null && ((CEntityInstance)val).IsValid && ((CBaseEntity)val).LifeState == 0)
 		{
-			((CBaseEntity)val).MoveType = (MoveType_t)2;
-			Schema.SetSchemaValue<int>(((NativeEntity)val).Handle, "CBaseEntity", "m_nActualMoveType", 2);
+			MoveLockManager.Unlock(player, "Phoenix");
 			((CBaseEntity)val).ActualGravityScale = 1f;
-			if (_phoenixGlows.TryGetValue(player, out (CDynamicProp, CDynamicProp) value))
-			{
-				GlowUtil.RemoveGlow((CBaseEntity?)(object)value.Item1, (CBaseEntity?)(object)value.Item2);
-				_phoenixGlows.Remove(player);
-			}
 		}
 	}
 
@@ -183,9 +255,7 @@ public class Phoenix : DiceBlueprint
 		// 同时授予共享无敌：直扣血类伤害（灼烧/核爆等）也会被主插件统一拦截。
 		Invulnerability.Grant(player, invulDuration);
 		RollTheDice.LogDebug($"[Phoenix] TRIGGER: sid={((CBasePlayerController)player).SteamID} invul={invulDuration:F1}s now={num:F2}\n");
-		((CBaseEntity)val).MoveType = (MoveType_t)0;
-		Schema.SetSchemaValue<int>(((NativeEntity)val).Handle, "CBaseEntity", "m_nActualMoveType", 0);
-		Utilities.SetStateChanged((CBaseEntity)(object)val, "CBaseEntity", "m_MoveType", 0);
+		MoveLockManager.Lock(player, "Phoenix");
 		((CBaseEntity)val).ActualGravityScale = 0.1f;
 		Vector? absOrigin = ((CBaseEntity)val).AbsOrigin;
 		if (absOrigin != null)
@@ -409,12 +479,7 @@ public class Phoenix : DiceBlueprint
 			CCSPlayerPawn val4 = ((obj3 == null) ? null : obj3.PlayerPawn?.Value);
 			if (val4 != null && ((CEntityInstance)val4).IsValid)
 			{
-				if ((int)((CBaseEntity)val4).MoveType != 0)
-				{
-					((CBaseEntity)val4).MoveType = (MoveType_t)0;
-					Schema.SetSchemaValue<int>(((NativeEntity)val4).Handle, "CBaseEntity", "m_nActualMoveType", 0);
-					Utilities.SetStateChanged((CBaseEntity)(object)val4, "CBaseEntity", "m_MoveType", 0);
-				}
+				MoveLockManager.Lock(player, "Phoenix");
 				if (((CBaseEntity)val4).ActualGravityScale > 0.15f)
 				{
 					((CBaseEntity)val4).ActualGravityScale = 0.1f;
