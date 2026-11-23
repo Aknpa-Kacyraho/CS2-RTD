@@ -79,7 +79,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.4.5";
+	public override string ModuleVersion => "1.4.6";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -90,14 +90,16 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		string arg = command.GetArg(2);
 		if (string.IsNullOrWhiteSpace(playerName))
 		{
-			command.ReplyToCommand((string?)((BasePlugin)this).Localizer["command.givedice.availabledices"]);
+			command.ReplyToCommand(((BasePlugin)this).Localizer["command.givedice.availablecount"].Value
+				.Replace("{count}", _dices.Count.ToString()));
+			IEnumerable<string> names = _dices
+				.OrderBy(dice => DiceUi.DiceName(dice, ((BasePlugin)this).Localizer), StringComparer.OrdinalIgnoreCase)
+				.Select(dice => DiceUi.DiceListLabel(dice, ((BasePlugin)this).Localizer));
+			foreach (string line in DiceUi.Columns(names, 3))
 			{
-				foreach (DiceBlueprint dix in _dices)
-				{
-					command.ReplyToCommand("- " + dix.ClassName);
-				}
-				return;
+				command.ReplyToCommand(line);
 			}
+			return;
 		}
 		bool isWildcard = string.IsNullOrWhiteSpace(playerName) || playerName == "*";
 		List<CCSPlayerController> list = (from p in Utilities.GetPlayers()
@@ -1926,8 +1928,8 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			{
 				localized = dice.ClassName;
 			}
-			string label = TierLabel(tier);
-			string color = TierColor(tier);
+			string label = DiceUi.TierLabel(tier);
+			string color = DiceUi.TierColor(tier).ToString();
 			string prefix = ((BasePlugin)this).Localizer["command.prefix"].Value;
 			player.PrintToChat($" {prefix}{color}🎲 你抽到了 [{label}] {localized} {((BasePlugin)this).Localizer["command.rtd.hint.status"].Value}");
 			if (Config?.Effects?.Hud ?? true)
@@ -2585,12 +2587,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			return "无";
 		}
-		return string.Join("、", held.Select(dice =>
-		{
-			string key = "dice_" + dice.ClassName + "_name";
-			string name = ((BasePlugin)this).Localizer[key];
-			return name == key ? dice.ClassName : name;
-		}));
+		return string.Join("、", held.Select(dice => DiceUi.DiceName(dice, ((BasePlugin)this).Localizer)));
 	}
 
 	private void CreateRoundBackup()

@@ -80,6 +80,8 @@ internal static class Program
 		Check("no registry errors", registry.ErrorCount == 0, Describe(registry, "error"));
 		Check("no unknown warnings", registry.WarningCount == KnownDuplicateComboWarnings(registry), Describe(registry, "warning"));
 
+		UiChecks(built, localizer);
+
 		Console.WriteLine("--------------------------------");
 		Console.WriteLine($"{_passed} passed, {_failed} failed");
 		if (_failed > 0)
@@ -96,6 +98,46 @@ internal static class Program
 			issue.Severity == "warning" &&
 			issue.Message.StartsWith("combo name '", StringComparison.Ordinal) &&
 			issue.Message.Contains(" is used by 2 combos", StringComparison.Ordinal));
+	}
+
+	private static void UiChecks(IReadOnlyList<DiceBlueprint> built, IStringLocalizer localizer)
+	{
+		Check("tier labels", DiceUi.TierLabel("rare") == "稀有"
+			&& DiceUi.TierLabel("epic") == "史诗"
+			&& DiceUi.TierLabel("legendary") == "传说"
+			&& DiceUi.TierLabel("combo") == "组合"
+			&& DiceUi.TierLabel("common") == "普通"
+			&& DiceUi.TierLabel("unknown") == "普通");
+		Check("tier colors", DiceUi.TierColor("common") == 1
+			&& DiceUi.TierColor("rare") == 4
+			&& DiceUi.TierColor("epic") == 3
+			&& DiceUi.TierColor("legendary") == 9
+			&& DiceUi.TierColor("combo") == 2);
+		Check("tier order", DiceUi.TierRank("legendary") > DiceUi.TierRank("combo")
+			&& DiceUi.TierRank("combo") > DiceUi.TierRank("epic")
+			&& DiceUi.TierRank("epic") > DiceUi.TierRank("rare")
+			&& DiceUi.TierRank("rare") > DiceUi.TierRank("common"));
+
+		List<string> columns = DiceUi.Columns(new[] { "a", "b", "c", "d", "e", "f", "g" }, 3).ToList();
+		Check("columns layout", columns.Count == 3
+			&& columns[0] == "a  b  c"
+			&& columns[2] == "g", string.Join(" | ", columns));
+		Check("columns empty", !DiceUi.Columns(Array.Empty<string>(), 3).Any());
+
+		DiceBlueprint? sample = built.FirstOrDefault(dice => dice.ClassName == "Awakener") ?? built.FirstOrDefault();
+		if (sample == null)
+		{
+			Check("dice ui sample", false, "no built dice");
+			return;
+		}
+		string name = DiceUi.DiceName(sample, localizer);
+		string line = DiceUi.DiceLine(sample, localizer, "legendary");
+		Check("dice name resolved", name != "dice_" + sample.ClassName + "_name" && name.Length > 0, name);
+		Check("dice line shape", line.Contains("●", StringComparison.Ordinal)
+			&& line.Contains("[传说]", StringComparison.Ordinal)
+			&& line.Contains(name, StringComparison.Ordinal), line);
+		string listLabel = DiceUi.DiceListLabel(sample, localizer);
+		Check("admin list label", listLabel.Contains("(" + sample.ClassName + ")", StringComparison.Ordinal), listLabel);
 	}
 
 	private static string Describe(DiceRegistry registry, string severity)

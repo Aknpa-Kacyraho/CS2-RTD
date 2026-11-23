@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text.RegularExpressions;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Core.Attributes.Registration;
@@ -25,9 +24,20 @@ public partial class RollTheDice
 			: _diceRegistry.ErrorCount == 0 && _diceRegistry.WarningCount == 0
 				? "ok"
 				: $"E{_diceRegistry.ErrorCount}/W{_diceRegistry.WarningCount}";
-		string summary = $"[RTD] v{ModuleVersion} | map={_currentMap} | enabled={Config?.Enabled} | dices={_dices.Count} | holders={holders} | round={_isDuringRound} | roundActive={DiceBlueprint.RoundActive} | fx={DiceFxTable.Count} | timers[{timers}] | registry={registry} | effects={(DiceEffects.Enabled ? "on" : "off")}";
-		command.ReplyToCommand(summary);
-		Console.WriteLine(summary);
+		string[] lines =
+		{
+			$"[RTD] v{ModuleVersion} | map={_currentMap} | enabled={Config?.Enabled} | effects={(DiceEffects.Enabled ? "on" : "off")}",
+			$"  dices={_dices.Count} | holders={holders} | round={_isDuringRound} | roundActive={DiceBlueprint.RoundActive}",
+			$"  fx={DiceFxTable.Count} | timers[{timers}]",
+			_diceRegistry == null
+				? "  registry=none"
+				: $"  registry={registry} | {_diceRegistry.Summary}"
+		};
+		foreach (string line in lines)
+		{
+			command.ReplyToCommand(line);
+			Console.WriteLine(line);
+		}
 	}
 
 	/// <summary>All dice currently held by a player (by SteamID).</summary>
@@ -45,29 +55,6 @@ public partial class RollTheDice
 		return held;
 	}
 
-	private static string TierLabel(string tier)
-	{
-		return tier switch
-		{
-			"rare" => "稀有",
-			"epic" => "史诗",
-			"legendary" => "传说",
-			"combo" => "组合",
-			_ => "普通"
-		};
-	}
-
-	private static string TierColor(string tier)
-	{
-		return tier switch
-		{
-			"rare" => "\u0004",
-			"epic" => "\u0003",
-			"legendary" => "\u0009",
-			"combo" => "\u0002",
-			_ => "\u0001"
-		};
-	}
 
 	private void PrintRollHelp(CCSPlayerController player, CommandInfo command)
 	{
@@ -78,7 +65,8 @@ public partial class RollTheDice
 			"command.rtd.help.auto",
 			"command.rtd.help.status",
 			"command.rtd.help.tab",
-			"command.rtd.help.skins"
+			"command.rtd.help.skins",
+			"command.rtd.help.tip"
 		})
 		{
 			command.ReplyToCommand((string?)((BasePlugin)this).Localizer[key]);
@@ -106,24 +94,14 @@ public partial class RollTheDice
 		}
 		else
 		{
-			command.ReplyToCommand(((BasePlugin)this).Localizer["command.rtd.status.title"].Value);
-			foreach (DiceBlueprint dice in held)
+			command.ReplyToCommand(((BasePlugin)this).Localizer["command.rtd.status.title.count"].Value
+				.Replace("{count}", held.Count.ToString()));
+			foreach (DiceBlueprint dice in held
+				.OrderByDescending(dice => DiceUi.TierRank(GetDiceTier(dice)))
+				.ThenBy(dice => DiceUi.DiceName(dice, ((BasePlugin)this).Localizer), StringComparer.OrdinalIgnoreCase))
 			{
-				string nameKey = "dice_" + dice.ClassName + "_name";
-				string name = ((BasePlugin)this).Localizer[nameKey];
-				if (name == nameKey)
-				{
-					name = dice.ClassName;
-				}
-				string descriptionKey = "dice_" + dice.ClassName + "_player";
-				string description = ((BasePlugin)this).Localizer[descriptionKey];
-				if (description == descriptionKey)
-				{
-					description = dice.Description ?? string.Empty;
-				}
-				description = Regex.Replace(description, "\\{[^}]*\\}", string.Empty).Trim();
 				string tier = GetDiceTier(dice);
-				command.ReplyToCommand($"  {TierColor(tier)}●\u0001 {name} [{TierLabel(tier)}] — {description}");
+				command.ReplyToCommand(DiceUi.DiceLine(dice, ((BasePlugin)this).Localizer, tier));
 			}
 		}
 

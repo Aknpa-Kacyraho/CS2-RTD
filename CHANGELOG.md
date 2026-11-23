@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.4.6 — 2026-11-23
+
+### Changed
+
+- Command UI now shares `DiceUi`: rarity labels/colors/order, dice names/descriptions, dice lines and column packing live in one place.
+- `!rtd help` adds one hint line after the existing commands.
+- `!rtd status` shows the held-dice count in the title and sorts by rarity (legendary → combo → epic → rare → common), then name.
+- `!givedice` without a target prints localized names in three columns plus a count header instead of 171 single-column class names.
+- `!rtd_health` prints four short diagnostic lines instead of one long line.
+
+### Added
+
+- UI assertions in `RollTheDice.RegistryTests` (rarity labels/colors/order, column packing, name fallback, line shape, admin list label), now 16 assertions total.
+
+### Unchanged
+
+- Draw probabilities, cooldowns, damage, durations, dice effects, command arguments, config keys and TAB/combo rules.
+
 ## 1.4.5 — 2026-11-23
 
 ### Added
