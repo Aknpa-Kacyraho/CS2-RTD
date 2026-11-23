@@ -86,6 +86,7 @@ internal static class Program
 		UiChecks(built, localizer, names);
 		LifecycleChecks();
 		ConfigAndCommandChecks();
+		MovementChecks();
 
 		Console.WriteLine("--------------------------------");
 		Console.WriteLine($"{_passed} passed, {_failed} failed");
@@ -230,6 +231,47 @@ internal static class Program
 		CommandHelperAttribute? helper = givedice?.GetCustomAttribute<CommandHelperAttribute>();
 		Check("givedice accepts zero args", helper != null && helper.MinArgs == 0,
 			helper == null ? "attribute missing" : helper.MinArgs.ToString());
+	}
+
+	private static void MovementChecks()
+	{
+		MoveScopeStack stack = new MoveScopeStack();
+		Check("move stack empty", stack.Count == 0 && stack.CurrentTarget == null);
+
+		Check("move stack push", stack.Push("Amber", 0) == 0
+			&& stack.Push("Skyline", 7) == 7
+			&& stack.Count == 2
+			&& stack.Contains("Amber"), stack.CurrentTarget?.ToString() ?? "null");
+		Check("move stack update keeps priority", stack.Push("Amber", 0) == 7
+			&& stack.Count == 2, stack.CurrentTarget?.ToString() ?? "null");
+
+		Check("move stack pop", stack.Remove("Skyline", out int? afterSkyline)
+			&& afterSkyline == 0
+			&& stack.Remove("Amber", out int? afterAmber)
+			&& afterAmber == null
+			&& stack.Count == 0);
+		Check("move stack unknown", !stack.Remove("Missing", out int? unchanged)
+			&& unchanged == null && stack.Count == 0);
+
+		stack.Push("A", 2);
+		stack.Push("B", 7);
+		stack.Clear();
+		Check("move stack clear", stack.Count == 0 && stack.CurrentTarget == null);
+
+		Check("move locks start empty", MoveLockManager.ActiveLockCount == 0
+			&& MoveLockManager.LockedPlayerCount == 0);
+
+		foreach (string file in new[] { "Amber.cs", "Phoenix.cs", "Skyline.cs", "Void.cs" })
+		{
+			string? path = FindRepoFile(Path.Combine("RollTheDice.Dices", file));
+			if (path == null)
+			{
+				Check("movement source " + file, false, "file not found");
+				continue;
+			}
+			string source = File.ReadAllText(path);
+			Check("no direct MoveType " + file, !source.Contains(".MoveType =", StringComparison.Ordinal));
+		}
 	}
 
 	private static string Describe(DiceRegistry registry, string severity)

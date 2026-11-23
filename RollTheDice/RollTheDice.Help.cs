@@ -28,7 +28,7 @@ public partial class RollTheDice
 		{
 			$"[RTD] v{ModuleVersion} | map={_currentMap} | enabled={Config?.Enabled} | effects={(DiceEffects.Enabled ? "on" : "off")}",
 			$"  dices={_dices.Count} | holders={holders} | round={_isDuringRound} | roundActive={DiceBlueprint.RoundActive}",
-			$"  fx={DiceFxTable.Count} | timers[{timers}]",
+			$"  fx={DiceFxTable.Count} | timers[{timers}] | move_locks={MoveLockManager.ActiveLockCount}keys/{MoveLockManager.LockedPlayerCount}p",
 			_diceRegistry == null
 				? "  registry=none"
 				: $"  registry={registry} | {_diceRegistry.Summary}"

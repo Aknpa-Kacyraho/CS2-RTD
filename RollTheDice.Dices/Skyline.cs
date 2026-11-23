@@ -4,7 +4,6 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Memory;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
 using RollTheDice.Utils;
@@ -65,6 +64,12 @@ public class Skyline : DiceBlueprint
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		EndFlight(player);
+		// EndFlight restores only when the pawn is still valid. Always drop the
+		// named scope too, otherwise a death/respawn can keep the flight lock.
+		if (player != null && player.IsValid)
+		{
+			MoveLockManager.Unlock(player, "Skyline");
+		}
 		_players.Remove(player);
 		_cooldowns.Remove(player);
 		_flightEndTime.Remove(player);
@@ -90,10 +95,7 @@ public class Skyline : DiceBlueprint
 	{
 		if (!((CEntityInstance)(object)((player == null) ? null : player.PlayerPawn?.Value) == (CEntityInstance)null) && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 		{
-			CCSPlayerPawn value = player.PlayerPawn.Value;
-			((CBaseEntity)value).MoveType = (MoveType_t)2;
-			Schema.SetSchemaValue<int>(((NativeEntity)value).Handle, "CBaseEntity", "m_nActualMoveType", 2);
-			Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_MoveType", 0);
+			MoveLockManager.Unlock(player, "Skyline");
 			if (DiceSynergy.HasPartner(player, "NoRecoil") && RollTheDice.Instance?.HasDiceActive(player, "NoRecoil") != true)
 			{
 				player.ReplicateConVar("weapon_accuracy_nospread", "0");
@@ -113,10 +115,7 @@ public class Skyline : DiceBlueprint
 				return;
 			}
 			float flightDuration = _config.Dices.Skyline.FlightDuration;
-			CCSPlayerPawn value2 = player.PlayerPawn.Value;
-			((CBaseEntity)value2).MoveType = (MoveType_t)7;
-			Schema.SetSchemaValue<int>(((NativeEntity)value2).Handle, "CBaseEntity", "m_nActualMoveType", 7);
-			Utilities.SetStateChanged((CBaseEntity)(object)value2, "CBaseEntity", "m_MoveType", 0);
+			MoveLockManager.Lock(player, "Skyline", MoveType_t.MOVETYPE_NOCLIP);
 			_flightEndTime[player] = num + flightDuration;
 			_cooldowns[player] = num + _config.Dices.Skyline.Cooldown;
 			player.PrintToCenterAlert($"☁ 飞行中！{flightDuration}秒");
@@ -149,13 +148,7 @@ public class Skyline : DiceBlueprint
 			}
 			else if ((CEntityInstance)(object)((key == null) ? null : key.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)key.PlayerPawn.Value).IsValid)
 			{
-				CCSPlayerPawn value = key.PlayerPawn.Value;
-				if ((int)((CBaseEntity)value).MoveType != 7)
-				{
-					((CBaseEntity)value).MoveType = (MoveType_t)7;
-					Schema.SetSchemaValue<int>(((NativeEntity)value).Handle, "CBaseEntity", "m_nActualMoveType", 7);
-					Utilities.SetStateChanged((CBaseEntity)(object)value, "CBaseEntity", "m_MoveType", 0);
-				}
+				MoveLockManager.Lock(key, "Skyline", MoveType_t.MOVETYPE_NOCLIP);
 				if (DiceSynergy.HasPartner(key, "NoRecoil"))
 				{
 					NoRecoil.ApplyNoRecoil(key);

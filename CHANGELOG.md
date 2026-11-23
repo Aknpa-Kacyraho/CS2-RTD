@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.4.11 — 2026-11-23
+
+### Changed
+
+- `MoveLockManager` now keeps a named movement-scope stack per player instead of a set of lock-to-Walk keys. The last scope wins; releasing the last scope restores the captured `MoveType` + `ActualMoveType`.
+- Added `Lock(player, key, MoveType_t target)`; the old `Lock(player, key)` still locks to `MOVETYPE_NONE`.
+- `Skyline` and `Void` now use the shared scope manager for noclip instead of writing `MoveType`/`m_nActualMoveType` directly.
+- `Skyline`, `Void` and `Phoenix` explicitly release their scope on removal even when the pawn is already invalid, so a respawn cannot inherit a stale movement lock.
+- `!rtd_health` reports `move_locks={keys}keys/{players}p`.
+
+### Added
+
+- `MoveScopeStack` pure stack (empty, push, update priority, pop, unknown key, clear).
+- Movement source guards: Amber/Phoenix/Skyline/Void no longer contain `.MoveType =`.
+- Registry/UI/Lifecycle/Movement tests now 45.
+
+### Unchanged
+
+- Flight/void/freeze/revive durations, cooldowns, damage, rewards, probabilities and config keys.
+- `Fate` still owns its dawn/darktide MoveType transitions; it was not migrated.
+
 ## 1.4.10 — 2026-11-23
 
 ### Fixed

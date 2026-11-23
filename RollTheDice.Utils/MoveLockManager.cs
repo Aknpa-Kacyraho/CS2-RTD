@@ -1,22 +1,37 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Memory;
 
 namespace RollTheDice.Utils;
 
+/// <summary>
+/// Shared movement scope manager. Each player has one saved original MoveType and
+/// a stack of named scopes. The last scope wins; releasing the last scope restores
+/// the pre-lock move type instead of forcing Walk.
+/// </summary>
 public static class MoveLockManager
 {
 	private sealed class LockState
 	{
-		public HashSet<string> Keys = new HashSet<string>();
+		public MoveScopeStack Stack = new MoveScopeStack();
 		public int OriginalMoveType;
+		public int OriginalActualMoveType;
 	}
 
 	private static readonly Dictionary<ulong, LockState> _locks = new Dictionary<ulong, LockState>();
 
+	public static int ActiveLockCount => _locks.Sum(pair => pair.Value.Stack.Count);
+
+	public static int LockedPlayerCount => _locks.Count;
+
 	public static void Lock(CCSPlayerController player, string key)
+	{
+		Lock(player, key, MoveType_t.MOVETYPE_NONE);
+	}
+
+	public static void Lock(CCSPlayerController player, string key, MoveType_t target)
 	{
 		CCSPlayerPawn? pawn = player?.PlayerPawn?.Value;
 		if (pawn == null || !pawn.IsValid)
@@ -29,14 +44,19 @@ public static class MoveLockManager
 		{
 			state = new LockState
 			{
-				// Capture the real pre-lock state. Unlock must not assume Walk:
-				// another plugin/dice may have put the player in a special MoveType.
-				OriginalMoveType = (int)((CBaseEntity)pawn).MoveType
+				// Capture both sides of the MoveType pair. Restoring only Walk is
+				// wrong when another plugin/dice left the player in noclip/observer.
+				OriginalMoveType = (int)((CBaseEntity)pawn).MoveType,
+				OriginalActualMoveType = (int)((CBaseEntity)pawn).ActualMoveType
 			};
 			_locks[steamId] = state;
 		}
-		state.Keys.Add(key);
-		ApplyLock(player);
+		state.Stack.Push(key, (int)target);
+		int? current = state.Stack.CurrentTarget;
+		if (current.HasValue)
+		{
+			ApplyTarget(pawn, (MoveType_t)current.Value);
+		}
 	}
 
 	public static void Unlock(CCSPlayerController player, string key)
@@ -46,17 +66,39 @@ public static class MoveLockManager
 			return;
 		}
 
-		ulong steamId = player.SteamID;
+		ulong steamId;
+		try
+		{
+			steamId = player.SteamID;
+		}
+		catch
+		{
+			return;
+		}
 		if (!_locks.TryGetValue(steamId, out LockState state))
 		{
 			return;
 		}
-
-		state.Keys.Remove(key);
-		if (state.Keys.Count == 0)
+		if (!state.Stack.Remove(key, out int? current))
 		{
-			_locks.Remove(steamId);
-			RestoreMovement(player, state);
+			return;
+		}
+
+		if (current.HasValue)
+		{
+			CCSPlayerPawn? pawn = player.PlayerPawn?.Value;
+			if (pawn != null && pawn.IsValid)
+			{
+				ApplyTarget(pawn, (MoveType_t)current.Value);
+			}
+			return;
+		}
+
+		_locks.Remove(steamId);
+		CCSPlayerPawn? restorePawn = player.PlayerPawn?.Value;
+		if (restorePawn != null && restorePawn.IsValid)
+		{
+			RestoreMovement(restorePawn, state);
 		}
 	}
 
@@ -66,34 +108,10 @@ public static class MoveLockManager
 		{
 			return false;
 		}
-		return _locks.TryGetValue(player.SteamID, out LockState state) && state.Keys.Count > 0;
+		return _locks.TryGetValue(player.SteamID, out LockState state) && state.Stack.Count > 0;
 	}
 
-	private static void ApplyLock(CCSPlayerController player)
-	{
-		CCSPlayerPawn? pawn = player?.PlayerPawn?.Value;
-		if (pawn == null || !pawn.IsValid)
-		{
-			return;
-		}
-		((CBaseEntity)pawn).MoveType = (MoveType_t)0;
-		Schema.SetSchemaValue<int>(((NativeEntity)pawn).Handle, "CBaseEntity", "m_nActualMoveType", 0);
-		Utilities.SetStateChanged((CBaseEntity)pawn, "CBaseEntity", "m_MoveType", 0);
-	}
-
-	private static void RestoreMovement(CCSPlayerController player, LockState state)
-	{
-		CCSPlayerPawn? pawn = player?.PlayerPawn?.Value;
-		if (pawn == null || !pawn.IsValid)
-		{
-			return;
-		}
-		((CBaseEntity)pawn).MoveType = (MoveType_t)state.OriginalMoveType;
-		Schema.SetSchemaValue<int>(((NativeEntity)pawn).Handle, "CBaseEntity", "m_nActualMoveType", state.OriginalMoveType);
-		Utilities.SetStateChanged((CBaseEntity)pawn, "CBaseEntity", "m_MoveType", 0);
-	}
-
-	/// <summary>Drop a player's locks. Restores the captured move type when the controller is still valid.</summary>
+	/// <summary>Drop a player's scopes. Restores the captured move types when the controller is still valid.</summary>
 	public static void Clear(ulong steamID)
 	{
 		if (!_locks.Remove(steamID, out LockState state))
@@ -121,5 +139,35 @@ public static class MoveLockManager
 			}
 		}
 		_locks.Clear();
+	}
+
+	private static void ApplyTarget(CCSPlayerPawn pawn, MoveType_t target)
+	{
+		int current = (int)target;
+		CBaseEntity entity = (CBaseEntity)pawn;
+		if ((int)entity.MoveType == current && (int)entity.ActualMoveType == current)
+		{
+			return;
+		}
+		entity.MoveType = target;
+		entity.ActualMoveType = target;
+		Utilities.SetStateChanged(entity, "CBaseEntity", "m_MoveType", 0);
+	}
+
+	private static void RestoreMovement(CCSPlayerController player, LockState state)
+	{
+		CCSPlayerPawn? pawn = player?.PlayerPawn?.Value;
+		if (pawn == null || !pawn.IsValid)
+		{
+			return;
+		}
+		RestoreMovement(pawn, state);
+	}
+
+	private static void RestoreMovement(CCSPlayerPawn pawn, LockState state)
+	{
+		((CBaseEntity)pawn).MoveType = (MoveType_t)state.OriginalMoveType;
+		((CBaseEntity)pawn).ActualMoveType = (MoveType_t)state.OriginalActualMoveType;
+		Utilities.SetStateChanged((CBaseEntity)pawn, "CBaseEntity", "m_MoveType", 0);
 	}
 }

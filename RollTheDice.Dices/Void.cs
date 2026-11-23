@@ -5,7 +5,6 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
-using CounterStrikeSharp.API.Modules.Memory;
 using CounterStrikeSharp.API.Modules.Utils;
 using Microsoft.Extensions.Localization;
 using RollTheDice.Enums;
@@ -87,6 +86,12 @@ public class Void : DiceBlueprint
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		DeactivateVoid(player);
+		// DeactivateVoid skips dead players; always drop the named scope so a
+		// respawn cannot inherit noclip from a removed Void dice.
+		if (player != null && player.IsValid)
+		{
+			MoveLockManager.Unlock(player, "Void");
+		}
 		_players.Remove(player);
 		_voidEndTime.Remove(player);
 		_cooldownEnd.Remove(player);
@@ -118,8 +123,7 @@ public class Void : DiceBlueprint
 			float num = Server.CurrentTime;
 			_voidEndTime[player] = num + _config.Dices.Void.Duration;
 			_cooldownEnd[player] = num + _config.Dices.Void.Cooldown;
-			((CBaseEntity)val).MoveType = (MoveType_t)7;
-			Schema.SetSchemaValue<int>(((NativeEntity)val).Handle, "CBaseEntity", "m_nActualMoveType", 7);
+			MoveLockManager.Lock(player, "Void", MoveType_t.MOVETYPE_NOCLIP);
 			((CBaseModelEntity)val).Render = Color.FromArgb(20, 255, 255, 255);
 			Utilities.SetStateChanged((CBaseEntity)(object)val, "CBaseModelEntity", "m_clrRender", 0);
 			player.PrintToCenterAlert("\ud83c\udf11 遁入虚无！5s无敌+飞行+隐身！");
@@ -133,8 +137,7 @@ public class Void : DiceBlueprint
 			CCSPlayerPawn val = player.PlayerPawn?.Value;
 			if (val != null && ((CEntityInstance)val).IsValid && ((CBaseEntity)val).LifeState == 0)
 			{
-				((CBaseEntity)val).MoveType = (MoveType_t)2;
-				Schema.SetSchemaValue<int>(((NativeEntity)val).Handle, "CBaseEntity", "m_nActualMoveType", 2);
+				MoveLockManager.Unlock(player, "Void");
 				((CBaseModelEntity)val).Render = Color.FromArgb(255, 255, 255, 255);
 				Utilities.SetStateChanged((CBaseEntity)(object)val, "CBaseModelEntity", "m_clrRender", 0);
 			}
@@ -171,12 +174,7 @@ public class Void : DiceBlueprint
 			}
 			if (_voidEndTime.TryGetValue(item, out var value2) && num < value2 && value2 > 0f)
 			{
-				CCSPlayerPawn value3 = item.PlayerPawn.Value;
-				if ((int)((CBaseEntity)value3).MoveType != 7)
-				{
-					((CBaseEntity)value3).MoveType = (MoveType_t)7;
-					Schema.SetSchemaValue<int>(((NativeEntity)value3).Handle, "CBaseEntity", "m_nActualMoveType", 7);
-				}
+				MoveLockManager.Lock(item, "Void", MoveType_t.MOVETYPE_NOCLIP);
 				int num2 = (int)Math.Ceiling(value2 - num);
 				int valueOrDefault = _lastVoidCountdown.GetValueOrDefault(item, -1);
 				if (num2 > 0 && num2 != valueOrDefault)

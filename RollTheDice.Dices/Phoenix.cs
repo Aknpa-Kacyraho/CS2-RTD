@@ -227,14 +227,15 @@ public class Phoenix : DiceBlueprint
 		_emberNext.Remove(player);
 		if (!((CEntityInstance)player).IsValid)
 		{
+			MoveLockManager.Unlock(player, "Phoenix");
 			return;
 		}
 		CCSPlayerPawn val = player.PlayerPawn?.Value;
 		if (val != null && ((CEntityInstance)val).IsValid && ((CBaseEntity)val).LifeState == 0)
 		{
-			MoveLockManager.Unlock(player, "Phoenix");
 			((CBaseEntity)val).ActualGravityScale = 1f;
 		}
+		MoveLockManager.Unlock(player, "Phoenix");
 	}
 
 	public void TriggerPhoenixRevive(CCSPlayerController player)

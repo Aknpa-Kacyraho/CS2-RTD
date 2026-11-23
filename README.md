@@ -274,6 +274,14 @@
 
 ---
 
+## v1.4.11 移动作用域进化
+
+- `MoveLockManager` 升级为命名作用域栈：最后激活者优先，最后一个作用域结束时恢复进入前的 `MoveType` + `ActualMoveType`。
+- `Skyline`/`Void` 的 noclip 改走统一作用域，不再直接写 MoveType；死亡/移除会显式释放，减少重生残留。
+- `!rtd_health` 增加 `move_locks=keys/players`。
+- 新增 `MoveScopeStack` 纯逻辑测试与 4 项源码守卫。
+- 不改飞行/虚无/冻结/涅槃的时长、冷却、伤害或奖励。
+
 ## v1.4.10 配置与命令 Bug 修复
 
 - 配置重载前做完整类型校验：`"enabled": "yes"` 这类错误会在改内存前失败，旧配置保持生效。
