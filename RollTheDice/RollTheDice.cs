@@ -79,7 +79,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.4.14";
+	public override string ModuleVersion => "1.4.15";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]

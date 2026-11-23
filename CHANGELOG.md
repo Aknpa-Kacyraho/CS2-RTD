@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.4.15 — 2026-11-23
+
+### Fixed
+
+- TAB combo tags no longer consume a shared dice on the first matching combo. `ResolveComboNames` now collects every active combo first, then keeps only dice that participate in no combo.
+- Shared-dice example: `Adrenaline + Berserker + Overheat` now shows both「狂暴血脉」and「狂热」instead of hiding the second.
+- Standalone dice are preserved after the combo names; combo order stays definition order.
+
+### Added
+
+- Shared-dice and standalone-dice combo tests; standard 61, real config 62.
+
+### Unchanged
+
+- All 68 combo pairings, names, effects and values.
+- TAB tag format, `[A]+N` compression and `!rtd tab` toggle.
+- Duplicate display name「超越天堂」is still collapsed to one tag and remains a known data item.
+
 ## 1.4.14 — 2026-11-23
 
 ### Fixed

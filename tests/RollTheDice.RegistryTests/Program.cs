@@ -315,10 +315,22 @@ internal static class Program
 			|| issue.Message.Contains("duplicate combo pair", StringComparison.Ordinal)
 			|| issue.Message.Contains("no display name", StringComparison.Ordinal)));
 
-		HashSet<string> resolved = DiceSynergy.ResolveComboNames(new HashSet<string> { "Giant", "RoyalBarrier" });
+		List<string> resolved = DiceSynergy.ResolveComboNames(new HashSet<string> { "Giant", "RoyalBarrier" });
 		Check("combo resolution", resolved.Contains("钢铁要塞")
 			&& !resolved.Contains("Giant")
 			&& !resolved.Contains("RoyalBarrier"), string.Join(",", resolved));
+
+		List<string> shared = DiceSynergy.ResolveComboNames(new HashSet<string> { "Adrenaline", "Berserker", "Overheat" });
+		Check("combo shared dice", shared.Contains("狂暴血脉")
+			&& shared.Contains("狂热")
+			&& !shared.Contains("Adrenaline")
+			&& !shared.Contains("Berserker")
+			&& !shared.Contains("Overheat"), string.Join(",", shared));
+
+		List<string> mixed = DiceSynergy.ResolveComboNames(new HashSet<string> { "Giant", "RoyalBarrier", "Fireball" });
+		Check("combo keeps standalone dice", mixed.Contains("钢铁要塞")
+			&& mixed.Contains("Fireball")
+			&& mixed.IndexOf("钢铁要塞") < mixed.IndexOf("Fireball"), string.Join(",", mixed));
 
 		Check("no dice set changed overrides", !DiceBlueprint.HasDiceSetChangedOverrides);
 

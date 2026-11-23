@@ -274,6 +274,13 @@
 
 ---
 
+## v1.4.15 Dice 设计优化
+
+- TAB Combo 标签不再“贪心消费”共享 Dice：先收集全部命中 Combo，再保留未参与 Dice。
+- `Adrenaline + Berserker + Overheat` 现在同时显示「狂暴血脉」「狂热」。
+- 独立 Dice 保留，Combo 顺序稳定，`[A]+N` 压缩不变。
+- 不改 Combo 数据、数值、概率或 TAB 开关。
+
 ## v1.4.14 Dice 播报优化
 
 - 抽到 Dice 的中央 HUD 描述改用与 `!rtd status` 一致的本地化文本，不再出现英文/Unknown/过期描述。

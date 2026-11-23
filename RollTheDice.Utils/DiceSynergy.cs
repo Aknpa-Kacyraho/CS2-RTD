@@ -12,19 +12,34 @@ public static class DiceSynergy
 {
 	internal static readonly List<(string A, string B, string ComboName)> _combos;
 
-	public static HashSet<string> ResolveComboNames(HashSet<string> activeDice)
+	public static List<string> ResolveComboNames(HashSet<string> activeDice)
 	{
-		HashSet<string> hashSet = new HashSet<string>(activeDice);
+		HashSet<string> participating = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		HashSet<string> comboSeen = new HashSet<string>(StringComparer.Ordinal);
+		List<string> comboNames = new List<string>();
 		foreach (var (item, item2, item3) in _combos)
 		{
-			if (hashSet.Contains(item) && hashSet.Contains(item2))
+			if (!activeDice.Contains(item) || !activeDice.Contains(item2))
 			{
-				hashSet.Remove(item);
-				hashSet.Remove(item2);
-				hashSet.Add(item3);
+				continue;
+			}
+			participating.Add(item);
+			participating.Add(item2);
+			if (comboSeen.Add(item3))
+			{
+				comboNames.Add(item3);
 			}
 		}
-		return hashSet;
+		// Keep every active combo instead of letting the first match consume a
+		// shared dice (Adrenaline can pair with Berserker and Overheat).
+		foreach (string dice in activeDice)
+		{
+			if (!participating.Contains(dice))
+			{
+				comboNames.Add(dice);
+			}
+		}
+		return comboNames;
 	}
 
 	public static bool HasPartner(CCSPlayerController player, string partnerClassName)
