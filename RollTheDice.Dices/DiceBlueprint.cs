@@ -197,6 +197,39 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 		return 0f;
 	}
 
+	private static bool? _hasDiceSetChangedOverrides;
+
+	/// <summary>
+	/// True when at least one dice overrides OnDiceSetChanged. Combo refresh uses
+	/// this to skip 171 empty virtual calls when no dice needs the callback.
+	/// </summary>
+	public static bool HasDiceSetChangedOverrides
+	{
+		get
+		{
+			if (_hasDiceSetChangedOverrides.HasValue)
+			{
+				return _hasDiceSetChangedOverrides.Value;
+			}
+			bool found = false;
+			foreach (Type type in typeof(DiceBlueprint).Assembly.GetTypes())
+			{
+				if (!type.IsSubclassOf(typeof(DiceBlueprint)))
+				{
+					continue;
+				}
+				MethodInfo? method = type.GetMethod("OnDiceSetChanged", new[] { typeof(CCSPlayerController) });
+				if (method != null && method.DeclaringType == type)
+				{
+					found = true;
+					break;
+				}
+			}
+			_hasDiceSetChangedOverrides = found;
+			return found;
+		}
+	}
+
 	public virtual void OnDiceSetChanged(CCSPlayerController player)
 	{
 	}

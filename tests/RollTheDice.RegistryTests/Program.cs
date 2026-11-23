@@ -87,6 +87,7 @@ internal static class Program
 		LifecycleChecks();
 		ConfigAndCommandChecks();
 		MovementChecks();
+		ComboChecks(registry);
 
 		Console.WriteLine("--------------------------------");
 		Console.WriteLine($"{_passed} passed, {_failed} failed");
@@ -274,6 +275,61 @@ internal static class Program
 			string source = File.ReadAllText(path);
 			Check("no direct MoveType " + file, !source.Contains(".MoveType =", StringComparison.Ordinal));
 		}
+	}
+
+	private static void ComboChecks(DiceRegistry registry)
+	{
+		FieldInfo? field = typeof(DiceSynergy).GetField("_combos", BindingFlags.NonPublic | BindingFlags.Static);
+		List<(string A, string B, string ComboName)>? combos =
+			field?.GetValue(null) as List<(string A, string B, string ComboName)>;
+		Check("combo table readable", combos != null);
+		if (combos == null)
+		{
+			return;
+		}
+
+		Check("combo count", combos.Count == 68, combos.Count.ToString());
+		Check("combo no self pair", combos.All(combo =>
+			!string.Equals(combo.A, combo.B, StringComparison.OrdinalIgnoreCase)));
+		HashSet<string> pairs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+		Check("combo no duplicate pair", combos.All(combo =>
+		{
+			string key = string.Compare(combo.A, combo.B, StringComparison.OrdinalIgnoreCase) <= 0
+				? combo.A + "|" + combo.B
+				: combo.B + "|" + combo.A;
+			return pairs.Add(key);
+		}));
+
+		List<IGrouping<string, (string A, string B, string ComboName)>> duplicateNames = combos
+			.GroupBy(combo => combo.ComboName)
+			.Where(group => group.Count() > 1)
+			.ToList();
+		Check("combo duplicate name known", duplicateNames.Count == 1
+			&& duplicateNames[0].Key == "超越天堂"
+			&& duplicateNames[0].Count() == 2,
+			string.Join(",", duplicateNames.Select(group => group.Key + "x" + group.Count())));
+
+		Check("combo registry guards", !registry.Issues.Any(issue =>
+			issue.Message.Contains("pairs", StringComparison.Ordinal)
+			|| issue.Message.Contains("duplicate combo pair", StringComparison.Ordinal)
+			|| issue.Message.Contains("no display name", StringComparison.Ordinal)));
+
+		HashSet<string> resolved = DiceSynergy.ResolveComboNames(new HashSet<string> { "Giant", "RoyalBarrier" });
+		Check("combo resolution", resolved.Contains("钢铁要塞")
+			&& !resolved.Contains("Giant")
+			&& !resolved.Contains("RoyalBarrier"), string.Join(",", resolved));
+
+		Check("no dice set changed overrides", !DiceBlueprint.HasDiceSetChangedOverrides);
+
+		string? path = FindRepoFile(Path.Combine("RollTheDice.Utils", "DiceSynergy.cs"));
+		if (path == null)
+		{
+			Check("synergy source", false, "file not found");
+			return;
+		}
+		string source = File.ReadAllText(path);
+		Check("synergy avoids GetPlayers", !source.Contains("Utilities.GetPlayers", StringComparison.Ordinal));
+		Check("synergy uses true name", source.Contains("GetTruePlayerName", StringComparison.Ordinal));
 	}
 
 	private static string Describe(DiceRegistry registry, string severity)

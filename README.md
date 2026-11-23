@@ -274,6 +274,14 @@
 
 ---
 
+## v1.4.13 Dice 联动优化
+
+- `HasPartner` 改为扫描伙伴 Dice 的持有者列表，不再每次分配全服玩家列表。
+- `RefreshCombos` 在没有 Dice 覆写 `OnDiceSetChanged` 时跳过 171 个空虚调用。
+- Combo 公告使用真名，不再带 TAB `[Dice]` 前缀。
+- Registry 增加自联动、重复配对、空显示名校验。
+- 不改 68 个 Combo 的配对、名称、效果或数值。
+
 ## v1.4.12 配置预检查对齐
 
 - 预检查改用 CSS 同款 JSON 选项：注释可用、尾逗号拒绝、与 Reload 规则一致。

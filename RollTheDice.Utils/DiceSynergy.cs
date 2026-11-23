@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.InteropServices;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
+using RollTheDice.Dices;
 
 namespace RollTheDice.Utils;
 
@@ -28,21 +29,40 @@ public static class DiceSynergy
 
 	public static bool HasPartner(CCSPlayerController player, string partnerClassName)
 	{
-		RollTheDice instance = RollTheDice.Instance;
-		if (instance == null)
+		RollTheDice? instance = RollTheDice.Instance;
+		if (instance == null || player == null || !player.IsValid)
 		{
 			return false;
 		}
-		if (instance.HasDiceActive(player, partnerClassName))
+		DiceBlueprint? partner = instance.GetDiceByName(partnerClassName);
+		if (partner == null)
 		{
-			return true;
+			return false;
 		}
-		return Utilities.GetPlayers().Any((CCSPlayerController p) => ((CEntityInstance)p).IsValid && (CEntityInstance)(object)p != (CEntityInstance)(object)player && ((CBaseEntity)p).TeamNum == ((CBaseEntity)player).TeamNum && instance.HasDiceActive(p, partnerClassName));
+		// Scan the partner dice's small holder list instead of allocating a new
+		// player list on every combo check (many run per tick).
+		ulong steamId = player.SteamID;
+		int team = player.TeamNum;
+		foreach (CCSPlayerController holder in partner._players)
+		{
+			if (holder == null || !holder.IsValid || holder.IsHLTV)
+			{
+				continue;
+			}
+			if (holder.SteamID == steamId || holder.TeamNum == team)
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public static void AnnounceCombo(CCSPlayerController player, string comboName, string comboMsg)
 	{
-		Server.PrintToChatAll($" \u0004[Combo!]\u0001 \u0002{((CBasePlayerController)player).PlayerName}\u0001 触发了 \u0003{comboName}\u0001：{comboMsg}");
+		string playerName = player == null
+			? "?"
+			: RollTheDice.Instance?.GetTruePlayerName(player) ?? ((CBasePlayerController)player).PlayerName;
+		Server.PrintToChatAll($" \u0004[Combo!]\u0001 \u0002{playerName}\u0001 触发了 \u0003{comboName}\u0001：{comboMsg}");
 	}
 
 	static DiceSynergy()

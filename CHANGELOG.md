@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.4.13 — 2026-11-23
+
+### Changed
+
+- `DiceSynergy.HasPartner` now resolves the partner dice once and scans its holder list instead of allocating a new `Utilities.GetPlayers()` list and re-querying the dice dictionary for every player. Same self/teammate semantics.
+- `RefreshCombos` skips the per-dice `OnDiceSetChanged` loop unless a dice actually overrides it (`HasDiceSetChangedOverrides`); currently none do.
+- Combo announcements use the undecorated player name via `GetTruePlayerName`, so TAB `[Dice]` prefixes no longer leak into chat.
+
+### Added
+
+- `DiceRegistry` combo guards: self-pair, duplicate unordered pair, empty display name (plus existing unknown dice / duplicate display name).
+- Combo tests: 68-entry table, no self/duplicate pair, known duplicate display name, resolution, capability flag, source guards. Standard 56; real config 57.
+
+### Unchanged
+
+- All 68 combo pairings, names, effects and values.
+- `ResolveComboNames` greedy display rule and TAB tags.
+- Dice probabilities, cooldowns, damage, durations, rewards, commands and config keys.
+
 ## 1.4.12 — 2026-11-23
 
 ### Fixed

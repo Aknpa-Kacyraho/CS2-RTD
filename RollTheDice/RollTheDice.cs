@@ -79,7 +79,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.4.12";
+	public override string ModuleVersion => "1.4.13";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -2087,35 +2087,38 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			List<CCSPlayerController> affected = Utilities.GetPlayers()
 				.Where((CCSPlayerController p) => p != null && p.IsValid && !p.IsHLTV && (trigger == null || (CEntityInstance)p == (CEntityInstance)trigger || p.TeamNum == trigger.TeamNum))
 				.ToList();
-			HashSet<ulong> affectedIds = new HashSet<ulong>(affected.Select(p => p.SteamID));
-			foreach (DiceBlueprint dice in _dices)
+			if (DiceBlueprint.HasDiceSetChangedOverrides)
 			{
-				if (dice._players.Count == 0)
+				HashSet<ulong> affectedIds = new HashSet<ulong>(affected.Select(p => p.SteamID));
+				foreach (DiceBlueprint dice in _dices)
 				{
-					continue;
-				}
-				// Only dice held by a player in the affected team can change their combo state.
-				bool relevant = false;
-				foreach (CCSPlayerController holder in dice._players)
-				{
-					if (holder != null && holder.IsValid && affectedIds.Contains(holder.SteamID))
+					if (dice._players.Count == 0)
 					{
-						relevant = true;
-						break;
+						continue;
 					}
-				}
-				if (!relevant)
-				{
-					continue;
-				}
-				foreach (CCSPlayerController p in affected)
-				{
-					try
+					// Only dice held by a player in the affected team can change their combo state.
+					bool relevant = false;
+					foreach (CCSPlayerController holder in dice._players)
 					{
-						dice.OnDiceSetChanged(p);
+						if (holder != null && holder.IsValid && affectedIds.Contains(holder.SteamID))
+						{
+							relevant = true;
+							break;
+						}
 					}
-					catch
+					if (!relevant)
 					{
+						continue;
+					}
+					foreach (CCSPlayerController p in affected)
+					{
+						try
+						{
+							dice.OnDiceSetChanged(p);
+						}
+						catch
+						{
+						}
 					}
 				}
 			}
@@ -2460,6 +2463,18 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	{
 		ulong steamId = ((CBasePlayerController)player).SteamID;
 		return _diceByName.TryGetValue(diceClassName, out DiceBlueprint? dice) && dice.HasPlayer(steamId);
+	}
+
+	/// <summary>O(1) dice lookup by class name for synergy checks.</summary>
+	public DiceBlueprint? GetDiceByName(string diceClassName)
+	{
+		return _diceByName.TryGetValue(diceClassName, out DiceBlueprint? dice) ? dice : null;
+	}
+
+	/// <summary>Player name without TAB dice/combo decoration; used by chat announcements.</summary>
+	public string GetTruePlayerName(CCSPlayerController player)
+	{
+		return player == null ? string.Empty : _playerNames.GetTrueName(player);
 	}
 
 	public bool ForceDiceForPlayer(CCSPlayerController player)

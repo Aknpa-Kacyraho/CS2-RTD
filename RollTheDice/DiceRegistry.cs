@@ -195,6 +195,7 @@ public sealed class DiceRegistry
 		HashSet<string> typeNames)
 	{
 		Dictionary<string, int> nameCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+		HashSet<string> pairs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 		foreach (var combo in combos)
 		{
 			ComboCount++;
@@ -206,8 +207,23 @@ public sealed class DiceRegistry
 			{
 				Add("warning", $"combo '{combo.ComboName}' references unknown dice {combo.B}");
 			}
+			if (string.Equals(combo.A, combo.B, StringComparison.OrdinalIgnoreCase))
+			{
+				Add("warning", $"combo '{combo.ComboName}' pairs {combo.A} with itself");
+			}
+			else
+			{
+				string pairKey = string.Compare(combo.A, combo.B, StringComparison.OrdinalIgnoreCase) <= 0
+					? combo.A + "|" + combo.B
+					: combo.B + "|" + combo.A;
+				if (!pairs.Add(pairKey))
+				{
+					Add("warning", $"duplicate combo pair {combo.A}+{combo.B}");
+				}
+			}
 			if (string.IsNullOrEmpty(combo.ComboName))
 			{
+				Add("warning", $"combo {combo.A}+{combo.B} has no display name");
 				continue;
 			}
 			nameCounts.TryGetValue(combo.ComboName, out int count);
