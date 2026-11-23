@@ -20,12 +20,17 @@ public partial class RollTheDice
 	{
 		try
 		{
-			// Validate JSON syntax before CSS applies the reload: a broken file must
-			// keep the previous in-memory config instead of leaving a partial update.
+			// Validate JSON syntax and types before CSS applies the reload: a broken
+			// file must keep the previous in-memory config instead of leaving a
+			// partial update. JsonDocument alone catches syntax but not "true" vs 1.
 			string path = PluginConfigPath();
 			if (File.Exists(path))
 			{
-				using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+				string json = File.ReadAllText(path);
+				if (!ConfigFileValidator.TryDeserialize(json, out _, out string configError))
+				{
+					throw new InvalidDataException(configError);
+				}
 			}
 			PluginConfigExtensions.Reload<PluginConfig>(Config);
 			// Defensive defaults: a hand-edited "dices": null / "maps": null must not

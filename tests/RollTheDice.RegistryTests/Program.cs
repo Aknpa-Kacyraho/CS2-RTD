@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Text.Json;
 using Microsoft.Extensions.Localization;
 using CounterStrikeSharp.API.Core.Translations;
+using CounterStrikeSharp.API.Modules.Commands;
 using RollTheDice;
 using RollTheDice.Dices;
 using RollTheDice.Utils;
@@ -84,6 +85,7 @@ internal static class Program
 
 		UiChecks(built, localizer, names);
 		LifecycleChecks();
+		ConfigAndCommandChecks();
 
 		Console.WriteLine("--------------------------------");
 		Console.WriteLine($"{_passed} passed, {_failed} failed");
@@ -205,6 +207,29 @@ internal static class Program
 			.ToArray();
 		Check("amber ulong state excluded", !amberFields.Contains("_frozenUntil"), string.Join(",", amberFields));
 		Check("dictionary cleanup cast", new Dictionary<string, int>() is IDictionary);
+	}
+
+	private static void ConfigAndCommandChecks()
+	{
+		Check("config validator accepts object", ConfigFileValidator.TryDeserialize("{}", out _, out _));
+		Check("config validator accepts comments", ConfigFileValidator.TryDeserialize(
+			"{\n  // comment\n  \"enabled\": true,\n}", out _, out _));
+		Check("config validator rejects type", !ConfigFileValidator.TryDeserialize(
+			"{\"enabled\":\"yes\"}", out _, out string typeError) && typeError.Length > 0, typeError);
+		Check("config validator ignores unknown", ConfigFileValidator.TryDeserialize(
+			"{\"enabled\":true,\"unknown_future_key\":1}", out _, out _));
+
+		string? deployed = Environment.GetEnvironmentVariable("RTD_CONFIG_PATH");
+		if (!string.IsNullOrWhiteSpace(deployed) && File.Exists(deployed))
+		{
+			Check("deployed config parses", ConfigFileValidator.TryDeserialize(
+				File.ReadAllText(deployed), out _, out string deployedError), deployedError);
+		}
+
+		MethodInfo? givedice = typeof(global::RollTheDice.RollTheDice).GetMethod("CommandGiveDice");
+		CommandHelperAttribute? helper = givedice?.GetCustomAttribute<CommandHelperAttribute>();
+		Check("givedice accepts zero args", helper != null && helper.MinArgs == 0,
+			helper == null ? "attribute missing" : helper.MinArgs.ToString());
 	}
 
 	private static string Describe(DiceRegistry registry, string severity)

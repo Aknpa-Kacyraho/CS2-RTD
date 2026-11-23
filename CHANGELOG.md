@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.4.10 — 2026-11-23
+
+### Fixed
+
+- Config reload now pre-validates the full `PluginConfig` shape before CSS mutates the live object. A wrong type (for example `"enabled": "yes"`) keeps the previous config instead of risking a half-applied reload.
+- `!givedice` now accepts zero arguments, making the existing available-dice list reachable; `!givedice <player> [dice]` is unchanged.
+- Auto-roll no longer removes a player's current dice when the drawable pool is empty; it returns before the destructive replace.
+
+### Added
+
+- `ConfigFileValidator` with comment/trailing-comma/case-insensitive support and unknown-field tolerance.
+- 5 regression assertions (config validation x4, `!givedice` arity x1); standard suite 34, plus 1 optional real-config check via `RTD_CONFIG_PATH`.
+
+### Unchanged
+
+- Draw probabilities, weights, cooldowns, damage, durations, rewards, command semantics and config keys.
+
 ## 1.4.9 — 2026-11-23
 
 ### Fixed

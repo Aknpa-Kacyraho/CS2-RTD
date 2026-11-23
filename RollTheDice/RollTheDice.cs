@@ -79,11 +79,11 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.4.9";
+	public override string ModuleVersion => "1.4.10";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
-	[CommandHelper(1, "<player> [dice]")]
+	[CommandHelper(0, "<player> [dice]")]
 	public void CommandGiveDice(CCSPlayerController player, CommandInfo command)
 	{
 		string playerName = command.GetArg(1);
@@ -1464,6 +1464,12 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	private void AutoRollTick()
 	{
 		if (!_isDuringRound)
+		{
+			return;
+		}
+		// Auto-roll replaces the current dice. If nothing is drawable, do not
+		// strip the player first: a failed draw would leave them with no dice.
+		if (GetDrawablePool().Count == 0)
 		{
 			return;
 		}
