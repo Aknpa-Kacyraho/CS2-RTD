@@ -50,6 +50,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 	private readonly Dictionary<string, DiceBlueprint> _diceByName = new Dictionary<string, DiceBlueprint>(StringComparer.OrdinalIgnoreCase);
 	private List<DiceBlueprint>? _drawablePool;
 	private List<DiceBlueprint>? _normalPool;
+	private DiceRegistry? _diceRegistry;
 
 	private readonly PlayerNameService _playerNames = new PlayerNameService();
 
@@ -78,7 +79,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.4.4";
+	public override string ModuleVersion => "1.4.5";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -2215,6 +2216,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		RegisterListeners();
 		RegisterEventHandlers();
 		RegisterUserMessageHooks();
+		BuildDiceRegistry();
 		Console.WriteLine($"[RTD] v{ModuleVersion} ready: map={_currentMap} dices={_dices.Count} effects={(DiceEffects.Enabled ? "on" : "off")}");
 	}
 
@@ -2260,6 +2262,30 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		_playerNames.ClearKnownPrefixes();
 		_drawablePool = null;
 		_normalPool = null;
+		_diceRegistry = null;
+	}
+
+	/// <summary>
+	/// Read-only metadata check. A bad registry entry is logged, never fatal: dice
+	/// creation, draw weights and config values are already final at this point.
+	/// </summary>
+	private void BuildDiceRegistry()
+	{
+		try
+		{
+			_diceRegistry = DiceRegistry.Build(
+				typeof(DiceBlueprint).Assembly.GetTypes(),
+				_dices,
+				_currentMapConfig.Dices,
+				((BasePlugin)this).Localizer,
+				DiceSynergy._combos);
+			_diceRegistry.Log(Console.WriteLine);
+		}
+		catch (Exception ex)
+		{
+			_diceRegistry = null;
+			LogErr($"{DateTime.Now:HH:mm:ss} DiceRegistry.Build error (non-fatal): {ex.Message}\n");
+		}
 	}
 
 	private void RegisterListeners()

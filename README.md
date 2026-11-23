@@ -274,6 +274,13 @@
 
 ---
 
+## v1.4.5 Dice 元数据校验
+
+- 新增只读 `DiceRegistry`：启动时校验 Dice 类型、配置、稀有度、本地化名称、Combo 引用与 `dicefx` profile。
+- `!rtd_health` 增加 `registry=ok` / `registry=E{错误}/W{警告}`。
+- 新增 8 项 Registry 回归断言，覆盖 171 个 Dice 的类型、构造与配置对齐；CI 自动运行。
+- 不改抽骰概率、冷却、伤害、时长、命令、配置 Key 或玩家可见文案。
+
 ## v1.4.4 架构优化
 
 - 抽取 `PlayerNameService`：真名缓存、TAB 刷新 Timer、已知 dice/combo 前缀拥有独立所有者。

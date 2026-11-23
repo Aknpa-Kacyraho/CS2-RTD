@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.5 — 2026-11-23
+
+### Added
+
+- Read-only `DiceRegistry`: startup check of dice types, `DicesConfig` entries, rarity tiers, `dice_*_name` localization keys, combo references and `dicefx.json` profiles. Findings are logged only; draw weights, dice instances and config values are untouched.
+- `!rtd_health` reports `registry=ok` or `registry=E{errors}/W{warnings}`.
+- `tests/RollTheDice.RegistryTests`: 8 assertions covering all 171 dice types, construction, config alignment, combo references and the known duplicate combo-name warning. CI now runs it.
+
+### Changed
+
+- No player-visible behavior change. Draw probabilities, cooldowns, damage, durations, commands and config keys are identical to v1.4.4.
+
 ## 1.4.4 — 2026-11-23
 
 ### Changed

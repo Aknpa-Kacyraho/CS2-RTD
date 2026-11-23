@@ -76,6 +76,19 @@ jobs:
             Write-Host "Config assertion runner not present; skipping."
           }
 
+          # Dice metadata checks: type/config/localization/rarity/combo alignment.
+          $registryTest = "tests/RollTheDice.RegistryTests/RollTheDice.RegistryTests.csproj"
+          if (Test-Path $registryTest) {
+            dotnet build $registryTest -c Release --no-restore
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+            dotnet run --project $registryTest -c Release --no-build
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          else {
+            Write-Host "Registry assertion runner not present; skipping."
+          }
+
       - name: Architecture check
         shell: pwsh
         run: |
