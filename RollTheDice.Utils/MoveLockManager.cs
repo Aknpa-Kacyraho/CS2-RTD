@@ -111,6 +111,51 @@ public static class MoveLockManager
 		return _locks.TryGetValue(player.SteamID, out LockState state) && state.Stack.Count > 0;
 	}
 
+	/// <summary>
+	/// Remove a named scope; if it was the last one, apply an explicit target
+	/// (e.g. Fate's respawn wants Walk) instead of the captured original.
+	/// Other remaining scopes still win over the fallback.
+	/// </summary>
+	public static void ReleaseTo(CCSPlayerController player, string key, MoveType_t target)
+	{
+		if (player == null)
+		{
+			return;
+		}
+		ulong steamId;
+		try
+		{
+			steamId = player.SteamID;
+		}
+		catch
+		{
+			return;
+		}
+		if (!_locks.TryGetValue(steamId, out LockState state))
+		{
+			return;
+		}
+		if (!state.Stack.Remove(key, out int? current))
+		{
+			return;
+		}
+		if (current.HasValue)
+		{
+			CCSPlayerPawn? pawn = player.PlayerPawn?.Value;
+			if (pawn != null && pawn.IsValid)
+			{
+				ApplyTarget(pawn, (MoveType_t)current.Value);
+			}
+			return;
+		}
+		_locks.Remove(steamId);
+		CCSPlayerPawn? restorePawn = player.PlayerPawn?.Value;
+		if (restorePawn != null && restorePawn.IsValid)
+		{
+			ApplyTarget(restorePawn, target);
+		}
+	}
+
 	/// <summary>Drop a player's scopes. Restores the captured move types when the controller is still valid.</summary>
 	public static void Clear(ulong steamID)
 	{

@@ -274,6 +274,15 @@
 
 ---
 
+## v1.4.17 收尾清理
+
+- TOML 配置也走原子重载；JSON/TOML 失败都会回滚。
+- Izayoi+Heaven 改名「月华天堂」，68 个 Combo 显示名唯一。
+- Add 期间抑制 Dice 自身 `NotifyPlayers`，抽到播报只保留一套 reveal；HUD 关闭时聊天补效果描述。
+- Fate 黎明冻结/复活/清理迁移到 `MoveLockManager.ReleaseTo`，Dice 内不再直接写 MoveType。
+- 断线清理扩展 ulong primitive/string/enum/HashSet 状态；实体 map 跳过。
+- 不做性能索引/主类拆分/实机验证，原因见指南。
+
 ## v1.4.16 配置原子重载
 
 - JSON 配置重载改为“先验证、再快照、再应用、失败回滚”；setter 中途异常不再留下半套配置。

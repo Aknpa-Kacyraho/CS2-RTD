@@ -234,6 +234,29 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 	{
 	}
 
+	private static int _suppressHolderNotificationDepth;
+
+	/// <summary>
+	/// True while a dice is being added from the roll/give path. Add-time
+	/// NotifyPlayers output is suppressed because AnnounceDiceRarity sends the
+	/// single reveal (chat + HUD) right afterwards.
+	/// </summary>
+	public static bool HolderNotificationsSuppressed => _suppressHolderNotificationDepth > 0;
+
+	/// <summary>Add a holder without the dice's own chat/center notification.</summary>
+	public static void AddWithoutHolderNotification(DiceBlueprint dice, CCSPlayerController player)
+	{
+		_suppressHolderNotificationDepth++;
+		try
+		{
+			dice.Add(player);
+		}
+		finally
+		{
+			_suppressHolderNotificationDepth--;
+		}
+	}
+
 	public virtual void Add(CCSPlayerController player)
 	{
 		if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && !((CEntityInstance)(object)((CBasePlayerController)player).Pawn?.Value == (CEntityInstance)null) && ((CEntityInstance)((CBasePlayerController)player).Pawn.Value).IsValid)
@@ -350,24 +373,53 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 			List<FieldInfo> fields = new List<FieldInfo>();
 			foreach (FieldInfo field in diceType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
 			{
-				Type fieldType = field.FieldType;
-				if (!fieldType.IsGenericType)
-				{
-					continue;
-				}
-				Type definition = fieldType.GetGenericTypeDefinition();
-				Type[] arguments = fieldType.GetGenericArguments();
-				if (arguments.Length == 0 || arguments[0] != typeof(CCSPlayerController))
-				{
-					continue;
-				}
-				if (definition == typeof(Dictionary<,>) || definition == typeof(HashSet<>))
+				if (IsCleanableStateField(field.FieldType))
 				{
 					fields.Add(field);
 				}
 			}
 			return fields.ToArray();
 		});
+	}
+
+	private static bool IsCleanableStateField(Type fieldType)
+	{
+		if (!fieldType.IsGenericType)
+		{
+			return false;
+		}
+		Type definition = fieldType.GetGenericTypeDefinition();
+		Type[] arguments = fieldType.GetGenericArguments();
+		if (arguments.Length == 0)
+		{
+			return false;
+		}
+		if (definition == typeof(Dictionary<,>))
+		{
+			if (arguments[0] == typeof(CCSPlayerController))
+			{
+				return true;
+			}
+			return arguments[0] == typeof(ulong) && IsSafeUlongValue(arguments[1]);
+		}
+		if (definition == typeof(HashSet<>))
+		{
+			return arguments[0] == typeof(CCSPlayerController) || arguments[0] == typeof(ulong);
+		}
+		return false;
+	}
+
+	/// <summary>
+	/// Only primitive/string/enum/HashSet&lt;ulong&gt; values are auto-cleaned for
+	/// ulong-keyed maps. Entity-owned values (swords/beams/glows) need a dice-specific
+	/// cleanup so the generic pass does not drop the only reference to a live entity.
+	/// </summary>
+	private static bool IsSafeUlongValue(Type type)
+	{
+		return type.IsPrimitive
+			|| type.IsEnum
+			|| type == typeof(string)
+			|| type == typeof(HashSet<ulong>);
 	}
 
 	private void CleanControllerState(ulong steamId)
@@ -398,6 +450,10 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 						{
 							keys.Add(key);
 						}
+						else if (key is ulong id && id == steamId)
+						{
+							keys.Add(key);
+						}
 					}
 					foreach (object key in keys)
 					{
@@ -418,6 +474,10 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 					{
 						set.Remove(controller);
 					}
+				}
+				else if (value is ISet<ulong> idSet)
+				{
+					idSet.Remove(steamId);
 				}
 			}
 			catch
@@ -493,6 +553,10 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 
 	public void NotifyPlayers(CCSPlayerController player, string diceName, Dictionary<string, string> data)
 	{
+		if (HolderNotificationsSuppressed)
+		{
+			return;
+		}
 		if (_localizer["dice_" + diceName + "_player"].ResourceNotFound || (!_globalConfig.NotifyPlayerViaChatMsg && !_globalConfig.NotifyPlayerViaCenterMsg))
 		{
 			return;

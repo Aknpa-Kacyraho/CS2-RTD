@@ -79,7 +79,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.4.16";
+	public override string ModuleVersion => "1.4.17";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -1797,7 +1797,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					{
 						diceBlueprint.Remove(player, DiceRemoveReason.NewDice);
 					}
-					diceBlueprint.Add(player);
+					DiceBlueprint.AddWithoutHolderNotification(diceBlueprint, player);
 					DiceEffects.OnDiceAdded(player, diceBlueprint.ClassName);
 					_playerNames.Refresh(player);
 					LogDebug($"{DateTime.Now:HH:mm:ss} ✓ {((CBasePlayerController)player).PlayerName} ← {diceBlueprint.ClassName}\n");
@@ -1824,7 +1824,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					{
 						diceBlueprint2.Remove(player, DiceRemoveReason.NewDice);
 					}
-					diceBlueprint2.Add(player);
+					DiceBlueprint.AddWithoutHolderNotification(diceBlueprint2, player);
 					DiceEffects.OnDiceAdded(player, diceBlueprint2.ClassName);
 					_playerNames.Refresh(player);
 					LogDebug($"{DateTime.Now:HH:mm:ss} ✓ {((CBasePlayerController)player).PlayerName} ← {diceName}\n");
@@ -1937,14 +1937,23 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			string label = DiceUi.TierLabel(tier);
 			string color = DiceUi.TierColor(tier).ToString();
 			string prefix = ((BasePlugin)this).Localizer["command.prefix"].Value;
+			string description = DiceUi.DiceDescription(dice, ((BasePlugin)this).Localizer);
+			bool showHud = Config?.Effects?.Hud ?? true;
 			player.PrintToChat($" {prefix}{color}🎲 你抽到了 [{label}] {localized} {((BasePlugin)this).Localizer["command.rtd.hint.status"].Value}");
-			if (Config?.Effects?.Hud ?? true)
+			if (!showHud
+				&& !string.IsNullOrEmpty(description)
+				&& !description.StartsWith("Unknown", StringComparison.Ordinal))
+			{
+				// NotifyPlayers is suppressed during Add; keep the effect text in
+				// chat when the HUD is disabled.
+				player.PrintToChat($" {prefix}{description}");
+			}
+			if (showHud)
 			{
 				string effects = DiceEffects.DescribeEffects(dice.ClassName);
 				string effectLine = string.IsNullOrEmpty(effects)
 					? ""
 					: $"<br/><span style=\"font-size:16px;color:#9ad\">特效：{DiceUi.HtmlEncode(effects)}</span>";
-				string description = DiceUi.DiceDescription(dice, ((BasePlugin)this).Localizer);
 				string descriptionLine = string.IsNullOrEmpty(description) || description.StartsWith("Unknown", StringComparison.Ordinal)
 					? ""
 					: $"<br/><span style=\"font-size:16px;color:#ddd\">{DiceUi.HtmlEncode(description)}</span>";

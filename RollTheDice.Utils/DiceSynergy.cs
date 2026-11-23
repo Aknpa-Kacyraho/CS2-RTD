@@ -143,7 +143,7 @@ public static class DiceSynergy
 		num2++;
 		span[num2] = ("World", "Heaven", "超越天堂");
 		num2++;
-		span[num2] = ("Izayoi", "Heaven", "超越天堂");
+		span[num2] = ("Izayoi", "Heaven", "月华天堂");
 		num2++;
 		span[num2] = ("DeathKnight", "Frostmourne", "死亡骑士完全体");
 		num2++;

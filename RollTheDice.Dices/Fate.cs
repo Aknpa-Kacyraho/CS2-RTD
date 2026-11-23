@@ -237,6 +237,7 @@ public class Fate : DiceBlueprint
 			SpeedBonusManager.Unregister(val, "FateOrbit");
 			DamageBonusManager.Unregister(val, "FateBalance");
 			SpeedBonusManager.Unregister(val, "FateDarktide");
+			MoveLockManager.ReleaseTo(val, "FateDawn", MoveType_t.MOVETYPE_WALK);
 			if (_dawnOriginalMaxHealth.TryGetValue(sid, out int origMax))
 			{
 				CCSPlayerPawn pawn = val.PlayerPawn?.Value;
@@ -421,8 +422,7 @@ public class Fate : DiceBlueprint
 						Utilities.SetStateChanged((CBaseEntity)(object)val5, "CBaseEntity", "m_iMaxHealth", 0);
 						Utilities.SetStateChanged((CBaseEntity)(object)val5, "CBaseEntity", "m_iHealth", 0);
 						Utilities.SetStateChanged((CBaseEntity)(object)val5, "CCSPlayerPawn", "m_ArmorValue", 0);
-						((CBaseEntity)val5).MoveType = (MoveType_t)2;
-						Schema.SetSchemaValue<int>(((NativeEntity)val5).Handle, "CBaseEntity", "m_nActualMoveType", 2);
+						MoveLockManager.ReleaseTo(player, "FateDawn", MoveType_t.MOVETYPE_WALK);
 						((CBaseModelEntity)val5).Render = Color.FromArgb(255, 255, 255, 255);
 						Utilities.SetStateChanged((CBaseEntity)(object)val5, "CBaseModelEntity", "m_clrRender", 0);
 						player.PrintToCenterAlert("\ud83c\udf05 黎明降临！你已重生！");
@@ -774,11 +774,11 @@ public class Fate : DiceBlueprint
 						{
 							_dawnRespawnTime.Remove(sid);
 							_dawnActivated[sid] = false;
+							MoveLockManager.ReleaseTo(capV, "FateDawn", MoveType_t.MOVETYPE_WALK);
 						}
 						else
 						{
-							((CBaseEntity)val).MoveType = (MoveType_t)0;
-							Schema.SetSchemaValue<int>(((NativeEntity)val).Handle, "CBaseEntity", "m_nActualMoveType", 0);
+							MoveLockManager.Lock(capV, "FateDawn");
 							((CBaseModelEntity)val).Render = Color.FromArgb(255, 255, 215, 0);
 							Utilities.SetStateChanged((CBaseEntity)(object)val, "CBaseModelEntity", "m_clrRender", 0);
 							capV.PrintToCenterAlert($"\ud83c\udf05 黎明将至...{freezeDur:F0}s后重生！");

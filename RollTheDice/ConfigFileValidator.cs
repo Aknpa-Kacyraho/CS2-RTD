@@ -1,6 +1,7 @@
 using System;
 using System.Text.Json;
 using CounterStrikeSharp.API.Modules.Extensions;
+using Tomlyn;
 
 namespace RollTheDice;
 
@@ -48,6 +49,31 @@ public static class ConfigFileValidator
 		try
 		{
 			config = JsonSerializer.Deserialize<PluginConfig>(json, Options);
+			if (config == null)
+			{
+				error = "Config deserialized to null";
+				return false;
+			}
+			error = string.Empty;
+			return true;
+		}
+		catch (Exception ex)
+		{
+			config = null;
+			error = ex.Message;
+			return false;
+		}
+	}
+
+	/// <summary>TOML counterpart so TOML reload can also use the atomic applier.</summary>
+	public static bool TryDeserializeToml(string text, out PluginConfig? config, out string error)
+	{
+		try
+		{
+			config = Toml.ToModel<PluginConfig>(text, options: new TomlModelOptions
+			{
+				ConvertPropertyName = name => name
+			});
 			if (config == null)
 			{
 				error = "Config deserialized to null";

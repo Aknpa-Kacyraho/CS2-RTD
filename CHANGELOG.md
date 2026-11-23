@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.4.17 — 2026-11-23
+
+### Fixed
+
+- TOML config reload now uses Tomlyn + `ConfigApplier`, so JSON and TOML both validate/app/rollback atomically. Other formats keep CSS Reload.
+- `Izayoi + Heaven` combo renamed from「超越天堂」to「月华天堂」; all 68 combo display names are now unique.
+- Add-time `NotifyPlayers` output is suppressed; `AnnounceDiceRarity` is the single reveal. HUD on: one chat + one center; HUD off: rarity chat + description chat.
+- `Fate` dawn freeze/respawn/cleanup now uses `MoveLockManager.ReleaseTo(player, "FateDawn", MOVETYPE_WALK)` instead of writing `MoveType`/`m_nActualMoveType` directly.
+- Disconnect cleanup now also removes ulong-keyed primitive/string/enum/`HashSet<ulong>` state for the disconnected SteamID. Entity-owned maps are deliberately skipped.
+
+### Added
+
+- `MoveLockManager.ReleaseTo`.
+- Tests: TOML parse/apply, unique combo names, Fate source guard, ulong cleanup, entity-map preservation, add-suppression guards. Standard 73; real config 74.
+
+### Not done
+
+- Performance indexing needs live profiling.
+- Main class split (2730/2900) is still within budget.
+- In-game regression still pending.
+
 ## 1.4.16 — 2026-11-23
 
 ### Fixed

@@ -20,14 +20,23 @@ public partial class RollTheDice
 	{
 		try
 		{
-			// Validate the exact file CSS will reload, with CSS's own JSON options.
-			// JSON then applies through ConfigApplier so a throwing setter rolls back;
-			// TOML keeps the CSS Reload path (we do not ship a TOML parser here).
+			// Validate the exact file CSS will reload, with CSS's own options.
+			// JSON and TOML apply through ConfigApplier so a throwing setter rolls
+			// back; other formats keep the CSS Reload path.
 			string path = Config.GetConfigPath();
 			if (File.Exists(path) && path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
 			{
 				string json = File.ReadAllText(path);
 				if (!ConfigFileValidator.TryDeserialize(json, out PluginConfig? candidate, out string configError) || candidate == null)
+				{
+					throw new InvalidDataException(configError);
+				}
+				ConfigApplier.Apply(Config, candidate);
+			}
+			else if (File.Exists(path) && path.EndsWith(".toml", StringComparison.OrdinalIgnoreCase))
+			{
+				string toml = File.ReadAllText(path);
+				if (!ConfigFileValidator.TryDeserializeToml(toml, out PluginConfig? candidate, out string configError) || candidate == null)
 				{
 					throw new InvalidDataException(configError);
 				}

@@ -90,6 +90,7 @@ internal static class Program
 		ComboChecks(registry);
 		BroadcastChecks(built, localizer);
 		ConfigApplyChecks();
+		CleanupChecks(localizer);
 
 		Console.WriteLine("--------------------------------");
 		Console.WriteLine($"{_passed} passed, {_failed} failed");
@@ -209,7 +210,7 @@ internal static class Program
 		string[] amberFields = ((FieldInfo[])scanner.Invoke(null, new object[] { typeof(Amber) })!)
 			.Select(field => field.Name)
 			.ToArray();
-		Check("amber ulong state excluded", !amberFields.Contains("_frozenUntil"), string.Join(",", amberFields));
+		Check("amber ulong state included", amberFields.Contains("_frozenUntil"), string.Join(",", amberFields));
 		Check("dictionary cleanup cast", new Dictionary<string, int>() is IDictionary);
 	}
 
@@ -266,7 +267,7 @@ internal static class Program
 		Check("move locks start empty", MoveLockManager.ActiveLockCount == 0
 			&& MoveLockManager.LockedPlayerCount == 0);
 
-		foreach (string file in new[] { "Amber.cs", "Phoenix.cs", "Skyline.cs", "Void.cs" })
+		foreach (string file in new[] { "Amber.cs", "Fate.cs", "Phoenix.cs", "Skyline.cs", "Void.cs" })
 		{
 			string? path = FindRepoFile(Path.Combine("RollTheDice.Dices", file));
 			if (path == null)
@@ -306,9 +307,7 @@ internal static class Program
 			.GroupBy(combo => combo.ComboName)
 			.Where(group => group.Count() > 1)
 			.ToList();
-		Check("combo duplicate name known", duplicateNames.Count == 1
-			&& duplicateNames[0].Key == "超越天堂"
-			&& duplicateNames[0].Count() == 2,
+		Check("combo display names unique", duplicateNames.Count == 0,
 			string.Join(",", duplicateNames.Select(group => group.Key + "x" + group.Count())));
 
 		Check("combo registry guards", !registry.Issues.Any(issue =>
@@ -375,6 +374,12 @@ internal static class Program
 		Check("broadcast source guards", source.Contains("DiceUi.DiceDescription", StringComparison.Ordinal)
 			&& source.Contains("DiceUi.HtmlEncode", StringComparison.Ordinal)
 			&& source.Contains("GetTruePlayerName(player)", StringComparison.Ordinal));
+		Check("broadcast add suppression", source.Contains("AddWithoutHolderNotification", StringComparison.Ordinal)
+			&& !DiceBlueprint.HolderNotificationsSuppressed);
+
+		string? blueprintPath = FindRepoFile(Path.Combine("RollTheDice.Dices", "DiceBlueprint.cs"));
+		Check("broadcast suppression source", blueprintPath != null
+			&& File.ReadAllText(blueprintPath).Contains("HolderNotificationsSuppressed", StringComparison.Ordinal));
 	}
 
 	private static void ConfigApplyChecks()
@@ -407,6 +412,15 @@ internal static class Program
 			ConfigApplier.Apply(live, candidate);
 		}
 		Check("config apply json value", live.Enabled == false, live.Enabled.ToString());
+
+		PluginConfig tomlLive = new PluginConfig();
+		bool tomlParsed = ConfigFileValidator.TryDeserializeToml("enabled = false\n", out PluginConfig? tomlCandidate, out string tomlError);
+		Check("config apply parses toml", tomlParsed && tomlCandidate != null, tomlError);
+		if (tomlCandidate != null)
+		{
+			ConfigApplier.Apply(tomlLive, tomlCandidate);
+		}
+		Check("config apply toml value", tomlLive.Enabled == false, tomlLive.Enabled.ToString());
 	}
 
 	private sealed class ApplyProbe
@@ -424,6 +438,35 @@ internal static class Program
 		{
 			get => 0;
 			set => throw new InvalidOperationException("boom");
+		}
+	}
+
+	private static void CleanupChecks(IStringLocalizer localizer)
+	{
+		PluginConfig pluginConfig = new PluginConfig();
+		MapConfig mapConfig = new MapConfig();
+		CleanupProbeDice probe = new CleanupProbeDice(pluginConfig, mapConfig, localizer);
+		probe.Primitive[123UL] = 1;
+		probe.EntityLike[123UL] = new object();
+		probe.Ids.Add(123UL);
+		probe.CleanupHolderState(123UL, RollTheDice.Enums.DiceRemoveReason.Disconnect);
+
+		Check("ulong cleanup primitive", !probe.Primitive.ContainsKey(123UL));
+		Check("ulong cleanup set", !probe.Ids.Contains(123UL));
+		Check("ulong cleanup skips entity values", probe.EntityLike.ContainsKey(123UL));
+	}
+
+	private sealed class CleanupProbeDice : DiceBlueprint
+	{
+		public readonly Dictionary<ulong, int> Primitive = new Dictionary<ulong, int>();
+
+		public readonly Dictionary<ulong, object> EntityLike = new Dictionary<ulong, object>();
+
+		public readonly HashSet<ulong> Ids = new HashSet<ulong>();
+
+		public CleanupProbeDice(PluginConfig globalConfig, MapConfig config, IStringLocalizer localizer)
+			: base(globalConfig, config, localizer)
+		{
 		}
 	}
 
