@@ -11,6 +11,7 @@
 狼王（WolfKing） - 传说
 世界（World） - 传说
 坠落天空（FinalJudgment） - 传说
+誓约胜利之剑（Excalibur） - 传说
 超越天堂（BeyondHeaven） - combo
 死亡骑士完全体（DeathKnightComplete） - combo
 火巨龙（FireDragon） - combo

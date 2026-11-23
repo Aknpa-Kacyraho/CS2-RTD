@@ -18,7 +18,7 @@ public static class DynamicHandlers
 			Console.WriteLine($"[DynamicHandlers] {plugin.GetType().Name}: unknown listener '{listenerName}'.");
 			return;
 		}
-		MethodInfo method = plugin.GetType().GetMethod(listenerName);
+		MethodInfo method = plugin.GetType().GetMethod(listenerName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 		if (method == null)
 		{
 			Console.WriteLine($"[DynamicHandlers] {plugin.GetType().Name}: listener '{listenerName}' has no method.");
@@ -44,7 +44,9 @@ public static class DynamicHandlers
 				catch (Exception ex)
 				{
 					Console.WriteLine("[DynamicHandlers] damage-hook wrap failed for " + plugin.GetType().Name + ": " + ex.Message);
-					obj = Delegate.CreateDelegate(nestedType, plugin, method);
+					// Do not register the raw callback: it would bypass the player/entity
+					// filter and can crash on non-player damage targets.
+					return;
 				}
 			}
 			else if (listenerName == "OnTick")
@@ -61,7 +63,8 @@ public static class DynamicHandlers
 				catch (Exception ex)
 				{
 					Console.WriteLine("[DynamicHandlers] tick wrap failed for " + plugin.GetType().Name + ": " + ex.Message);
-					obj = Delegate.CreateDelegate(nestedType, plugin, method);
+					// Do not register the raw callback: it would bypass the holder check.
+					return;
 				}
 			}
 			else
@@ -86,7 +89,7 @@ public static class DynamicHandlers
 			Console.WriteLine($"[DynamicHandlers] {plugin.GetType().Name}: unknown listener '{listenerName}'.");
 			return;
 		}
-		MethodInfo method = plugin.GetType().GetMethod(listenerName);
+		MethodInfo method = plugin.GetType().GetMethod(listenerName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 		if (method == null)
 		{
 			Console.WriteLine($"[DynamicHandlers] {plugin.GetType().Name}: listener '{listenerName}' has no method.");
@@ -128,7 +131,7 @@ public static class DynamicHandlers
 			Console.WriteLine($"[DynamicHandlers] {plugin.GetType().Name}: unknown event '{eventName}'.");
 			return;
 		}
-		MethodInfo method = plugin.GetType().GetMethod(eventName);
+		MethodInfo method = plugin.GetType().GetMethod(eventName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 		if (method == null)
 		{
 			Console.WriteLine($"[DynamicHandlers] {plugin.GetType().Name}: event '{eventName}' has no method.");
@@ -158,7 +161,7 @@ public static class DynamicHandlers
 		{
 			return;
 		}
-		MethodInfo method = module.GetType().GetMethod(eventName);
+		MethodInfo method = module.GetType().GetMethod(eventName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 		if (!(method == null))
 		{
 			Type type2 = typeof(BasePlugin).GetNestedType("GameEventHandler`1").MakeGenericType(type);
@@ -179,7 +182,7 @@ public static class DynamicHandlers
 	public static void RegisterUserMessageHook(BasePlugin basePlugin, int messageId, DiceBlueprint plugin, HookMode hookMode)
 	{
 		//IL_00da: Unknown result type (might be due to invalid IL or missing references)
-		MethodInfo method = plugin.GetType().GetMethod($"HookUserMessage{messageId}");
+		MethodInfo method = plugin.GetType().GetMethod($"HookUserMessage{messageId}", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 		if (method == null)
 		{
 			Console.WriteLine("[DynamicHandlers] Method not found for UserMessage ID: " + messageId);
@@ -199,7 +202,7 @@ public static class DynamicHandlers
 	public static void DeregisterUserMessageHook(BasePlugin basePlugin, int messageId, DiceBlueprint plugin, HookMode hookMode)
 	{
 		//IL_00b5: Unknown result type (might be due to invalid IL or missing references)
-		MethodInfo method = plugin.GetType().GetMethod($"HookUserMessage{messageId}");
+		MethodInfo method = plugin.GetType().GetMethod($"HookUserMessage{messageId}", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 		if (!(method == null))
 		{
 		Type typeFromHandle = typeof(UserMessage.UserMessageHandler);

@@ -38,6 +38,9 @@ public static class DiceEffects
 	// 每 tick MoveTo 也带不走，所以 Wings 模式一律走这里。
 	private static readonly Dictionary<(ulong SteamId, string ClassName), WingFx> Winged = new Dictionary<(ulong, string), WingFx>();
 
+	// Rate-limit per-player tick errors; a broken effect must not flood the log at 64 Hz.
+	private static float _lastErrorLog = -999f;
+
 	public static bool Enabled { get; set; } = true;
 
 	/// <summary>只关掉"持续类"特效（脚底痕迹 / 持续附着 / 环绕），保留抽到/击杀等触发特效。</summary>
@@ -251,10 +254,10 @@ public static class DiceEffects
 		{
 			return;
 		}
-		try
+		float now = Server.CurrentTime;
+		foreach (CCSPlayerController player in Utilities.GetPlayers())
 		{
-			float now = Server.CurrentTime;
-			foreach (CCSPlayerController player in Utilities.GetPlayers())
+			try
 			{
 				if (player == null || !player.IsValid || player.IsBot || player.IsHLTV)
 				{
@@ -340,9 +343,15 @@ public static class DiceEffects
 					}
 				}
 			}
-		}
-		catch
-		{
+			catch (Exception ex)
+			{
+				// Isolate one player/dice failure so the rest of the tick still runs.
+				if (Server.CurrentTime - _lastErrorLog >= 5f)
+				{
+					_lastErrorLog = Server.CurrentTime;
+					Console.WriteLine($"[DiceFX] OnTick failed for slot {player?.Slot}: {ex.Message}");
+				}
+			}
 		}
 	}
 

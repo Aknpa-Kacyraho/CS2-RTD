@@ -103,6 +103,17 @@ public class Evolution : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_nextEvolveTime, steamId);
+		RemoveControllerEntries(_damageStacks, steamId);
+		RemoveControllerEntries(_speedStacks, steamId);
+		RemoveControllerEntries(_hpStacks, steamId);
+		RemoveControllerEntries(_originalMaxHealth, steamId);
+		DamageBonusManager.UnregisterBySteamId(steamId, "Evolution");
+		SpeedBonusManager.UnregisterBySteamId(steamId, "Evolution");
+	}
+
 	private void RevertPlayer(CCSPlayerController player)
 	{
 		DamageBonusManager.Unregister(player, "Evolution");

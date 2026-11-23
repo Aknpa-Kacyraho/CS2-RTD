@@ -21,7 +21,9 @@ public static class StackingHealth
 			}
 			if (!_baseHealth.ContainsKey(steamID))
 			{
-				_baseHealth[steamID] = 100;
+				// Capture the real base health instead of assuming 100; other plugins
+				// or server modes may use a different value.
+				_baseHealth[steamID] = ((CBaseEntity)player.PlayerPawn.Value).MaxHealth;
 			}
 			if (!_modifiers[steamID].ContainsKey(key))
 			{
@@ -33,10 +35,14 @@ public static class StackingHealth
 
 	public static void UnregisterMultiplier(CCSPlayerController player, string key)
 	{
-		if ((CEntityInstance)(object)player == (CEntityInstance)null || !((CEntityInstance)player).IsValid)
+		if (player == null)
 		{
-			_modifiers.Remove((player != null) ? ((CBasePlayerController)player).SteamID : 0);
-			_baseHealth.Remove((player != null) ? ((CBasePlayerController)player).SteamID : 0);
+			return;
+		}
+		if (!player.IsValid)
+		{
+			// No safe SteamID read on an invalid controller. Disconnect cleanup uses
+			// Clear(ulong) instead of guessing key 0.
 			return;
 		}
 		ulong steamID = ((CBasePlayerController)player).SteamID;
@@ -47,15 +53,16 @@ public static class StackingHealth
 		value.Remove(key);
 		if (value.Count == 0)
 		{
+			int baseHealth = _baseHealth.TryGetValue(steamID, out int storedBase) ? storedBase : 100;
 			_modifiers.Remove(steamID);
 			_baseHealth.Remove(steamID);
 			if ((CEntityInstance)(object)player.PlayerPawn?.Value != (CEntityInstance)null && ((CEntityInstance)player.PlayerPawn.Value).IsValid)
 			{
 				CCSPlayerPawn value2 = player.PlayerPawn.Value;
-				((CBaseEntity)value2).MaxHealth = 100;
-				if (((CBaseEntity)value2).Health > 100)
+				((CBaseEntity)value2).MaxHealth = baseHealth;
+				if (((CBaseEntity)value2).Health > baseHealth)
 				{
-					((CBaseEntity)value2).Health = 100;
+					((CBaseEntity)value2).Health = baseHealth;
 				}
 				Utilities.SetStateChanged((CBaseEntity)(object)value2, "CBaseEntity", "m_iMaxHealth", 0);
 				Utilities.SetStateChanged((CBaseEntity)(object)value2, "CBaseEntity", "m_iHealth", 0);
@@ -98,6 +105,21 @@ public static class StackingHealth
 	{
 		_modifiers.Remove(steamID);
 		_baseHealth.Remove(steamID);
+	}
+
+	/// <summary>Cleanup-only overload for invalid/disconnected controllers (no pawn recompute).</summary>
+	public static void UnregisterMultiplier(ulong steamId, string key)
+	{
+		if (!_modifiers.TryGetValue(steamId, out Dictionary<string, float> map))
+		{
+			return;
+		}
+		map.Remove(key);
+		if (map.Count == 0)
+		{
+			_modifiers.Remove(steamId);
+			_baseHealth.Remove(steamId);
+		}
 	}
 
 	public static void ClearAll()

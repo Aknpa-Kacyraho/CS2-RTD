@@ -141,6 +141,12 @@ public class IceDragon : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_originalMaxHealth, steamId);
+		RemoveControllerEntries(_originalArmor, steamId);
+	}
+
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
 		//IL_0080: Unknown result type (might be due to invalid IL or missing references)

@@ -92,6 +92,12 @@ public class Knight : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_nextTransferTime, steamId);
+		RemoveControllerEntries(_originalMaxHealth, steamId);
+	}
+
 	public void OnTick()
 	{
 		//IL_0197: Unknown result type (might be due to invalid IL or missing references)

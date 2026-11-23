@@ -122,6 +122,12 @@ public class FireDragon : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_originalMaxHealth, steamId);
+		RemoveControllerEntries(_originalArmor, steamId);
+	}
+
 	public HookResult EventPlayerHurt(EventPlayerHurt @event, GameEventInfo info)
 	{
 		//IL_0165: Unknown result type (might be due to invalid IL or missing references)

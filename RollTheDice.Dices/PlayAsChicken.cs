@@ -145,6 +145,12 @@ public class PlayAsChicken : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_chickens, steamId);
+		RemoveControllerEntries(_originalMaxHealth, steamId);
+	}
+
 	public void OnTick()
 	{
 		if (_chickens.Count == 0)

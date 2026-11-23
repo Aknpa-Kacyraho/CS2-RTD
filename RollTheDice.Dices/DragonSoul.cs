@@ -101,6 +101,11 @@ public class DragonSoul : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_originalMaxHealth, steamId);
+	}
+
 	public void OnTick()
 	{
 		if (_players.Count < 2 || _transforming)

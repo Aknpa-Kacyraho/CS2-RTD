@@ -244,7 +244,7 @@ public class ThunderChain : DiceBlueprint
 		return (HookResult)0;
 	}
 
-	private static void SpawnLightningVisuals(Vector fromPos, Vector hitPos)
+	private void SpawnLightningVisuals(Vector fromPos, Vector hitPos)
 	{
 		//IL_0090: Unknown result type (might be due to invalid IL or missing references)
 		//IL_00b0: Unknown result type (might be due to invalid IL or missing references)
@@ -266,7 +266,7 @@ public class ThunderChain : DiceBlueprint
 			beam.EndPos.Y = hitPos.Y;
 			beam.EndPos.Z = hitPos.Z;
 			((CBaseEntity)beam).DispatchSpawn();
-			new Timer(0.5f, (Action)delegate
+			ScopedTimer(0.5f, (Action)delegate
 			{
 				if ((CEntityInstance)(object)beam != (CEntityInstance)null && ((CEntityInstance)beam).IsValid)
 				{
@@ -282,7 +282,7 @@ public class ThunderChain : DiceBlueprint
 		boom.Teleport(hitPos, new QAngle((float?)0f, (float?)0f, (float?)0f), new Vector((float?)0f, (float?)0f, (float?)0f));
 		boom.DispatchSpawn();
 		((CEntityInstance)boom).AcceptInput("Explode", (CEntityInstance)null, (CEntityInstance)null, "", 0);
-		new Timer(0.5f, (Action)delegate
+		ScopedTimer(0.5f, (Action)delegate
 		{
 			if ((CEntityInstance)(object)boom != (CEntityInstance)null && ((CEntityInstance)boom).IsValid)
 			{

@@ -122,6 +122,12 @@ public class RoyalBarrier : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_originalMaxHealth, steamId);
+		RemoveControllerEntries(_originalArmor, steamId);
+	}
+
 	public void OnTick()
 	{
 		//IL_01bd: Unknown result type (might be due to invalid IL or missing references)

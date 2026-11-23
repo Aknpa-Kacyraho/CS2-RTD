@@ -16,6 +16,9 @@ public class FogOfWar : DiceBlueprint
 
 	private CPlayerVisibility? _playerVisibility;
 
+	// Map-provided entity must not be removed; only remove what this dice created.
+	private bool _ownsPlayerVisibility;
+
 	private readonly HashSet<uint> _foggedPawnIndices = new HashSet<uint>();
 
 	public override string ClassName => "FogOfWar";
@@ -105,10 +108,15 @@ public class FogOfWar : DiceBlueprint
 		if ((CEntityInstance)(object)_playerVisibility == (CEntityInstance)null || !((CEntityInstance)_playerVisibility).IsValid)
 		{
 			_playerVisibility = Utilities.CreateEntityByName<CPlayerVisibility>("env_player_visibility");
+			_ownsPlayerVisibility = true;
 			if ((CEntityInstance)(object)_playerVisibility != (CEntityInstance)null && ((CEntityInstance)_playerVisibility).IsValid)
 			{
 				((CBaseEntity)_playerVisibility).DispatchSpawn();
 			}
+		}
+		else
+		{
+			_ownsPlayerVisibility = false;
 		}
 		if ((CEntityInstance)(object)_playerVisibility != (CEntityInstance)null && ((CEntityInstance)_playerVisibility).IsValid)
 		{
@@ -141,7 +149,14 @@ public class FogOfWar : DiceBlueprint
 			((CEntityInstance)_fogController).Remove();
 		}
 		_fogController = null;
+		if (_ownsPlayerVisibility &&
+			(CEntityInstance)(object)_playerVisibility != (CEntityInstance)null &&
+			((CEntityInstance)_playerVisibility).IsValid)
+		{
+			((CEntityInstance)_playerVisibility).Remove();
+		}
 		_playerVisibility = null;
+		_ownsPlayerVisibility = false;
 	}
 
 	public void OnTick()

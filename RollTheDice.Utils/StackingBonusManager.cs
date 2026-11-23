@@ -88,6 +88,12 @@ public static class StackingBonusManager
 		}
 	}
 
+	/// <summary>Drop every buff owned by a player (disconnect / explicit cleanup).</summary>
+	public static void ClearPlayer(ulong steamId)
+	{
+		_bonuses.Remove(steamId);
+	}
+
 	public static float GetSource(ulong steamId, string domain, string source)
 	{
 		if (_bonuses.TryGetValue(steamId, out Dictionary<string, Entry> map) && map.TryGetValue(Key(domain, source), out Entry entry) && !IsExpired(entry))

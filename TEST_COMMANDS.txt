@@ -1,5 +1,5 @@
 ================================================================================
-  RollTheDice 全骰子测试命令 (已删黑潮/连跳大师，当前约 140 骰子)
+  RollTheDice 全骰子测试命令 (已删黑潮/连跳大师，当前171 骰子)
   用法: !givedice * ClassName
 ================================================================================
 !givedice * BeyondHeaven             超越天堂      [combodice] 按E暂停时间9s，只能一次！合成自World/十六夜+天堂
@@ -86,7 +86,6 @@
 !givedice * Martyrdom                殉道者        死亡时原地爆炸，对800范围内的敌人造成最多200伤害！
 !givedice * Mimic                    模仿大师       击杀敌人后获得其骰子！
 !givedice * Miser                    吝啬鬼        本回合每花费2000，受到的伤害降低10%！上限50%
-!givedice * Molt                     蜕皮         死亡时复活，体型缩小为0.4倍！
 !givedice * Mosquito                 蚊子         体型极小化！(20%大小, 22HP)
 !givedice * Necromancer              死灵法师       队友死亡时消耗50HP在死亡位置将其复活！复活后1秒无敌！（不能开枪）
 !givedice * Nightglow                夜光         地图亮度极低！但所有玩家发光可见！
@@ -119,7 +118,6 @@
 !givedice * Respawn                  涅槃         死亡后你将复活！
 !givedice * ReverseCausality         因果倒置       所有攻击伤害延迟5s生效，延迟期间你的伤害翻倍！
 !givedice * ReturnToSender           遣返         射击敌人有30%~70%几率将对方送回出生点！
-!givedice * Rewind                   回溯求源       按E触发时间回溯！全员回到出生点满血满甲，死者复活，回合时间重置！仅一次
 !givedice * RouletteGambler          轮盘赌徒       每次开枪有2%概率死亡！非死亡射击+1%速度+1%伤害(最高50%)！
 !givedice * RoyalBarrier             皇家壁垒       你获得了血甲！但移速极慢且无法跳跃！
 !givedice * Sacrifice                献祭         队友死亡4人时触发献祭！复活随机队友(300HP+300甲+AK47+速度×2)，自己献祭！
@@ -148,7 +146,6 @@
 !givedice * Traitor                  叛徒         击杀队友时随机杀死一名敌人！
 !givedice * Trickster                诡术师        你获得了一个假骰子！首次击杀后揭露真相并获得新骰子！
 !givedice * Twilight                 黄昏之时       全部玩家出生点随机互换！
-!givedice * Universe                 宇宙         你死亡时自动时间回溯！全员状态回滚到回合初！上限次
 !givedice * Vampire                  吸血鬼        造成的伤害回复自身HP！
 !givedice * Void                     虚无         按E遁入虚无！5s无敌+noclip飞行+隐身，不可攻击，冷却45s！
 !givedice * WASDChaos                方向错乱       全员方向错乱！WASD按键效果随机旋转！
@@ -221,3 +218,21 @@ Supernova      LaserCage       光轮圣裁        激光判定半径+40，更�
 FinalJudgment  Ragnarok        末日            坠落天空伤害范围+30%
 
 当前 Combo 总数: 40 对
+
+!givedice * Anatomist                解剖学家  爆头伤害 ×1.6，非爆头伤害 ×0.8
+!givedice * Combo                    连击  连续命中叠层：每层 +10% 伤害（上限 10 层），≥5 层每次命中回 5HP，满层 +15% 移速并标记敌人 5s
+!givedice * Crouch                   蹲伏  蹲下时减伤 30% 并每秒回复 5HP
+!givedice * Curse                    怨念  自身阵亡后标记击杀者受伤增加，存活队友获得短时伤害加成
+!givedice * Echo                     回音  命中敌人 0.8s 后对同一目标追加一次回音伤害
+!givedice * Excalibur                誓约胜利之剑  按住 E 蓄力、松手释放：光丝拼凑成剑，挥落后贯穿全场的金色光带（穿墙），命中 500 伤害，CD 90s
+!givedice * Fate                     命运  被击杀者的骰子必掉落，可触发平衡/预兆/命运效果
+!givedice * Guillotine               斩首  对 HP < 35% 的敌人造成致死伤害
+!givedice * IronHead                 铁头功  受到爆头伤害减少 99%
+!givedice * Kinship                  羁绊  队友阵亡时自己 1s 无敌；自己阵亡时存活队友 1s 无敌
+!givedice * LastStand                最后一发  弹匣只剩最后一发时，该发伤害 ×3
+!givedice * MagneticPulse            磁力脉冲  1s 内造成 20+ 伤害时把附近敌人吸到身边并减速 40%，CD 12s
+!givedice * PainConverter            痛觉转化  受敌伤按掉血比例蓄痛（上限 100），按 E 释放 5s 爆发：伤害 / 移速 / 回血
+!givedice * Rally                    集结  400~500 码内每名存活队友为自己与附近队友提供光环伤害 / 减伤（上限 5 层）
+!givedice * ReloadGap                换弹窗口  换弹过程中减伤 80%，换完 3s 内伤害 +40%
+!givedice * Teneril                  忒尼尔  队友阵亡时随机诅咒一名敌人（减速 + 削减当前血量）
+!givedice * Yagorou                  亚戈鲁  击杀后短时无敌；每回合一次致命伤免疫

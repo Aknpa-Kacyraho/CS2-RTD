@@ -159,6 +159,15 @@ public class DeathKnightComplete : DiceBlueprint
 		_deniedThisRound.Clear();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_originalMaxHealth, steamId);
+		RemoveControllerEntries(_originalArmor, steamId);
+		RemoveControllerEntries(_lastHealTime, steamId);
+		RemoveControllerEntries(_startMaxHP, steamId);
+		DamageReductionManager.UnregisterBySteamId(steamId, "DeathKnightComplete");
+	}
+
 	public void OnTick()
 	{
 		if (_players.Count == 0)

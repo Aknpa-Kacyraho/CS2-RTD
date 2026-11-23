@@ -5,6 +5,7 @@ using System.IO.Enumeration;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Extensions;
@@ -15,20 +16,36 @@ using RollTheDice.Utils;
 namespace RollTheDice;
 
 public partial class RollTheDice
-{	private void ReloadConfigFromDisk()
+{	private bool ReloadConfigFromDisk()
 	{
 		try
 		{
+			// Validate JSON syntax before CSS applies the reload: a broken file must
+			// keep the previous in-memory config instead of leaving a partial update.
+			string path = PluginConfigPath();
+			if (File.Exists(path))
+			{
+				using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+			}
 			PluginConfigExtensions.Reload<PluginConfig>(Config);
+			// Defensive defaults: a hand-edited "dices": null / "maps": null must not
+			// leave the plugin in a half-initialized state later in the map load.
+			Config.Dices ??= new DicesConfig();
+			Config.MapConfigs ??= new Dictionary<string, MapConfig>();
+			Config.PlayerConfigs ??= new Dictionary<ulong, PlayerConfig>();
+			DiceEffects.Enabled = Config.Effects?.Enabled ?? true;
+			DiceEffects.TrailsEnabled = Config.Effects?.Trails ?? true;
 			UpdatePlayerConfig();
 			// Deliberately no Update() here: reloading must not write the in-memory copy
 			// back to disk, otherwise a manual edit is overwritten on the next map start.
+			return true;
 		}
 		catch (Exception ex)
 		{
 			string text = ((BasePlugin)this).Localizer["core.error"].Value.Replace("{error}", ex.Message);
 			Console.WriteLine(text);
 			Server.PrintToChatAll(text);
+			return false;
 		}
 	}
 
@@ -62,9 +79,10 @@ public partial class RollTheDice
 	}
 
 	/// <summary>
-	/// Map configs are overlays: start from the global dice config and copy only the
-	/// values that differ from a default-constructed dice config. Without this, a map
-	/// that disables one dice resets every other dice to defaults instead of globals.
+	/// Fallback overlay used only when the raw JSON cannot be read (missing file or a
+	/// runtime-only map config created by the admin command). Prefer
+	/// <see cref="MapConfigMerger"/>: this path compares against default values and
+	/// cannot distinguish an omitted field from an explicit default value.
 	/// </summary>
 	private static DicesConfig MergeMapDices(DicesConfig global, DicesConfig map)
 	{
@@ -119,28 +137,107 @@ public partial class RollTheDice
 
 	private void LoadMapConfig(string mapName)
 	{
-		MapConfig? matched = (from mapConfig in Config.MapConfigs
-			where FileSystemName.MatchesSimpleExpression(mapConfig.Key.AsSpan(), mapName.AsSpan())
-			select mapConfig.Value).FirstOrDefault();
+		DicesConfig globalDices = Config.Dices ?? new DicesConfig();
+		MapConfig? matched = null;
+		string? matchedPattern = null;
+		if (Config.MapConfigs != null)
+		{
+			foreach (KeyValuePair<string, MapConfig> entry in Config.MapConfigs)
+			{
+				if (FileSystemName.MatchesSimpleExpression(entry.Key.AsSpan(), mapName.AsSpan()))
+				{
+					matched = entry.Value;
+					matchedPattern = entry.Key;
+					break;
+				}
+			}
+		}
+
 		if (matched == null)
 		{
-			_currentMapConfig = new MapConfig { Dices = Config.Dices };
+			_currentMapConfig = new MapConfig { Dices = globalDices };
 		}
 		else
 		{
-			matched.Dices = MergeMapDices(Config.Dices, matched.Dices ?? new DicesConfig());
-			_currentMapConfig = matched;
+			// Prefer the raw JSON overlay: it preserves which fields the map actually
+			// wrote, including explicit false/0/default values. Fall back to the old
+			// model-based merge only when the file cannot be read (e.g. a runtime-only
+			// map config created by the admin command).
+			JsonObject? mapDicesJson = matchedPattern == null ? null : ReadMapDicesJson(matchedPattern);
+			DicesConfig mergedDices = mapDicesJson != null
+				? MapConfigMerger.Merge(globalDices, mapDicesJson)
+				: MergeMapDices(globalDices, matched.Dices ?? new DicesConfig());
+
+			// Do not write the merged overlay back into matched.Dices: matched is the
+			// deserialized map entry and must stay a pure overlay, otherwise the next
+			// map load starts from a copy that already contains stale global values.
+			_currentMapConfig = new MapConfig
+			{
+				Enabled = matched.Enabled,
+				Dices = mergedDices
+			};
 		}
 		if (_currentMapConfig.Dices == null)
 		{
-			_currentMapConfig.Dices = Config.Dices;
+			_currentMapConfig.Dices = globalDices;
 		}
 		Console.WriteLine(((BasePlugin)this).Localizer["core.mapconfig"].Value.Replace("{mapName}", mapName));
+	}
+
+	/// <summary>Path of the plugin's own JSON config (same directory as dicefx.json).</summary>
+	private string PluginConfigPath()
+	{
+		DirectoryInfo pluginDir = new DirectoryInfo(ModuleDirectory);
+		string cssRoot = pluginDir.Parent?.Parent?.FullName ?? Directory.GetCurrentDirectory();
+		return Path.Combine(cssRoot, "configs", "plugins", Path.GetFileName(ModuleDirectory), "RollTheDice.json");
+	}
+
+	/// <summary>
+	/// Reads maps.&lt;pattern&gt;.dices from the on-disk JSON. Returns null on any
+	/// failure or when the map has no dice block; the caller then falls back to the
+	/// deserialized model merge. Never throws.
+	/// </summary>
+	private JsonObject? ReadMapDicesJson(string mapPattern)
+	{
+		try
+		{
+			string path = PluginConfigPath();
+			if (!File.Exists(path))
+			{
+				return null;
+			}
+			using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+			if (!document.RootElement.TryGetProperty("maps", out JsonElement maps) ||
+				maps.ValueKind != JsonValueKind.Object)
+			{
+				return null;
+			}
+			if (!maps.TryGetProperty(mapPattern, out JsonElement mapConfig) ||
+				mapConfig.ValueKind != JsonValueKind.Object)
+			{
+				return null;
+			}
+			if (!mapConfig.TryGetProperty("dices", out JsonElement dices) ||
+				dices.ValueKind != JsonValueKind.Object)
+			{
+				return null;
+			}
+			return JsonNode.Parse(dices.GetRawText()) as JsonObject;
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine("[RollTheDice] failed to read raw map config for '" + mapPattern + "': " + ex.Message);
+			return null;
+		}
 	}
 
 	public void OnConfigParsed(PluginConfig config)
 	{
 		Config = config;
+		// Keep the config graph usable even if a hand-edited file contains null blocks.
+		Config.Dices ??= new DicesConfig();
+		Config.MapConfigs ??= new Dictionary<string, MapConfig>();
+		Config.PlayerConfigs ??= new Dictionary<ulong, PlayerConfig>();
 		DiceEffects.Enabled = config.Effects?.Enabled ?? true;
 		DiceEffects.TrailsEnabled = config.Effects?.Trails ?? true;
 		Console.WriteLine(((BasePlugin)this).Localizer["core.config"]);
@@ -148,19 +245,26 @@ public partial class RollTheDice
 
 	private void UpdatePlayerConfig()
 	{
+		Config.PlayerConfigs ??= new Dictionary<ulong, PlayerConfig>();
+		_playerConfigs ??= new Dictionary<ulong, PlayerConfig>();
 		if (_playerConfigs.Count == 0)
 		{
 			_playerConfigs = Config.PlayerConfigs;
+			return;
 		}
-		else if (!ReferenceEquals(Config.PlayerConfigs, _playerConfigs))
+		if (ReferenceEquals(Config.PlayerConfigs, _playerConfigs))
 		{
-			// Merge by SteamID instead of replacing the whole dictionary, so entries
-			// added externally while the plugin was running are not discarded.
-			Config.PlayerConfigs ??= new Dictionary<ulong, PlayerConfig>();
-			foreach (KeyValuePair<ulong, PlayerConfig> entry in _playerConfigs)
+			return;
+		}
+		// Merge by SteamID without overwriting entries that were reloaded from disk:
+		// only configs added at runtime are carried over, so a manual edit wins.
+		foreach (KeyValuePair<ulong, PlayerConfig> entry in _playerConfigs)
+		{
+			if (!Config.PlayerConfigs.ContainsKey(entry.Key))
 			{
 				Config.PlayerConfigs[entry.Key] = entry.Value;
 			}
 		}
+		_playerConfigs = Config.PlayerConfigs;
 	}
 }

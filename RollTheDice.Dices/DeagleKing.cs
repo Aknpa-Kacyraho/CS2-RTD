@@ -73,6 +73,11 @@ public class DeagleKing : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		StackingHealth.Clear(steamId);
+	}
+
 	public HookResult OnPlayerTakeDamagePre(CBaseEntity entity, CTakeDamageInfo info)
 	{
 		if (_players.Count == 0 || info == null || info.Damage <= 0f)

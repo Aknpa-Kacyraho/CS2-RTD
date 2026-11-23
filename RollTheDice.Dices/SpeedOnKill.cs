@@ -61,7 +61,7 @@ namespace RollTheDice.Dices;
 		attacker.PrintToCenterAlert($"\u2694 \u8fde\u51fb\u8282\u594f {multiplier * 100f:F0}% {duration:F0}\u79d2!");
 		if (_activeBoosts.Remove(attacker, out Timer previous) && previous != null)
 		{
-			previous.Kill();
+			CancelScopedTimer(previous);
 		}
 		_activeBoosts[attacker] = ScopedTimer(duration, (Action)delegate
 		{
@@ -106,7 +106,7 @@ namespace RollTheDice.Dices;
 		SpeedBonusManager.Unregister(player, "SpeedOnKill");
 		if (_activeBoosts.Remove(player, out Timer value) && value != null)
 		{
-			value.Kill();
+			CancelScopedTimer(value);
 		}
 		CCSPlayerPawn val = player.PlayerPawn?.Value;
 		if (val != null && ((CEntityInstance)val).IsValid)
@@ -122,13 +122,13 @@ namespace RollTheDice.Dices;
 		{
 			if (val4 != null)
 			{
-				val4.Kill();
+				CancelScopedTimer(val4);
 			}
-			if (val3 != null)
+			if (val3 != null && val3.IsValid)
 			{
 				SpeedBonusManager.Unregister(val3, "SpeedOnKill");
 			}
-			CCSPlayerPawn val5 = ((val3 == null) ? null : val3.PlayerPawn?.Value);
+			CCSPlayerPawn val5 = ((val3 == null || !val3.IsValid) ? null : val3.PlayerPawn?.Value);
 			if (val5 != null && ((CEntityInstance)val5).IsValid)
 			{
 				val5.VelocityModifier = 1f + SpeedBonusManager.GetEffective(val3, 100f);
@@ -142,6 +142,22 @@ namespace RollTheDice.Dices;
 	public override void Destroy()
 	{
 		Reset();
+	}
+
+	public override void RemoveBySteamId(ulong steamId, DiceRemoveReason reason)
+	{
+		foreach (var pair in _activeBoosts.ToList())
+		{
+			CCSPlayerController player = pair.Key;
+			// Short-circuit before reading SteamID: the controller may already be invalid.
+			if (player == null || !player.IsValid || player.SteamID == steamId)
+			{
+				CancelScopedTimer(pair.Value);
+				_activeBoosts.Remove(player);
+			}
+		}
+		SpeedBonusManager.UnregisterBySteamId(steamId, "SpeedOnKill");
+		base.RemoveBySteamId(steamId, reason);
 	}
 
 	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
@@ -170,7 +186,7 @@ namespace RollTheDice.Dices;
 		attacker.PrintToCenterAlert($"⚡ 击杀加速 {(num - 1f) * 100f:F0}% {num2:F0}秒!");
 		if (_activeBoosts.Remove(attacker, out Timer value2) && value2 != null)
 		{
-			value2.Kill();
+			CancelScopedTimer(value2);
 		}
 		_activeBoosts[attacker] = ScopedTimer(num2, (Action)delegate
 		{

@@ -108,6 +108,13 @@ public class Dragonborn : DiceBlueprint
 		_originalMaxHealth.Clear();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_killCount, steamId);
+		RemoveControllerEntries(_transformed, steamId);
+		RemoveControllerEntries(_originalMaxHealth, steamId);
+	}
+
 	private void RestoreMaxHealth(CCSPlayerController player)
 	{
 		if (player == null || !player.IsValid || !_originalMaxHealth.TryGetValue(player, out int original))

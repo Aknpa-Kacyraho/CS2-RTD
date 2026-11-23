@@ -82,6 +82,14 @@ public class Awakener : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_killCount, steamId);
+		RemoveControllerEntries(_originalMaxHealth, steamId);
+		DamageBonusManager.UnregisterBySteamId(steamId, ClassName);
+		DamageReductionManager.UnregisterBySteamId(steamId, ClassName);
+	}
+
 	private void Revert(CCSPlayerController player)
 	{
 		if (player == null || !player.IsValid)

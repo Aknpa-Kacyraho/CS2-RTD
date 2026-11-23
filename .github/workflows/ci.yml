@@ -1,0 +1,115 @@
+name: CI
+
+"on":
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: "true"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # RollTheDice.csproj targets net10.0.
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        shell: pwsh
+        run: |
+          dotnet restore RollTheDice.csproj
+          if (Test-Path "tests") {
+            Get-ChildItem -Path "tests" -Recurse -Filter *.csproj -File |
+              ForEach-Object { dotnet restore $_.FullName }
+          }
+
+      - name: Build
+        shell: pwsh
+        run: |
+          dotnet build RollTheDice.csproj -c Release --no-restore
+
+      - name: Test
+        shell: pwsh
+        run: |
+          $testFrameworkProjects = @(
+            Get-ChildItem -Path "tests" -Recurse -Filter *.csproj -File -ErrorAction SilentlyContinue |
+              Where-Object {
+                (Get-Content -Raw -Encoding UTF8 -LiteralPath $_.FullName) -match "Microsoft\.NET\.Test\.Sdk"
+              }
+          )
+
+          if ($testFrameworkProjects.Count -gt 0) {
+            foreach ($project in $testFrameworkProjects) {
+              dotnet test $project.FullName -c Release --no-restore
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+          }
+          else {
+            Write-Host "No test-framework project found; skipping dotnet test."
+          }
+
+          # The repository currently ships a console assertion runner instead of
+          # an xUnit/NUnit project. Run it explicitly so it still gates CI.
+          $configTest = "tests/RollTheDice.ConfigTests/RollTheDice.ConfigTests.csproj"
+          if (Test-Path $configTest) {
+            dotnet build $configTest -c Release --no-restore
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+            dotnet run --project $configTest -c Release --no-build
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          else {
+            Write-Host "Config assertion runner not present; skipping."
+          }
+
+      - name: Architecture check
+        shell: pwsh
+        run: |
+          $script = "scripts/check-rtd-architecture.ps1"
+          if (-not (Test-Path $script)) {
+            Write-Host "::notice title=Architecture check skipped::The repository does not contain $script yet."
+            exit 0
+          }
+
+          & $script
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Validate JSON files
+        shell: pwsh
+        run: |
+          $root = (Get-Location).Path
+          $jsonFiles = @(
+            Get-ChildItem -Path $root -Recurse -Filter *.json -File |
+              Where-Object { $_.FullName -notmatch "\\(bin|obj|\.git)\\" }
+          )
+
+          if ($jsonFiles.Count -eq 0) {
+            Write-Host "No JSON files found."
+            exit 0
+          }
+
+          foreach ($file in $jsonFiles) {
+            try {
+              $null = Get-Content -Raw -Encoding UTF8 -LiteralPath $file.FullName | ConvertFrom-Json
+            }
+            catch {
+              Write-Error "Invalid JSON: $($file.FullName): $($_.Exception.Message)"
+              exit 1
+            }
+          }
+
+          Write-Host "Validated $($jsonFiles.Count) JSON file(s)."

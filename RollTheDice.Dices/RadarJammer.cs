@@ -66,6 +66,13 @@ public class RadarJammer : DiceBlueprint
 		{
 			RestoreRadarForPlayer(item);
 		}
+		// Timers can outlive their holder entry (disconnect/RemoveBySteamId); cancel
+		// any remaining restore timer before clearing the map.
+		foreach (Timer timer in _restoreTimers.Values.ToList())
+		{
+			CancelScopedTimer(timer);
+		}
+		_restoreTimers.Clear();
 		_players.Clear();
 		_cooldowns.Clear();
 	}
@@ -75,14 +82,28 @@ public class RadarJammer : DiceBlueprint
 		Reset();
 	}
 
+	public override void RemoveBySteamId(ulong steamId, DiceRemoveReason reason)
+	{
+		foreach (CCSPlayerController player in _players.ToList())
+		{
+			if (player == null)
+			{
+				continue;
+			}
+			// Short-circuit before reading SteamID: the controller may already be invalid.
+			if (!player.IsValid || player.SteamID == steamId)
+			{
+				Remove(player, reason);
+			}
+		}
+		base.RemoveBySteamId(steamId, reason);
+	}
+
 	private void RestoreRadarForPlayer(CCSPlayerController jammer)
 	{
 		if (_restoreTimers.TryGetValue(jammer, out Timer value))
 		{
-			if (value != null)
-			{
-				value.Kill();
-			}
+			CancelScopedTimer(value);
 			_restoreTimers.Remove(jammer);
 		}
 		if ((CEntityInstance)(object)jammer == (CEntityInstance)null || !((CEntityInstance)jammer).IsValid)
@@ -132,7 +153,7 @@ public class RadarJammer : DiceBlueprint
 		CCSPlayerController captured = attacker;
 		if (_restoreTimers.TryGetValue(attacker, out Timer oldTimer) && oldTimer != null)
 		{
-			oldTimer.Kill();
+			CancelScopedTimer(oldTimer);
 		}
 		Timer value2 = ScopedTimer(blackoutDuration, (Action)delegate
 		{

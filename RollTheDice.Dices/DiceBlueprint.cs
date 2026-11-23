@@ -47,6 +47,27 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 		return timer;
 	}
 
+	/// <summary>
+	/// Cancel a timer created by <see cref="ScopedTimer"/> and remove it from the
+	/// ownership list at the same time. Calling <c>timer.Kill()</c> directly leaves
+	/// the cancelled timer in <see cref="_scopedTimers"/> until round end.
+	/// </summary>
+	protected void CancelScopedTimer(Timer? timer)
+	{
+		if (timer == null)
+		{
+			return;
+		}
+		try
+		{
+			timer.Kill();
+		}
+		catch
+		{
+		}
+		_scopedTimers.Remove(timer);
+	}
+
 	/// <summary>Kill every timer owned by this dice. Called on round end and unload.</summary>
 	public void KillTimers()
 	{
@@ -87,6 +108,10 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 
 	public void SafeOnTick()
 	{
+		if (!RoundActive && !NeedsBackgroundTick)
+		{
+			return;
+		}
 		if (HasAnyHolder || NeedsBackgroundTick)
 		{
 			TickHook?.Invoke();
@@ -97,6 +122,10 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 	{
 		// A dice nobody holds must not pay for entity resolution on every hit.
 		if (!HasAnyHolder)
+		{
+			return HookResult.Continue;
+		}
+		if (!RoundActive)
 		{
 			return HookResult.Continue;
 		}
@@ -204,6 +233,52 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 	public void RemoveBySteamId(ulong steamId)
 	{
 		_players.RemoveAll(p => p == null || !p.IsValid || p.SteamID == steamId);
+	}
+
+	/// <summary>
+	/// Disconnect fallback: remove holders by SteamID and let dice that own
+	/// per-player timers/state clean up. The controller may already be invalid, so
+	/// derived dice should match on SteamID instead of requiring a valid controller.
+	/// </summary>
+	public virtual void RemoveBySteamId(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveBySteamId(steamId);
+		OnHolderRemoved(steamId, reason);
+	}
+
+	/// <summary>
+	/// Disconnect/prune hook for dice that keep per-player timers or dictionaries.
+	/// The controller may already be invalid; implementations must match on SteamID.
+	/// </summary>
+	public virtual void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+	}
+
+	/// <summary>
+	/// Remove controller-keyed entries without touching invalid pawn/schema data.
+	/// Invalid keys are treated as stale; valid keys must match the SteamID.
+	/// </summary>
+	protected static void RemoveControllerEntries<T>(
+		Dictionary<CCSPlayerController, T> map,
+		ulong steamId)
+	{
+		List<CCSPlayerController> remove = new List<CCSPlayerController>();
+		foreach (KeyValuePair<CCSPlayerController, T> pair in map)
+		{
+			CCSPlayerController key = pair.Key;
+			if (key == null)
+			{
+				continue;
+			}
+			if (!key.IsValid || key.SteamID == steamId)
+			{
+				remove.Add(key);
+			}
+		}
+		foreach (CCSPlayerController key in remove)
+		{
+			map.Remove(key);
+		}
 	}
 
 	/// <summary>Drop controllers that are no longer valid. Returns the number removed.</summary>

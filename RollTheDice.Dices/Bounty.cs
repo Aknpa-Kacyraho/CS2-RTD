@@ -17,7 +17,7 @@ public class Bounty : DiceBlueprint
 
 	private readonly Dictionary<CCSPlayerController, ulong> _bountyTargets = new Dictionary<CCSPlayerController, ulong>();
 
-	private readonly List<Timer> _pendingTimers = new List<Timer>();
+	private readonly Dictionary<CCSPlayerController, Timer> _pendingTimers = new Dictionary<CCSPlayerController, Timer>();
 
 	private bool _comboActive;
 
@@ -64,27 +64,34 @@ public class Bounty : DiceBlueprint
 			"playerName",
 			((CBasePlayerController)player).PlayerName
 		} });
-		Timer item = ScopedTimer(5f, (Action)delegate
+		if (_pendingTimers.Remove(player, out Timer previousPending))
+		{
+			CancelScopedTimer(previousPending);
+		}
+		_pendingTimers[player] = ScopedTimer(5f, (Action)delegate
 		{
 			if (!((CEntityInstance)(object)player == (CEntityInstance)null) && ((CEntityInstance)player).IsValid && _players.Contains(player))
 			{
 				AssignBountyTarget(player);
 			}
 		}, (TimerFlags?)null);
-		_pendingTimers.Add(item);
 	}
 
 	public override void Remove(CCSPlayerController player, DiceRemoveReason reason = DiceRemoveReason.GameLogic)
 	{
 		_players.Remove(player);
 		_bountyTargets.Remove(player);
+		if (_pendingTimers.Remove(player, out Timer pending))
+		{
+			CancelScopedTimer(pending);
+		}
 	}
 
 	public override void Reset()
 	{
-		foreach (Timer pendingTimer in _pendingTimers)
+		foreach (Timer pendingTimer in _pendingTimers.Values)
 		{
-			pendingTimer.Kill();
+			CancelScopedTimer(pendingTimer);
 		}
 		_pendingTimers.Clear();
 		_players.Clear();
@@ -94,6 +101,23 @@ public class Bounty : DiceBlueprint
 	public override void Destroy()
 	{
 		Reset();
+	}
+
+	public override void RemoveBySteamId(ulong steamId, DiceRemoveReason reason)
+	{
+		foreach (CCSPlayerController player in _players.ToList())
+		{
+			if (player == null)
+			{
+				continue;
+			}
+			// Short-circuit before reading SteamID: the controller may already be invalid.
+			if (!player.IsValid || player.SteamID == steamId)
+			{
+				Remove(player, reason);
+			}
+		}
+		base.RemoveBySteamId(steamId, reason);
 	}
 
 	private void AssignBountyTarget(CCSPlayerController player)

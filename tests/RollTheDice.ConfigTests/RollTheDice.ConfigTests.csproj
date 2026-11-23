@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>annotations</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>RollTheDice.ConfigTests</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="..\..\RollTheDice\DicesConfig.cs" Link="DicesConfig.cs" />
+    <Compile Include="..\..\RollTheDice\MapConfig.cs" Link="MapConfig.cs" />
+    <Compile Include="..\..\RollTheDice\MapConfigMerger.cs" Link="MapConfigMerger.cs" />
+    <Compile Include="..\..\RollTheDice.Configs\*.cs" LinkBase="Configs" />
+  </ItemGroup>
+</Project>

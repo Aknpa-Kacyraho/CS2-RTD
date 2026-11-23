@@ -87,6 +87,13 @@ public class God : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_states, steamId);
+		DamageBonusManager.UnregisterBySteamId(steamId, ClassName);
+		DamageReductionManager.UnregisterBySteamId(steamId, ClassName);
+	}
+
 	public HookResult EventPlayerDeath(EventPlayerDeath @event, GameEventInfo info)
 	{
 		CCSPlayerController attacker = @event.Attacker;

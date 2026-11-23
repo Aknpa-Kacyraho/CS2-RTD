@@ -101,6 +101,11 @@ public class Mosquito : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_originalMaxHealth, steamId);
+	}
+
 	public HookResult EventPlayerHurt(EventPlayerHurt @event, GameEventInfo info)
 	{
 		CCSPlayerController attacker = @event.Attacker;

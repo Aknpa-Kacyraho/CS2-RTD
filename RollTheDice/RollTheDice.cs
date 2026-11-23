@@ -62,7 +62,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private readonly List<(float End, List<IBeamGroup> Groups, Vector Center)> _sigilTests = new List<(float End, List<IBeamGroup> Groups, Vector Center)>();
 
-	private bool _sigilTimerStarted;
+	private Timer? _sigilTimer;
 
 	// One repeating timer owns the "roll every X seconds" feature. The old implementation
 	// scheduled a new timer from inside its own callback and another one every round, so
@@ -83,7 +83,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.4.2";
+	public override string ModuleVersion => "1.4.3";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -262,11 +262,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			_sigilTests.Add((Server.CurrentTime + seconds, new List<IBeamGroup> { group }, c));
 			total += beams;
 		}
-		if (!_sigilTimerStarted)
-		{
-			_sigilTimerStarted = true;
-			AddTimer(0.05f, SigilTestTick, TimerFlags.REPEAT);
-		}
+		EnsureSigilTimer();
 		string breakdown = string.Join(", ", spawned.Select((s) => $"{s.Label} {s.Beams}"));
 		command.ReplyToCommand($"[rtdsigil] {styleName} beams = {total} ({breakdown}), radius {radius:0}, density {density:0.##}, {seconds:0}s");
 	}
@@ -320,11 +316,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		};
 		SigilDome dome = new SigilDome(center, cfg.DomeRadius, palette, cfg.SigilWidth, cfg.DomeSpin, cfg.DomeGrowSeconds, Server.CurrentTime, options);
 		_sigilTests.Add((Server.CurrentTime + seconds, new List<IBeamGroup> { dome }, center));
-		if (!_sigilTimerStarted)
-		{
-			_sigilTimerStarted = true;
-			AddTimer(0.05f, SigilTestTick, TimerFlags.REPEAT);
-		}
+		EnsureSigilTimer();
 		command.ReplyToCommand($"[rtddome] {cfg.DomeDiscs} 层轮盘 / 侧阵门 {(cfg.DomeGates ? $"{cfg.DomeGateTilt:0}°/{(int)(cfg.DomeGateSize * 100)}%" : "off")} / 轨道 {(cfg.DomeTracks ? "on" : "off")} / 主轴 {(cfg.DomeAxis ? "on" : "off")} / 外缘 {(cfg.DomeRim ? "on" : "off")} / 锚线 {cfg.DomeAnchors} / style={cfg.DomeStyle} / beams = {dome.BeamCount}, radius {cfg.DomeRadius:0}, {seconds:0}s");
 	}
 
@@ -363,11 +355,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		};
 		SkySigilField sky = new SkySigilField(center, count, cfg.SkyHeightStart, cfg.SkyHeightEnd, cfg.SkyRadiusStart, cfg.SkyRadiusEnd, cfg.SkyRadiusAlternate, cfg.SkyStartDelay, cfg.SkyLayerDelay, cfg.SkyGrowSeconds, cfg.SkySpin, parameters, palette, cfg.SigilWidth, Server.CurrentTime, options);
 		_sigilTests.Add((Server.CurrentTime + seconds, new List<IBeamGroup> { sky }, center));
-		if (!_sigilTimerStarted)
-		{
-			_sigilTimerStarted = true;
-			AddTimer(0.05f, SigilTestTick, TimerFlags.REPEAT);
-		}
+		EnsureSigilTimer();
 		// 各层是"到点才建"的，等铺完再回显真实束数（回调里别用 command，改用玩家）。
 		float reportAt = MathF.Max(cfg.SkyStartDelay + count * cfg.SkyLayerDelay + 0.6f, 1f);
 		AddTimer(reportAt, () =>
@@ -441,11 +429,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			seconds, cfg.BeamExpandSeconds, core, Server.CurrentTime,
 			cfg.BeamHaloScale, cfg.BeamFlags, cfg.BeamScrollSpeed, 0f, cfg.BeamVisualScale);
 		_sigilTests.Add((Server.CurrentTime + seconds, new List<IBeamGroup> { column }, center));
-		if (!_sigilTimerStarted)
-		{
-			_sigilTimerStarted = true;
-			AddTimer(0.05f, SigilTestTick, TimerFlags.REPEAT);
-		}
+		EnsureSigilTimer();
 		command.ReplyToCommand($"[rtdpillar] 半径 {radius:0} / 高 {cfg.PillarHeight:0} / 扩张 {cfg.BeamExpandSeconds:0.##}s / {seconds:0}s");
 	}
 
@@ -509,10 +493,38 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		command.ReplyToCommand($"[rtdinfo] 名字：真名缓存={trueName}｜缓存中{(_originalPlayerNames.ContainsKey(target) ? "有" : "无")}（TAB 前缀是显示用，含队友 combo 的 dice 名）");
 	}
 
+	private void EnsureSigilTimer()
+	{
+		if (_sigilTimer != null)
+		{
+			return;
+		}
+		_sigilTimer = AddTimer(0.05f, SigilTestTick, TimerFlags.REPEAT);
+	}
+
+	private void StopSigilTimer()
+	{
+		if (_sigilTimer == null)
+		{
+			return;
+		}
+		try
+		{
+			_sigilTimer.Kill();
+		}
+		catch
+		{
+		}
+		_sigilTimer = null;
+	}
+
 	private void SigilTestTick()
 	{
 		if (_sigilTests.Count == 0)
 		{
+			// The list only becomes empty after a previous tick removed the last
+			// preview, so this tick is a no-op and killing the driver here is safe.
+			StopSigilTimer();
 			return;
 		}
 		float now = Server.CurrentTime;
@@ -709,7 +721,12 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		switch (arg.ToLower(CultureInfo.CurrentCulture))
 		{
 		case "reload":
-			PluginConfigExtensions.Reload<PluginConfig>(Config);
+			// Use the shared reload path so player configs and effect switches stay in
+			// sync; only rebuild modules when the file was actually applied.
+			if (!ReloadConfigFromDisk())
+			{
+				break;
+			}
 			// Dice capture Config/MapConfig in their constructor. Without rebuilding them,
 			// "reload" only changed the JSON on disk and per-dice values stayed stale.
 			DestroyModules();
@@ -1305,6 +1322,10 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			string capturedDice = className;
 			((BasePlugin)this).AddTimer(1f, (Action)delegate
 			{
+				if (!_isDuringRound)
+				{
+					return;
+				}
 				if (!((CEntityInstance)(object)capturedEntry == (CEntityInstance)null) && ((CEntityInstance)capturedEntry).IsValid && GetDiceRollCount(capturedEntry) < GetMaxDiceCount(capturedEntry))
 				{
 					var (text, text2) = RollTheDiceForPlayer(capturedEntry, capturedDice);
@@ -1314,11 +1335,15 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 						PlayDiceSoundForPlayer(capturedEntry, text);
 					}
 				}
-			}, (TimerFlags?)null);
+			}, TimerFlags.STOP_ON_MAPCHANGE);
 		}
 		LogDebug($"{DateTime.Now:HH:mm:ss} RoundStart: {value} alive, {count} rolling, pool={drawablePool.Count}d, special=[{string.Join(",", list3.Select((DiceBlueprint d) => d.ClassName))}], P_total={1.0 - list3.Aggregate(1.0, (double m, DiceBlueprint st) => m * (1.0 - (double)st.SecondRoundProbability)):F3}\n");
 		((BasePlugin)this).AddTimer(3f, (Action)delegate
 		{
+			if (!_isDuringRound)
+			{
+				return;
+			}
 			// 此时本回合的 dice 已发放完毕 → 播放"回合开始"特效。
 			DiceEffects.OnRoundStart();
 			Dictionary<CCSPlayerController, int> dictionary3 = new Dictionary<CCSPlayerController, int>();
@@ -1413,7 +1438,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 					}
 				}
 			}
-		}, (TimerFlags?)null);
+		}, TimerFlags.STOP_ON_MAPCHANGE);
 	}
 
 	private void RollTheDiceEveryXSeconds(int seconds)
@@ -1505,8 +1530,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			}
 		}
 		_sigilTests.Clear();
-		// The repeating debug tick has no handle; leave _sigilTimerStarted true so a
-		// second timer is not started. Groups above are removed explicitly.
+		StopSigilTimer();
 	}
 
 	private HookResult OnRoundEnd(EventRoundEnd @event, GameEventInfo info)
@@ -1530,6 +1554,12 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		}
 		// 本回合的"禁骰"已随本回合滚骰生效，回合结束即失效。
 		DeathKnightComplete.ClearDeniedThisRound();
+		// Player-scoped combat state must not survive the round-end/round-start gap.
+		MoveLockManager.ClearAll();
+		StackingHealth.ClearAll();
+		DamageBonusManager.ClearAll();
+		DamageReductionManager.ClearAll();
+		SpeedBonusManager.ClearAll();
 		if (Config.CooldownRounds > 0)
 		{
 			foreach (KeyValuePair<CCSPlayerController, int> item in _PlayerCooldown)
@@ -1590,10 +1620,21 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		// Belt and braces: prune any other stale controller left by a half-finished removal.
 		PruneInvalidDiceHolders();
 		// 控制器可能已失效（RemoveDiceForPlayer 会 early-return），用 xuid 兜底清理特效状态。
-		if (@event.Xuid != 0UL)
+		ulong cleanupSteamId = @event.Xuid;
+		if (cleanupSteamId == 0UL && disconnected != null && disconnected.IsValid)
 		{
-			DiceEffects.OnPlayerLeft(@event.Xuid);
-			if (_nameRefreshTimers.Remove(@event.Xuid, out Timer nameTimer))
+			cleanupSteamId = disconnected.SteamID;
+		}
+		if (cleanupSteamId != 0UL)
+		{
+			DiceEffects.OnPlayerLeft(cleanupSteamId);
+			// Drop player-scoped state immediately; waiting for round/map cleanup
+			// lets a reconnect inherit freezes, buffs or invulnerability.
+			Invulnerability.Clear(cleanupSteamId);
+			MoveLockManager.Clear(cleanupSteamId);
+			StackingHealth.Clear(cleanupSteamId);
+			StackingBonusManager.ClearPlayer(cleanupSteamId);
+			if (_nameRefreshTimers.Remove(cleanupSteamId, out Timer nameTimer))
 			{
 				nameTimer.Kill();
 			}
@@ -1702,7 +1743,12 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	private void OnMapStart(string mapName)
 	{
-		ReloadConfigFromDisk();
+		if (!ReloadConfigFromDisk())
+		{
+			// Keep the previous config instead of mixing a failed reload with a new
+			// module set; the old module set is still rebuilt below for the new map.
+			Console.WriteLine("[RollTheDice] config reload failed; using previous in-memory config for this map.");
+		}
 		// Rebuild for the new map even if a previous map left modules behind (hot reload
 		// or a same-name changelevel). Map-level overrides are captured at construction.
 		DestroyModules();
@@ -2027,7 +2073,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			{
 				if (dice.HasPlayer(steamId))
 				{
-					dice.RemoveBySteamId(steamId);
+					dice.RemoveBySteamId(steamId, reason);
 				}
 			}
 			catch
@@ -2409,7 +2455,14 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			foreach (string listener in dix.Listeners)
 			{
-				DynamicHandlers.RegisterModuleListener((BasePlugin)(object)this, listener, dix);
+				try
+				{
+					DynamicHandlers.RegisterModuleListener((BasePlugin)(object)this, listener, dix);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"[RollTheDice] Failed to register listener '{listener}' for {dix.ClassName}: {ex.Message}");
+				}
 			}
 		}
 	}
@@ -2420,7 +2473,14 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			foreach (string listener in dix.Listeners)
 			{
-				DynamicHandlers.DeregisterModuleListener((BasePlugin)(object)this, listener, dix);
+				try
+				{
+					DynamicHandlers.DeregisterModuleListener((BasePlugin)(object)this, listener, dix);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"[RollTheDice] Failed to deregister listener '{listener}' for {dix.ClassName}: {ex.Message}");
+				}
 			}
 		}
 	}
@@ -2431,7 +2491,14 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			foreach (string @event in dix.Events)
 			{
-				DynamicHandlers.RegisterModuleEventHandler((BasePlugin)(object)this, @event, dix);
+				try
+				{
+					DynamicHandlers.RegisterModuleEventHandler((BasePlugin)(object)this, @event, dix);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"[RollTheDice] Failed to register event '{@event}' for {dix.ClassName}: {ex.Message}");
+				}
 			}
 		}
 	}
@@ -2442,7 +2509,14 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			foreach (string @event in dix.Events)
 			{
-				DynamicHandlers.DeregisterModuleEventHandler((BasePlugin)(object)this, @event, dix);
+				try
+				{
+					DynamicHandlers.DeregisterModuleEventHandler((BasePlugin)(object)this, @event, dix);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"[RollTheDice] Failed to deregister event '{@event}' for {dix.ClassName}: {ex.Message}");
+				}
 			}
 		}
 	}
@@ -2456,7 +2530,14 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			foreach (var (messageId, hookMode) in dix.UserMessages)
 			{
-				DynamicHandlers.RegisterUserMessageHook((BasePlugin)(object)this, messageId, dix, hookMode);
+				try
+				{
+					DynamicHandlers.RegisterUserMessageHook((BasePlugin)(object)this, messageId, dix, hookMode);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"[RollTheDice] Failed to register user message {messageId} for {dix.ClassName}: {ex.Message}");
+				}
 			}
 		}
 	}
@@ -2470,7 +2551,14 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		{
 			foreach (var (messageId, hookMode) in dix.UserMessages)
 			{
-				DynamicHandlers.DeregisterUserMessageHook((BasePlugin)(object)this, messageId, dix, hookMode);
+				try
+				{
+					DynamicHandlers.DeregisterUserMessageHook((BasePlugin)(object)this, messageId, dix, hookMode);
+				}
+				catch (Exception ex)
+				{
+					Console.WriteLine($"[RollTheDice] Failed to deregister user message {messageId} for {dix.ClassName}: {ex.Message}");
+				}
 			}
 		}
 	}

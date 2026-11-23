@@ -84,6 +84,14 @@ public class Paladin : DiceBlueprint
 		_originalMaxHealth.Clear();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_paladinSpeedBonus, steamId);
+		RemoveControllerEntries(_paladinHpBonus, steamId);
+		RemoveControllerEntries(_originalMaxHealth, steamId);
+		SpeedBonusManager.UnregisterBySteamId(steamId, "Paladin");
+	}
+
 	private void Revert(CCSPlayerController player)
 	{
 		SpeedBonusManager.Unregister(player, "Paladin");

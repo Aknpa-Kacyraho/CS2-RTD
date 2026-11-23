@@ -274,6 +274,16 @@
 
 ---
 
+## v1.4.3 稳定性修复
+
+- 断线兜底清理玩家级 Invulnerability/MoveLock/StackingHealth/StackingBonus；13/14 个生命值 Dice 增加按 SteamID 清理（Phoenix 因翅膀/光效实体延后）。
+- `MoveLockManager` 恢复锁定前 MoveType，不再固定 Walk。
+- `StackingHealth` 使用实际基础 MaxHealth，不再假设 100。
+- `DynamicHandlers` 包装失败时不再注册原始危险回调；注册/注销按 Dice 隔离。
+- `DiceEffects` 按玩家隔离异常并限频记录。
+- 回合结束清理移动/血量/Buff；地图配置 Reload 增加诊断和失败回退。
+- 新增配置回归测试与 CI；TEST/稀有度文档与 171 个 Dice 对齐。
+
 ## v1.4.2 稳定性修复
 
 - 修复 v1.4.0 空持有者短路冻结拆除队列的问题：FinalJudgment/Excalibur/Supernova 在淡出队列未清空时继续 Tick。

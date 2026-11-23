@@ -32,6 +32,16 @@ public static class ChildGuard
 		{
 			return;
 		}
+		// Track is called from several effect helpers; avoid checking the same child
+		// multiple times per tick when two helpers share one parent/child pair.
+		foreach (Entry entry in Watched)
+		{
+			if (entry.Child.Handle == child.Handle)
+			{
+				entry.Parent = parent;
+				return;
+			}
+		}
 		Watched.Add(new Entry { Child = child, Parent = parent });
 	}
 

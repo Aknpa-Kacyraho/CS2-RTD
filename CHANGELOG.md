@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.4.3 — 2026-11-23
+
+### Fixed
+
+- Disconnect fallback now clears player-scoped Invulnerability/MoveLock/StackingHealth/StackingBonus and health-state dictionaries for 13/14 health dice (Phoenix deferred because its wings/glow entities need separate cleanup).
+- `MoveLockManager` records and restores the pre-lock MoveType instead of forcing Walk; `Clear/ClearAll` restore when the controller is still valid.
+- `StackingHealth` captures the actual base MaxHealth instead of assuming 100; invalid controllers no longer fall back to SteamID 0.
+- `DynamicHandlers` no longer registers the raw damage/tick callback when the safety wrapper fails; registration/deregistration failures are isolated per dice/handler.
+- `DiceEffects.OnTick` isolates failures per player with rate-limited logging.
+- `ChildGuard.Track` de-duplicates child handles; `FogOfWar` removes only the `_playerVisibility` entity it created.
+- Round end now clears MoveLock/Stacking/Damage/Speed managers before the next round.
+- Map-config reload diagnostics and broader overlay deserialization fallback.
+- TEST/dice documentation now covers all 171 dice and corrected rarity counts.
+
+### Added
+
+- `tests/RollTheDice.ConfigTests`: config merge/overlay/reload assertions.
+- `.github/workflows/ci.yml`: restore/build/test/JSON validation for Windows net10.0.
+
 ## 1.4.2 — 2026-11-22
 
 ### Fixed

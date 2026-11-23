@@ -92,6 +92,13 @@ public class WolfKing : DiceBlueprint
 		Reset();
 	}
 
+	public override void OnHolderRemoved(ulong steamId, DiceRemoveReason reason)
+	{
+		RemoveControllerEntries(_originalMaxHealth, steamId);
+		DamageBonusManager.UnregisterBySteamId(steamId, "WolfKing");
+		SpeedBonusManager.UnregisterBySteamId(steamId, "WolfKing");
+	}
+
 	private void RestoreMaxHealth(CCSPlayerController player)
 	{
 		if (player == null || !player.IsValid || !_originalMaxHealth.TryGetValue(player, out int original))

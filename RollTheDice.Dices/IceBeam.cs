@@ -95,7 +95,7 @@ public class IceBeam : DiceBlueprint
 		{
 			if (value != null)
 			{
-				value.Kill();
+				CancelScopedTimer(value);
 			}
 		}
 		// 解冻所有被冻结的敌方玩家：只 Kill 定时器会跳过它们的 Unlock，导致 MoveType=0 残留。
@@ -211,10 +211,11 @@ public class IceBeam : DiceBlueprint
 			Timer obj = _frozenPlayers[userid];
 			if (obj != null)
 			{
-				obj.Kill();
+				CancelScopedTimer(obj);
 			}
 		}
-		_frozenSteamIDs.Add(((CBasePlayerController)userid).SteamID);
+		ulong victimSteamId = ((CBasePlayerController)userid).SteamID;
+		_frozenSteamIDs.Add(victimSteamId);
 		CCSPlayerPawn value = userid.PlayerPawn.Value;
 		value.VelocityModifier = _config.Dices.IceBeam.SlowAmount;
 		Utilities.SetStateChanged((CBaseEntity)(object)value, "CCSPlayerPawn", "m_flVelocityModifier", 0);
@@ -228,11 +229,18 @@ public class IceBeam : DiceBlueprint
 			// ★ 冻结结束在数秒后：目标可能已断开/换边 → 先验有效性再读 SteamID / pawn（否则原生崩）。
 			if (capturedVictim == null || !((CEntityInstance)capturedVictim).IsValid)
 			{
-				_frozenPlayers.Remove(capturedVictim);
+				// The victim disconnected before the freeze ended: drop the lock and
+				// the SteamID entry so a reconnect cannot inherit a stale freeze.
+				_frozenSteamIDs.Remove(victimSteamId);
+				MoveLockManager.Clear(victimSteamId);
+				if (capturedVictim != null)
+				{
+					_frozenPlayers.Remove(capturedVictim);
+				}
 				return;
 			}
 			MoveLockManager.Unlock(capturedVictim, "IceBeam");
-			_frozenSteamIDs.Remove(((CBasePlayerController)capturedVictim).SteamID);
+			_frozenSteamIDs.Remove(victimSteamId);
 			CCSPlayerController obj2 = capturedVictim;
 			if ((CEntityInstance)(object)((obj2 == null) ? null : obj2.PlayerPawn?.Value) != (CEntityInstance)null && ((CEntityInstance)capturedVictim.PlayerPawn.Value).IsValid)
 			{

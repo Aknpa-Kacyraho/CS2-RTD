@@ -466,7 +466,9 @@ public static class Effects
 		}
 		else
 		{
-			new Timer(lifeSeconds.Value, cleanup, null);
+			// No plugin instance means we are unloading or not initialized. Do not
+			// schedule a callback that can outlive the plugin; drop the entity now.
+			Remove(entity);
 		}
 	}
 }
