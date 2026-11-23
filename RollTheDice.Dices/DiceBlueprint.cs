@@ -246,6 +246,17 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 	public virtual void RemoveBySteamId(ulong steamId, DiceRemoveReason reason)
 	{
 		RemoveBySteamId(steamId);
+		CleanupHolderState(steamId, reason);
+	}
+
+	/// <summary>
+	/// Special cleanup followed by the generic controller-keyed map cleanup.
+	/// Safe to call twice: derived OnHolderRemoved implementations and dictionary
+	/// removals are idempotent. Used by disconnect (valid or invalid controller),
+	/// RemoveBySteamId and PruneInvalid.
+	/// </summary>
+	public void CleanupHolderState(ulong steamId, DiceRemoveReason reason)
+	{
 		try
 		{
 			OnHolderRemoved(steamId, reason);
@@ -425,14 +436,7 @@ public class DiceBlueprint(PluginConfig GlobalConfig, MapConfig Config, IStringL
 			}
 			// Prune used to only drop _players, so per-player maps stayed behind and
 			// a later disconnect cleanup could no longer find them.
-			try
-			{
-				OnHolderRemoved(steamId, DiceRemoveReason.Disconnect);
-			}
-			catch
-			{
-			}
-			CleanControllerState(steamId);
+			CleanupHolderState(steamId, DiceRemoveReason.Disconnect);
 		}
 		return stale.Count;
 	}

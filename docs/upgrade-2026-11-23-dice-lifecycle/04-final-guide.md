@@ -1,4 +1,4 @@
-# 统一 Dice 生命周期指南（Cycle 6 / v1.4.8）
+# 统一 Dice 生命周期指南（Cycle 6 / v1.4.8–v1.4.9）
 
 ## 目标
 
@@ -8,10 +8,10 @@
 
 1. `DiceBlueprint` 增加 controller-keyed 字典/集合的通用清理兜底，按类型缓存反射字段。
 2. `RemoveBySteamId`：特殊清理 → 通用兜底。
-3. `PruneInvalid`：调用 `OnHolderRemoved` → 通用兜底。
+3. `PruneInvalid`：调用 `OnHolderRemoved` → 通用兜底；有效 controller 断线的 `Remove` 后也补跑 `CleanupHolderState`。
 4. `Phoenix`：新增 `OnHolderRemoved`，拆光翼/光晕/还原血量/清 9 个字典；MoveType 迁移到 `MoveLockManager`。
 5. `Amber`：MoveType 迁移到 `MoveLockManager`；`Remove`/`Reset`/`OnHolderRemoved` 清理冻结。
-6. Registry/UI 测试增加 8 项生命周期断言（28 项总计）。
+6. Registry/UI 测试增加 9 项生命周期断言（29 项总计）。
 7. 版本升到 v1.4.8，更新 CHANGELOG/README/自检。
 
 ## 明确不做
@@ -25,7 +25,7 @@
 ## 验收门槛
 
 - 构建 0 warning / 0 error。
-- 配置测试 32/32；Registry/UI/Lifecycle 测试 28/28。
+- 配置测试 32/32；Registry/UI/Lifecycle 测试 29/29。
 - 架构检查通过，`timers=0`，主类不超 2900 行。
 - 静态确认 Amber/Phoenix 不再直接写 MoveType。
 - 人工审查清理顺序：特殊清理先于通用兜底。

@@ -274,6 +274,12 @@
 
 ---
 
+## v1.4.9 生命周期热修
+
+- 有效 controller 断线时，在 Dice 自己的 `Remove` 之后补跑 `CleanupHolderState`。
+- 覆盖“旧 `Remove` 只删 `_players`、留下次级 controller 字典”的路径；`PruneInvalid` 之后找不到的残留也能清掉。
+- 不改变概率、伤害、持续时间、奖励、命令或配置 Key。
+
 ## v1.4.8 新老 Dice 生命周期对齐
 
 - 断线与 `PruneInvalid` 统一清理：先执行 Dice 自己的 `OnHolderRemoved`，再兜底移除残留的 controller 键字典/集合。

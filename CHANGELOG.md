@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.4.9 — 2026-11-23
+
+### Fixed
+
+- Valid-controller disconnect now calls the shared `CleanupHolderState` after each dice's `Remove`. A legacy `Remove` that dropped `_players` but left secondary controller-keyed maps behind could no longer be found by `PruneInvalid`; this closes that gap.
+- `CleanupHolderState` centralizes `OnHolderRemoved` + generic controller-state cleanup; `RemoveBySteamId`, `PruneInvalid` and the disconnect path all use it.
+
+### Added
+
+- Lifecycle assertion for the shared cleanup API; Registry/UI/Lifecycle tests now 29.
+
+### Unchanged
+
+- No probability, damage, duration, reward, command or config changes.
+
 ## 1.4.8 — 2026-11-23
 
 ### Fixed
@@ -15,7 +30,7 @@
 
 ### Added
 
-- Lifecycle assertions in `RollTheDice.RegistryTests` (cleanup overrides, controller-state field scanner, ulong-state exclusion, dictionary cast), now 28 assertions total.
+- Lifecycle assertions in `RollTheDice.RegistryTests` (cleanup overrides, controller-state field scanner, ulong-state exclusion, dictionary cast, shared cleanup API), now 29 assertions total.
 
 ### Unchanged
 

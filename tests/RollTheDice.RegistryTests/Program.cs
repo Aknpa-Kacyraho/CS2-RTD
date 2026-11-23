@@ -170,6 +170,7 @@ internal static class Program
 	{
 		Check("amber cleanup override", typeof(Amber).GetMethod("OnHolderRemoved")?.DeclaringType == typeof(Amber));
 		Check("phoenix cleanup override", typeof(Phoenix).GetMethod("OnHolderRemoved")?.DeclaringType == typeof(Phoenix));
+		Check("shared cleanup api", typeof(DiceBlueprint).GetMethod("CleanupHolderState") != null);
 
 		MethodInfo? scanner = typeof(DiceBlueprint).GetMethod(
 			"GetControllerStateFields",

@@ -79,7 +79,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.4.8";
+	public override string ModuleVersion => "1.4.9";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -2029,6 +2029,13 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 				}
 				catch
 				{
+				}
+				if (reason == DiceRemoveReason.Disconnect)
+				{
+					// Some legacy Remove overrides drop _players but leave secondary
+					// controller-keyed maps behind; prune can no longer see them after
+					// _players is empty, so run the shared cleanup for this SteamID now.
+					dix.CleanupHolderState(steamId, reason);
 				}
 				DiceEffects.OnDiceRemoved(player, dix.ClassName);
 				flag = true;

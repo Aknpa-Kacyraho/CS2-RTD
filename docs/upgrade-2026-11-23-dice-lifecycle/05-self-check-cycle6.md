@@ -1,4 +1,4 @@
-# Cycle 6 自检报告（v1.4.8）
+# Cycle 6 自检报告（v1.4.8 + v1.4.9 hotfix）
 
 ## 用户视角
 
@@ -25,13 +25,13 @@
 - `Amber`：`Remove`/`Reset`/`OnHolderRemoved` 清理冻结；`OnTick` 用 Lock/Unlock。
 - 构建：0 warning / 0 error。
 - 配置测试：32/32。
-- Registry/UI/Lifecycle 测试：28/28。
-- 架构检查：`timers=0`，主类 2696/2900，通过。
+- Registry/UI/Lifecycle 测试：29/29。
+- 架构检查：`timers=0`，主类 2703/2900，通过。
 - 未部署、未实机；CI 将在提交后运行。
 
 ## 结论
 
-v1.4.8 是新老 Dice 生命周期对齐版本，构建、配置测试、生命周期断言、架构检查均通过。仍未达到“无 Bug”，剩余明确风险：
+v1.4.8 是新老 Dice 生命周期对齐版本，v1.4.9 补上“有效 controller 断线后补跑共享清理”的路径；构建、配置测试、生命周期断言、架构检查均通过。仍未达到“无 Bug”，剩余明确风险：
 
 1. `Fate`、`Skyline`、`Void` 仍直接写 MoveType（noclip/复活机制）。
 2. `Dictionary<ulong, T>` 状态不做自动清理，仍依赖各 Dice 的 `Remove`/`OnHolderRemoved`。

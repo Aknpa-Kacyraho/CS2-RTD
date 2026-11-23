@@ -25,18 +25,25 @@ private static bool ShouldRemoveController(CCSPlayerController controller, ulong
 public virtual void RemoveBySteamId(ulong steamId, DiceRemoveReason reason)
 {
     RemoveBySteamId(steamId);
+    CleanupHolderState(steamId, reason);
+}
+
+public void CleanupHolderState(ulong steamId, DiceRemoveReason reason)
+{
     try { OnHolderRemoved(steamId, reason); } catch { }
     CleanControllerState(steamId);
 }
 ```
+
+`RemoveDiceForPlayer` 在 `reason == Disconnect` 时，执行完 Dice 自己的 `Remove` 后再调用 `CleanupHolderState`，覆盖“有效 controller 断线、但旧 Remove 只删 `_players`”的路径。
 
 `PruneInvalid`：
 
 - 先收集失效控制器。
 - 从 `_players` 移除。
 - 读取 SteamID（失败则 0）。
-- 调用 `OnHolderRemoved(steamId, Disconnect)`（失败隔离）。
-- 调用 `CleanControllerState(steamId)`。
+- 调用 `CleanupHolderState(steamId, Disconnect)`（内部先 `OnHolderRemoved` 再通用兜底）。
+- 有效 controller 断线时，`RemoveDiceForPlayer` 在 `Remove` 后也会补跑 `CleanupHolderState`，覆盖旧 `Remove` 只删 `_players` 的路径。
 
 ## 2. Phoenix
 
@@ -65,7 +72,7 @@ dotnet run --project tests/RollTheDice.RegistryTests -c Release
 powershell -NoProfile -ExecutionPolicy Bypass -File "D:\Works\CS2\scripts\check-rtd-architecture.ps1"
 ```
 
-预期：0 warning / 0 error；32/32；28/28；timers=0；主类 ≤2900。
+预期：0 warning / 0 error；32/32；29/29；timers=0；主类 ≤2900。
 
 ## 风险与回退
 
