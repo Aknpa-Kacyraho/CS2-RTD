@@ -88,6 +88,7 @@ internal static class Program
 		ConfigAndCommandChecks();
 		MovementChecks();
 		ComboChecks(registry);
+		BroadcastChecks(built, localizer);
 
 		Console.WriteLine("--------------------------------");
 		Console.WriteLine($"{_passed} passed, {_failed} failed");
@@ -330,6 +331,37 @@ internal static class Program
 		string source = File.ReadAllText(path);
 		Check("synergy avoids GetPlayers", !source.Contains("Utilities.GetPlayers", StringComparison.Ordinal));
 		Check("synergy uses true name", source.Contains("GetTruePlayerName", StringComparison.Ordinal));
+	}
+
+	private static void BroadcastChecks(IReadOnlyList<DiceBlueprint> built, IStringLocalizer localizer)
+	{
+		string encoded = DiceUi.HtmlEncode("<b>&\"'");
+		Check("broadcast html encode", encoded.Contains("&lt;b&gt;", StringComparison.Ordinal)
+			&& encoded.Contains("&amp;", StringComparison.Ordinal)
+			&& !encoded.Contains("<b>", StringComparison.Ordinal), encoded);
+
+		DiceBlueprint? sample = built.FirstOrDefault(dice => dice.ClassName == "Awakener") ?? built.FirstOrDefault();
+		if (sample == null)
+		{
+			Check("broadcast description", false, "no built dice");
+			return;
+		}
+		string description = DiceUi.DiceDescription(sample, localizer);
+		Check("broadcast description localized", description.Length > 0
+			&& !description.Contains('{')
+			&& !description.Contains('}')
+			&& description != "dice_" + sample.ClassName + "_player", description);
+
+		string? path = FindRepoFile(Path.Combine("RollTheDice", "RollTheDice.cs"));
+		if (path == null)
+		{
+			Check("broadcast source", false, "file not found");
+			return;
+		}
+		string source = File.ReadAllText(path);
+		Check("broadcast source guards", source.Contains("DiceUi.DiceDescription", StringComparison.Ordinal)
+			&& source.Contains("DiceUi.HtmlEncode", StringComparison.Ordinal)
+			&& source.Contains("GetTruePlayerName(player)", StringComparison.Ordinal));
 	}
 
 	private static string Describe(DiceRegistry registry, string severity)

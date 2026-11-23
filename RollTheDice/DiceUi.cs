@@ -100,6 +100,12 @@ public static class DiceUi
 		return Regex.Replace(description ?? string.Empty, "\\{[^}]*\\}", string.Empty).Trim();
 	}
 
+	/// <summary>Encode dynamic text before inserting it into center HTML.</summary>
+	public static string HtmlEncode(string? value)
+	{
+		return System.Net.WebUtility.HtmlEncode(value ?? string.Empty);
+	}
+
 	/// <summary>
 	/// Admin list label: readable localized name plus the exact ClassName that
 	/// `!givedice &lt;player&gt; &lt;dice&gt;` accepts. Plain class names stay unadorned.

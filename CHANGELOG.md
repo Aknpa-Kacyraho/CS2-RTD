@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.4.14 — 2026-11-23
+
+### Fixed
+
+- Dice reveal HUD now uses the same localized `dice_<Class>_player` description as `!rtd status`, instead of the cached `dice.Description` field (which could be English, `Unknown Dice`, or stale).
+- Dynamic HUD text (name, tier, description, effects) is HTML-encoded, so `&`, `<` and `>` cannot break the center panel.
+- Legendary/combo broadcasts use the undecorated true player name instead of the TAB `[Dice]`-decorated name.
+- `Unknown`-prefixed descriptions are omitted from the HUD.
+
+### Added
+
+- `DiceUi.HtmlEncode`.
+- Broadcast tests: HTML encoding, localized description, source guards. Standard 59; real config 60.
+
+### Unchanged
+
+- Reveal text, sound, all-server toggle, HUD toggle.
+- Dice `NotifyPlayers` chat/center layer (not merged with the rarity reveal).
+- Probabilities, effects, durations, commands and config keys.
+
 ## 1.4.13 — 2026-11-23
 
 ### Changed

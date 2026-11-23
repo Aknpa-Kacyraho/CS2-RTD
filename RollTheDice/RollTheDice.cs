@@ -79,7 +79,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 
 	public static RollTheDice? Instance { get; private set; }
 
-	public override string ModuleVersion => "1.4.13";
+	public override string ModuleVersion => "1.4.14";
 
 	[ConsoleCommand("givedice", "Give Dice to player")]
 	[RequiresPermissions(new string[] { "@rollthedice/admin" })]
@@ -1933,12 +1933,7 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 		try
 		{
 			string tier = GetDiceTier(dice);
-			string nameKey = "dice_" + dice.ClassName + "_name";
-			string localized = ((BasePlugin)this).Localizer[nameKey];
-			if (localized == nameKey)
-			{
-				localized = dice.ClassName;
-			}
+			string localized = DiceUi.DiceName(dice, ((BasePlugin)this).Localizer);
 			string label = DiceUi.TierLabel(tier);
 			string color = DiceUi.TierColor(tier).ToString();
 			string prefix = ((BasePlugin)this).Localizer["command.prefix"].Value;
@@ -1946,16 +1941,18 @@ public partial class RollTheDice : BasePlugin, IPluginConfig<PluginConfig>
 			if (Config?.Effects?.Hud ?? true)
 			{
 				string effects = DiceEffects.DescribeEffects(dice.ClassName);
-				string effectLine = string.IsNullOrEmpty(effects) ? "" : $"<br/><span style=\"font-size:16px;color:#9ad\">特效：{effects}</span>";
-				string description = Regex.Replace(dice.Description ?? "", "\\{[^}]*\\}", "").Trim();
-				string descriptionLine = string.IsNullOrEmpty(description) || description == "Unknown"
+				string effectLine = string.IsNullOrEmpty(effects)
 					? ""
-					: $"<br/><span style=\"font-size:16px;color:#ddd\">{description}</span>";
-				player.PrintToCenterHtml($"<div style=\"font-size:22px\"><b>🎲 {localized}</b><br/><span style=\"font-size:16px;color:#fd6\">[{label}]</span>{descriptionLine}{effectLine}</div>", 5);
+					: $"<br/><span style=\"font-size:16px;color:#9ad\">特效：{DiceUi.HtmlEncode(effects)}</span>";
+				string description = DiceUi.DiceDescription(dice, ((BasePlugin)this).Localizer);
+				string descriptionLine = string.IsNullOrEmpty(description) || description.StartsWith("Unknown", StringComparison.Ordinal)
+					? ""
+					: $"<br/><span style=\"font-size:16px;color:#ddd\">{DiceUi.HtmlEncode(description)}</span>";
+				player.PrintToCenterHtml($"<div style=\"font-size:22px\"><b>🎲 {DiceUi.HtmlEncode(localized)}</b><br/><span style=\"font-size:16px;color:#fd6\">[{DiceUi.HtmlEncode(label)}]</span>{descriptionLine}{effectLine}</div>", 5);
 			}
 			if ((tier == "legendary" || tier == "combo") && (CurrentRarity?.BroadcastLegendary ?? true))
 			{
-				Server.PrintToChatAll($" {prefix}{color}🌟 {label}骰子降临！{((CBasePlayerController)player).PlayerName} 抽到了【{localized}】！");
+				Server.PrintToChatAll($" {prefix}{color}🌟 {label}骰子降临！{GetTruePlayerName(player)} 抽到了【{localized}】！");
 			}
 			if ((tier == "legendary" || tier == "combo") && Config?.Sounds?.LegendarySounds != null && Config.Sounds.LegendarySounds.TryGetValue(dice.ClassName, out string legendarySound) && !string.IsNullOrEmpty(legendarySound))
 			{
