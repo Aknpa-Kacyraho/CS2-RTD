@@ -89,6 +89,7 @@ internal static class Program
 		MovementChecks();
 		ComboChecks(registry);
 		BroadcastChecks(built, localizer);
+		ConfigApplyChecks();
 
 		Console.WriteLine("--------------------------------");
 		Console.WriteLine($"{_passed} passed, {_failed} failed");
@@ -374,6 +375,56 @@ internal static class Program
 		Check("broadcast source guards", source.Contains("DiceUi.DiceDescription", StringComparison.Ordinal)
 			&& source.Contains("DiceUi.HtmlEncode", StringComparison.Ordinal)
 			&& source.Contains("GetTruePlayerName(player)", StringComparison.Ordinal));
+	}
+
+	private static void ConfigApplyChecks()
+	{
+		ApplyProbe target = new ApplyProbe { A = 1, B = 2 };
+		ApplyProbe source = new ApplyProbe { A = 10, B = 20 };
+		ConfigApplier.Apply(target, source);
+		Check("config apply copies", target.A == 10 && target.B == 20,
+			target.A + "/" + target.B);
+
+		ThrowingApplyProbe throwingTarget = new ThrowingApplyProbe { A = 1 };
+		ThrowingApplyProbe throwingSource = new ThrowingApplyProbe { A = 99 };
+		bool threw = false;
+		try
+		{
+			ConfigApplier.Apply(throwingTarget, throwingSource);
+		}
+		catch (InvalidOperationException)
+		{
+			threw = true;
+		}
+		Check("config apply rolls back", threw && throwingTarget.A == 1,
+			threw + "/" + throwingTarget.A);
+
+		PluginConfig live = new PluginConfig();
+		bool parsed = ConfigFileValidator.TryDeserialize("{\"enabled\":false}", out PluginConfig? candidate, out _);
+		Check("config apply parses json", parsed && candidate != null);
+		if (candidate != null)
+		{
+			ConfigApplier.Apply(live, candidate);
+		}
+		Check("config apply json value", live.Enabled == false, live.Enabled.ToString());
+	}
+
+	private sealed class ApplyProbe
+	{
+		public int A { get; set; }
+
+		public int B { get; set; }
+	}
+
+	private sealed class ThrowingApplyProbe
+	{
+		public int A { get; set; }
+
+		public int B
+		{
+			get => 0;
+			set => throw new InvalidOperationException("boom");
+		}
 	}
 
 	private static string Describe(DiceRegistry registry, string severity)

@@ -21,18 +21,22 @@ public partial class RollTheDice
 		try
 		{
 			// Validate the exact file CSS will reload, with CSS's own JSON options.
-			// CSS deserializes the whole file before copying properties, so type
-			// errors keep the old config; this pre-check gives the same error earlier.
+			// JSON then applies through ConfigApplier so a throwing setter rolls back;
+			// TOML keeps the CSS Reload path (we do not ship a TOML parser here).
 			string path = Config.GetConfigPath();
 			if (File.Exists(path) && path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
 			{
 				string json = File.ReadAllText(path);
-				if (!ConfigFileValidator.TryDeserialize(json, out _, out string configError))
+				if (!ConfigFileValidator.TryDeserialize(json, out PluginConfig? candidate, out string configError) || candidate == null)
 				{
 					throw new InvalidDataException(configError);
 				}
+				ConfigApplier.Apply(Config, candidate);
 			}
-			PluginConfigExtensions.Reload<PluginConfig>(Config);
+			else
+			{
+				PluginConfigExtensions.Reload<PluginConfig>(Config);
+			}
 			// Defensive defaults: a hand-edited "dices": null / "maps": null must not
 			// leave the plugin in a half-initialized state later in the map load.
 			Config.Dices ??= new DicesConfig();

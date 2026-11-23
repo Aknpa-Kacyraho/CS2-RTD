@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.4.16 — 2026-11-23
+
+### Fixed
+
+- JSON config reload is now all-or-nothing. `ConfigApplier` snapshots the live config, applies the fully deserialized candidate, and rolls back already-applied properties if a setter throws. CSS `Reload` deserializes before copying but has no rollback.
+- Setter failures are unwrapped from `TargetInvocationException` so the reload error shows the real message.
+- TOML configs still use CSS's native Reload; JSON uses the validator + atomic applier.
+
+### Added
+
+- Atomic-apply tests: normal copy, rollback after a throwing setter, JSON parse, JSON apply. Standard 65; real config 66.
+
+### Unchanged
+
+- Config keys, defaults, dice values, commands, broadcasts, TAB, combos.
+- Config path and JSON options remain aligned with CSS.
+
 ## 1.4.15 — 2026-11-23
 
 ### Fixed
