@@ -60,9 +60,19 @@ artifacts\RollTheDice\1.4.19\RollTheDice.dll
 
 ## 部署记录
 
-（部署完成后补）
+- 部署前备份：`备份\deploy_20261124_130901_v1419_live\`（插件目录 + 配置，46 个文件 / 4.37MB）
+- 部署后 DLL：982,016B，2026-11-24 13:07:39
+- 配置：`effects.hud_duration = 8` 已写入，UTF-8 无 BOM
+- 配置校验：`validate-configs.ps1` 通过（15 files）
+- `rtd_health`：**未验证** —— CS2 1.42.0.1 与 Metamod/CSS 不兼容，加载即崩
+- 无新 mdmp：**未验证**
+- 发布：tag `v1.4.19`，Release asset `RollTheDice-1.4.19.zip`（1,458,977B）
 
-- 部署前备份：
-- 部署后 DLL：
-- `rtd_health`：
-- 无新 mdmp：
+## CS2 1.42 阻塞记录
+
+- CS2 于 2026-11-23 14:44 更新到 **1.42.0.1**
+- Metamod 2.0.0.1491（2026-11-15）、CSS 1.0.380（2026-11-17，适配 1.41.9.7）均未适配
+- 崩溃：`cs2.exe` → `tier0.dll`，`0xC0000005`，偏移 `0xbc62c`
+- 隔离结果：无 Metamod 稳定；只留 Metamod 核心稳定；Metamod + CSS 崩；Metamod + Bot 插件崩
+- 处置：`gameinfo.gi` 切回 Online（无 metamod），恢复所有 vdf，环境可玩原版
+- 待办：上游更新后切回 WithBots，补 smoke test 与真人回归
