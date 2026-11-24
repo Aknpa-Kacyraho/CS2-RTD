@@ -19,4 +19,11 @@ public class EffectsConfig
 	/// <summary>抽到 dice 时在屏幕中央显示一块 HUD 信息面板（骰子名 + 档位 + 覆盖的特效类别）。</summary>
 	[JsonPropertyName("hud")]
 	public bool Hud { get; set; } = true;
+
+	/// <summary>
+	/// 抽到 dice 时中央 HUD 的停留秒数。默认 8；小于等于 0 时回退到 8，最大 30。
+	/// 聊天里始终保留一份描述，所以延长 HUD 只是让第一眼更清楚，不影响回顾。
+	/// </summary>
+	[JsonPropertyName("hud_duration")]
+	public int HudDuration { get; set; } = 8;
 }

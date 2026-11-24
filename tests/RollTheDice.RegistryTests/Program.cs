@@ -383,6 +383,10 @@ internal static class Program
 		Check("broadcast source guards", source.Contains("DiceUi.DiceDescription", StringComparison.Ordinal)
 			&& source.Contains("DiceUi.HtmlEncode", StringComparison.Ordinal)
 			&& source.Contains("GetTruePlayerName(player)", StringComparison.Ordinal));
+		Check("reveal chat carries description", source.Contains("hasDescription", StringComparison.Ordinal)
+			&& source.Contains("ChatColors.Grey", StringComparison.Ordinal));
+		Check("reveal hud duration configurable", source.Contains("HudDuration", StringComparison.Ordinal)
+			&& new PluginConfig().Effects.HudDuration == 8);
 
 		string? mainPath = FindRepoFile(Path.Combine("RollTheDice", "RollTheDice.cs"));
 		Check("broadcast add suppression", mainPath != null

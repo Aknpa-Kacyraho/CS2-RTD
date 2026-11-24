@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.19 — 2026-11-24
+
+### Changed
+
+- Dice reveal chat now prints the effect description on a second line, so players no longer have to type `!rtd status` to learn what they just got. When the description is missing or `Unknown`, the old hint line is kept instead.
+- Central HUD stay time is configurable via `effects.hud_duration` (default 8 seconds, clamped to 1–30; values `<= 0` fall back to 8).
+
+### Unchanged
+
+- Draw probabilities, weights, cooldowns, damage, durations, rewards, commands and existing config keys.
+- HUD content, rarity broadcast, legendary sound, TAB/combo rules.
+
+### Tests
+
+- Standard 76, real config 77. Added reveal-chat and HUD-duration guards.
+
 ## 1.4.18 — 2026-11-23
 
 ### Fixed
