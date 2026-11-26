@@ -70,16 +70,16 @@ artifacts\RollTheDice\1.4.19\RollTheDice.dll
 - 无新 mdmp
 - 发布：tag `v1.4.19`，Release asset `RollTheDice-1.4.19.zip`（1,458,975B）
 
-## CS2 1.42 兼容记录（2026-11-26 更新）
+## CS2 1.42 兼容记录（2026-11-26 全部打通）
 
 - CS2 于 2026-11-23 14:44 更新到 **1.42.0.1**
-- **CSS 1.0.380 崩，1.0.381 正常**（`fix: temporarily patch s2sdk`）
-- Metamod 2.0.0.1491 核心正常；`BotController`、`BotVision` 正常
-- `MultiAddonManager` 1.6.7 崩；**1.6.8 正常**（`Use NetMessageInfo_t for the SignonState message lookup`）
-- `BotHider` 仍不兼容：`tier0.dll`，`0xC0000005`，偏移 `0xbc62c`
-- 处置：`BotHider.vdf` → `.vdf.disabled_142`；MAM 升级 1.6.8 并启用；`gameinfo.gi` 使用 WithBots
-- `BotHiderImpl` 显示 `UNLOADED`（`BH_Attach rejected`），属预期
-- `meta list` 最终为：BotController v0.9.0、BotVision v0.4.0、CounterStrikeSharp v1.0.381、MultiAddonManager v1.6.8
+- **CSS 1.0.380 崩 → 1.0.381 正常**（`fix: temporarily patch s2sdk`）
+- **MAM 1.6.7 崩 → 1.6.8 正常**（`Use NetMessageInfo_t for the SignonState message lookup`）
+- **BotHider 0.7.1 崩 → 0.7.2 正常**（`Update CS2 SDK` + `corrected GameFrame interface`）
+- Metamod 2.0.0.1491 核心、`BotController` v0.9.0、`BotVision` v0.4.0 一直正常
+- 最终 `meta list`：BotController v0.9.0、BotHider v0.7.2、BotVision v0.4.0、CounterStrikeSharp v1.0.381、MultiAddonManager v1.6.8
+- `css_plugins list`：15/15 `LOADED`，无 `UNLOADED`
+- `gameinfo.gi` 使用 WithBots；测试期间发现它会被外部改回 Online 版，启动前需复查 `addons/metamod`
 
 ## 版本号修正
 
