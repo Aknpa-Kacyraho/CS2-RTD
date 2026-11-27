@@ -78,7 +78,9 @@ public class FinalJudgment : DiceBlueprint
 		_players.Remove(player);
 	}
 
-	public override bool NeedsBackgroundTick => _fade.Any;
+	// 光柱 / 冲击环 / 待引爆法阵都必须继续 tick：施法者阵亡后 _players 会清空，
+	// 只靠 _fade.Any 会让 OnTick 在爆炸前停掉，导致"死了就不炸、法阵一直挂着"。
+	public override bool NeedsBackgroundTick => _fade.Any || _detonateAt.Count > 0 || _beam.Count > 0 || _shock.Count > 0;
 
 	public override void Reset()
 	{

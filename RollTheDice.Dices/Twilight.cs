@@ -65,10 +65,11 @@ public class Twilight : DiceBlueprint
 
 	private void SwapPaired()
 	{
+		// 只换真人：BOT 参与配对会把真人和人机传送到同一个碰撞体里，直接卡住。
 		List<CCSPlayerController> alive = Utilities.GetPlayers().Where(delegate(CCSPlayerController p)
 		{
 			CCSPlayerPawn pawn = p?.PlayerPawn?.Value;
-			return p != null && p.IsValid && !((CBasePlayerController)p).IsHLTV && pawn != null && pawn.IsValid && ((CBaseEntity)pawn).LifeState == 0 && ((CBaseEntity)pawn).AbsOrigin != null;
+			return p != null && p.IsValid && !p.IsBot && !((CBasePlayerController)p).IsHLTV && pawn != null && pawn.IsValid && ((CBaseEntity)pawn).LifeState == 0 && ((CBaseEntity)pawn).AbsOrigin != null;
 		}).ToList();
 		if (alive.Count < 2)
 		{
@@ -84,6 +85,14 @@ public class Twilight : DiceBlueprint
 			Vector posA = ((CBaseEntity)a.PlayerPawn.Value).AbsOrigin;
 			Vector posB = ((CBaseEntity)b.PlayerPawn.Value).AbsOrigin;
 			if (posA == null || posB == null)
+			{
+				continue;
+			}
+			// 两个落点太近时互换没有意义，还容易把两个碰撞体塞进同一个位置。
+			float dx = posA.X - posB.X;
+			float dy = posA.Y - posB.Y;
+			float dz = posA.Z - posB.Z;
+			if (dx * dx + dy * dy + dz * dz < 4096f)
 			{
 				continue;
 			}

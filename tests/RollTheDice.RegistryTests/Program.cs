@@ -221,6 +221,16 @@ internal static class Program
 			.ToArray();
 		Check("amber ulong state included", amberFields.Contains("_frozenUntil"), string.Join(",", amberFields));
 		Check("dictionary cleanup cast", new Dictionary<string, int>() is IDictionary);
+
+		// 玩家阵亡后 _players 清空，待引爆的法阵/光柱必须继续 tick，否则死后不爆炸。
+		string? finalPath = FindRepoFile(Path.Combine("RollTheDice.Dices", "FinalJudgment.cs"));
+		Check("final judgment keeps ticking after death", finalPath != null
+			&& File.ReadAllText(finalPath).Contains("_detonateAt.Count > 0", StringComparison.Ordinal));
+
+		// 黄昏之时只能换真人，BOT 参与会把真人和人机塞进同一个位置。
+		string? twilightPath = FindRepoFile(Path.Combine("RollTheDice.Dices", "Twilight.cs"));
+		Check("twilight skips bots", twilightPath != null
+			&& File.ReadAllText(twilightPath).Contains("!p.IsBot", StringComparison.Ordinal));
 	}
 
 	private static void ConfigAndCommandChecks()

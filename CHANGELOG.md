@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.4.20 — 2026-11-27
+
+### Fixed
+
+- `FinalJudgment`（坠落天空）：施法者阵亡后，已锁定的法阵仍会按时引爆。`NeedsBackgroundTick` 现在同时跟踪 `_detonateAt`、`_beam`、`_shock`，`_players` 清空后 `SafeOnTick` 不会再把 `OnTick` 停掉。这同时修掉“死后不爆炸”和“爆炸后法阵不消失”两种表现。
+- `Twilight`（黄昏之时）：位置互换只配对真人（`!IsBot`），BOT 不再参与，真人和人机不会被传送到同一个碰撞体里。落点距离小于 64 单位的配对直接跳过。
+
+### Unchanged
+
+- 抽骰概率、权重、冷却、伤害、持续时间、奖励、命令和已有配置 Key。
+- `FinalJudgment` 的伤害/半径/延迟；`Twilight` 仍然是每回合一次交换。
+
+### Tests
+
+- Standard 78, real config 79. Added post-death tick and bot-skip guards.
+
 ## 1.4.19 — 2026-11-24
 
 ### Changed
